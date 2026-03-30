@@ -1,0 +1,16 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["../*", "./*/*", "./*/*/*"],
+            "message": "Use absolute imports (@/) instead of relative cross-directory imports."
+          }
+        ]
+      }
+    ]
+  }
+}
