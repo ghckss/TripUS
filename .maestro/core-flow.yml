@@ -1,0 +1,124 @@
+appId: com.tripus.app
+name: TripUS core journey
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- openLink:
+    link: "tripus://?__expo_url=${EXPO_DEV_SERVER_URL}&__expo_disable_onboarding=1&__expo_disable_fab=1&__expo_disable_auto_launch=1"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - repeat:
+          times: 3
+          commands:
+            - waitForAnimationToEnd:
+                timeout: 5000
+            - runFlow:
+                when:
+                  visible: 열기
+                commands:
+                  - tapOn:
+                      text: 열기
+                      retryTapIfNoChange: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible: DEVELOPMENT SERVERS
+          timeout: 15000
+      - tapOn:
+          text: "http://.*:8081"
+      - waitForAnimationToEnd:
+          timeout: 10000
+      - runFlow:
+          when:
+            visible: Continue
+          commands:
+            - tapOn: Continue
+      - runFlow:
+          when:
+            visible: Reload
+          commands:
+            - back
+- extendedWaitUntil:
+    visible:
+      id: login-development
+    timeout: 30000
+- tapOn:
+    id: login-development
+- extendedWaitUntil:
+    visible: 내 여행
+    timeout: 15000
+- tapOn:
+    id: trips-new
+- scrollUntilVisible:
+    element:
+      id: new-trip-submit
+    direction: DOWN
+- tapOn:
+    id: new-trip-submit
+- extendedWaitUntil:
+    visible:
+      id: trip-open-places
+    timeout: 15000
+- tapOn:
+    id: trip-open-places
+- tapOn:
+    id: places-query
+- inputText: cafe
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: cafe 추천 장소
+    timeout: 15000
+- tapOn:
+    id: "places-save-mock:.*:cafe:1"
+- extendedWaitUntil:
+    visible: 장소를 저장했어요.
+    timeout: 15000
+- tapOn:
+    point: "9%,8%"
+- extendedWaitUntil:
+    visible:
+      id: trip-open-ai-plan
+    timeout: 15000
+- tapOn:
+    id: trip-open-ai-plan
+- tapOn:
+    id: ai-plan-generate
+- extendedWaitUntil:
+    visible: 일정을 다듬어 보세요
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: itinerary-save
+    direction: DOWN
+- tapOn:
+    id: itinerary-save
+- extendedWaitUntil:
+    visible: 서울 가을 여행
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: trip-open-complete
+    direction: DOWN
+- tapOn:
+    id: trip-open-complete
+- extendedWaitUntil:
+    visible: 다녀온 장소를 정리해요
+    timeout: 15000
+- tapOn:
+    id: "complete-rating-.*-5"
+- scrollUntilVisible:
+    element:
+      id: complete-trip-submit
+    direction: DOWN
+- tapOn:
+    id: complete-trip-submit
+- extendedWaitUntil:
+    visible: TRIP COMPLETE
+    timeout: 15000
+- assertVisible: 평가 완료
+- assertVisible: 5점

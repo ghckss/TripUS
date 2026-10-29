@@ -13,6 +13,7 @@
     "db:logs": "docker compose logs -f postgres",
     "db:up": "docker compose up -d postgres",
     "dev": "pnpm -r --parallel --if-present dev",
+    "e2e:maestro": "pnpm --filter @tripus/mobile e2e:maestro",
     "deploy:bootstrap": "pnpm --filter @tripus/infra bootstrap",
     "deploy:aws": "pnpm --filter @tripus/infra deploy",
     "deploy:diff": "pnpm --filter @tripus/infra diff",

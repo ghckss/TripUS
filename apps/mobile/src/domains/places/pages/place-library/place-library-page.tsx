@@ -16,13 +16,13 @@ export default function PlacesScreen() {
       <AppText variant="title">저장한 모든 장소</AppText>
       <AppText color={colors.muted}>일정 배치 여부와 관계없이 저장한 장소를 단순하게 모아봐요.</AppText>
       <Card>
-        <TextInput value={query} onChangeText={setQuery} onSubmitEditing={() => void search()} returnKeyType="search" placeholder="예: 해운대 맛집" placeholderTextColor={colors.muted} style={styles.input} />
-        <Button label={searching ? "검색 중…" : "장소 검색"} disabled={searching || query.trim().length < 2} onPress={() => void search()} />
+        <TextInput testID="places-query" value={query} onChangeText={setQuery} onSubmitEditing={() => void search()} returnKeyType="search" placeholder="예: 해운대 맛집" placeholderTextColor={colors.muted} style={styles.input} />
+        <Button label={searching ? "검색 중…" : "장소 검색"} disabled={searching || query.trim().length < 2} testID="places-search" onPress={() => void search()} />
       </Card>
       {results.map((candidate) => <Card key={candidate.googlePlaceId}>
         <AppText variant="heading">{candidate.name}</AppText>
         <AppText color={colors.muted}>{candidate.address ?? "주소 정보 없음"}</AppText>
-        <Button label={saving ? "저장 중…" : "장소 보관함에 저장"} disabled={saving} variant="secondary" onPress={() => void saveCandidate(candidate)} />
+        <Button label={saving ? "저장 중…" : "장소 보관함에 저장"} disabled={saving} variant="secondary" testID={`places-save-${candidate.googlePlaceId}`} onPress={() => void saveCandidate(candidate)} />
       </Card>)}
       {message && <AppText color={colors.secondary}>{message}</AppText>}
       {loading && <Card><AppText color={colors.muted}>장소를 불러오는 중이에요…</AppText></Card>}

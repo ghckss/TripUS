@@ -34,13 +34,13 @@ export default function NewTripScreen() {
       <AppText variant="title">어디로 떠나나요?</AppText>
       <AppText color={colors.muted}>기본 정보는 언제든 다시 바꿀 수 있어요.</AppText>
       <Card>
-        <AppText variant="label">여행 이름</AppText><TextInput value={title} onChangeText={setTitle} style={styles.input} />
-        <AppText variant="label">여행지</AppText><TextInput value={destination} onChangeText={setDestination} style={styles.input} />
-        <AppText variant="label">시작일</AppText><TextInput value={startDate} onChangeText={setStartDate} placeholder="YYYY-MM-DD" style={styles.input} />
-        <AppText variant="label">종료일</AppText><TextInput value={endDate} onChangeText={setEndDate} placeholder="YYYY-MM-DD" style={styles.input} />
+        <AppText variant="label">여행 이름</AppText><TextInput testID="new-trip-title" value={title} onChangeText={setTitle} style={styles.input} />
+        <AppText variant="label">여행지</AppText><TextInput testID="new-trip-destination" value={destination} onChangeText={setDestination} style={styles.input} />
+        <AppText variant="label">시작일</AppText><TextInput testID="new-trip-start-date" value={startDate} onChangeText={setStartDate} placeholder="YYYY-MM-DD" style={styles.input} />
+        <AppText variant="label">종료일</AppText><TextInput testID="new-trip-end-date" value={endDate} onChangeText={setEndDate} placeholder="YYYY-MM-DD" style={styles.input} />
       </Card>
       {error && <AppText color={colors.danger}>{error}</AppText>}
-      <Button label={saving ? "여행 만드는 중…" : "여행 만들기"} disabled={saving} onPress={() => void submit()} />
+      <Button label={saving ? "여행 만드는 중…" : "여행 만들기"} disabled={saving} testID="new-trip-submit" onPress={() => void submit()} />
     </Screen>
   );
 }

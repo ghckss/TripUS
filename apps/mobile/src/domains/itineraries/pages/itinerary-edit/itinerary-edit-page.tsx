@@ -52,7 +52,7 @@ export default function ItineraryScreen() {
       <AppText variant="heading">예외 상황 미리 보기</AppText>
       <Pressable onPress={() => router.push(`/trips/${tripId}/exceptions/schedule-conflict`)}><Card><AppText variant="label">일정 충돌 화면 →</AppText></Card></Pressable>
       <Pressable onPress={() => router.push(`/trips/${tripId}/exceptions/route-failure`)}><Card><AppText variant="label">대중교통 경로 실패 화면 →</AppText></Card></Pressable>
-      <Button label={saving ? "저장 중…" : "일정 저장"} disabled={!itinerary || saving} onPress={() => void save().then((saved) => { if (saved) router.back(); })} />
+      <Button label={saving ? "저장 중…" : "일정 저장"} disabled={!itinerary || saving} testID="itinerary-save" onPress={() => void save().then((saved) => { if (saved) router.back(); })} />
     </Screen>
   );
 }

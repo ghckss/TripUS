@@ -88,8 +88,10 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 
 ### M6. 품질과 출시
 
-- React Native Testing Library와 API 통합 테스트
-- Maestro 핵심 흐름 E2E
+상태: 진행 중(모바일 컴포넌트 테스트와 iOS·Android Maestro 핵심 흐름 구축 완료)
+
+- React Native Testing Library와 API 통합 테스트 — 모바일 기반 구축, API 통합 범위 확장 진행 중
+- Maestro 핵심 흐름 E2E — 로컬 iOS·Android Development Build flow 통과
 - SQLite 기반 오프라인 최소 일정
 - 공유 메뉴 진입과 앱/유니버설 링크
 - 접근성, 저사양 기기, 느린 네트워크 점검

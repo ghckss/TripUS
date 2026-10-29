@@ -44,7 +44,7 @@ AI 일정은 기본적으로 결정적 목업을 사용한다. 실제 OpenAI 어
 
 지도 검색과 대중교통은 기본 목업이며 `MAPS_PROVIDER=google`과 `GOOGLE_MAPS_API_KEY`로 Google 어댑터를 활성화한다. 사진은 기본적으로 `.data/photos`에 저장한다. 운영 S3 호환 저장소는 `PHOTO_STORAGE_PROVIDER=s3`, `PHOTO_S3_BUCKET`, `AWS_REGION`을 설정한다. 원본 사진은 사용자별 총량 제한 없이 보존하되 파일당 100MB 안전 제한을 적용한다.
 
-소셜 인증 운영 모드는 `AUTH_MODE=jwt`와 Google·Apple Client ID 설정이 필요하다. 로컬에서는 `AUTH_MODE=development`의 개발용 로그인을 사용한다. 서버 환경 변수는 [apps/api/.env.example](./apps/api/.env.example), Docker Compose 변수는 루트 [.env.example](./.env.example)을 참고한다.
+소셜 인증 운영 모드는 `AUTH_MODE=jwt`와 Google·Apple Client ID 설정이 필요하다. 로컬에서는 `AUTH_MODE=development`의 개발용 로그인을 사용한다. 실행 대상별 모바일 API 주소와 서버의 전체 설정값은 [환경 변수 설정](./docs/environment.md)을 참고한다.
 
 ## 품질 검사
 

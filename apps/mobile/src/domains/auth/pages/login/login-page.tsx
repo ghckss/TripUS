@@ -20,7 +20,7 @@ export default function LoginScreen() {
         <AppText color={colors.muted}>소셜 계정으로 안전하게 로그인하고 여행 기록을 동기화하세요.</AppText>
         <Button label={loading === "google" ? "Google 로그인 중…" : "Google로 계속하기"} disabled={Boolean(loading) || !googleConfigured} onPress={() => void loginWithGoogle()} />
         {Platform.OS === "ios" && <Button label={loading === "apple" ? "Apple 로그인 중…" : "Apple로 계속하기"} disabled={Boolean(loading)} variant="secondary" onPress={() => void loginWithApple()} />}
-        {process.env.EXPO_PUBLIC_AUTH_MODE !== "production" && <Button label={loading === "development" ? "개발 로그인 중…" : "개발용 로그인"} disabled={Boolean(loading)} variant="ghost" onPress={() => void loginForDevelopment()} />}
+        {process.env.EXPO_PUBLIC_AUTH_MODE !== "production" && <Button label={loading === "development" ? "개발 로그인 중…" : "개발용 로그인"} disabled={Boolean(loading)} variant="ghost" testID="login-development" onPress={() => void loginForDevelopment()} />}
         {!googleConfigured && <AppText variant="caption" color={colors.muted}>Google 클라이언트 ID를 설정하면 소셜 로그인이 활성화돼요.</AppText>}
         {error && <AppText color={colors.danger}>{error}</AppText>}
       </Card>

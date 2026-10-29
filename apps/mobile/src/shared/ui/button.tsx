@@ -2,12 +2,12 @@ import { Pressable, StyleProp, StyleSheet, ViewStyle } from "react-native";
 import { AppText } from "@/shared/ui/app-text";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 
-type ButtonProps = { label: string; onPress: () => void; variant?: "primary" | "secondary" | "ghost" | "danger"; disabled?: boolean; style?: StyleProp<ViewStyle> };
+type ButtonProps = { label: string; onPress: () => void; variant?: "primary" | "secondary" | "ghost" | "danger"; disabled?: boolean; style?: StyleProp<ViewStyle>; testID?: string };
 
-export function Button({ label, onPress, variant = "primary", disabled, style }: ButtonProps) {
+export function Button({ label, onPress, variant = "primary", disabled, style, testID }: ButtonProps) {
   const foreground = variant === "primary" || variant === "danger" ? colors.white : colors.ink;
   return (
-    <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress}
+    <Pressable accessibilityRole="button" accessibilityState={{ disabled: Boolean(disabled) }} disabled={disabled} onPress={onPress} testID={testID}
       style={({ pressed }) => [styles.base, styles[variant], pressed && styles.pressed, disabled && styles.disabled, style]}>
       <AppText variant="label" color={foreground}>{label}</AppText>
     </Pressable>
