@@ -1,0 +1,27 @@
+import { Body, Controller, Get, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+
+import { CreateSavedPlaceDto } from '../application/dto/create-saved-place.dto';
+import { SavedPlaceResponseDto, SavePlaceResultDto } from '../application/dto/saved-place-response.dto';
+import { PlacesService } from '../application/places.service';
+
+@ApiTags('places')
+@Controller('trips/:tripId/places')
+export class PlacesController {
+  constructor(@Inject(PlacesService) private readonly places: PlacesService) {}
+
+  @Get()
+  @ApiOkResponse({ type: SavedPlaceResponseDto, isArray: true })
+  list(@Param('tripId', new ParseUUIDPipe()) tripId: string): Promise<SavedPlaceResponseDto[]> {
+    return this.places.list(tripId);
+  }
+
+  @Post()
+  @ApiCreatedResponse({ type: SavePlaceResultDto })
+  create(
+    @Param('tripId', new ParseUUIDPipe()) tripId: string,
+    @Body() input: CreateSavedPlaceDto,
+  ): Promise<SavePlaceResultDto> {
+    return this.places.create(tripId, input);
+  }
+}

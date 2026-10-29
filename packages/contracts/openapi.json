@@ -22,6 +22,49 @@
         ]
       }
     },
+    "/v1/trips/{tripId}/places": {
+      "get": {
+        "operationId": "PlacesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SavedPlaceResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "places"
+        ]
+      },
+      "post": {
+        "operationId": "PlacesController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavePlaceResultDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "places"
+        ]
+      }
+    },
     "/v1/trips": {
       "get": {
         "operationId": "TripsController_list",
@@ -100,6 +143,102 @@
       "HealthResponse": {
         "type": "object",
         "properties": {}
+      },
+      "PlaceTag": {
+        "type": "string",
+        "enum": [
+          "attraction",
+          "food",
+          "cafe",
+          "shopping",
+          "lodging",
+          "transport",
+          "activity",
+          "other"
+        ]
+      },
+      "PlacePreference": {
+        "type": "string",
+        "enum": [
+          "must_visit",
+          "want_to_visit",
+          "if_time_allows"
+        ]
+      },
+      "SavedPlaceResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tripId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "googlePlaceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "tag": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlaceTag"
+              }
+            ]
+          },
+          "preference": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlacePreference"
+              }
+            ]
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "tripId",
+          "name",
+          "tag",
+          "preference"
+        ]
+      },
+      "SavePlaceStatus": {
+        "type": "string",
+        "enum": [
+          "created",
+          "already_exists"
+        ]
+      },
+      "SavePlaceResultDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SavePlaceStatus"
+              }
+            ]
+          },
+          "place": {
+            "$ref": "#/components/schemas/SavedPlaceResponseDto"
+          }
+        },
+        "required": [
+          "status",
+          "place"
+        ]
       },
       "TripResponseDto": {
         "type": "object",

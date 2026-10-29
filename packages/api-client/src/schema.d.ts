@@ -20,6 +20,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trips/{tripId}/places": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlacesController_list"];
+        put?: never;
+        post: operations["PlacesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trips": {
         parameters: {
             query?: never;
@@ -57,6 +73,28 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         HealthResponse: Record<string, never>;
+        /** @enum {string} */
+        PlaceTag: "attraction" | "food" | "cafe" | "shopping" | "lodging" | "transport" | "activity" | "other";
+        /** @enum {string} */
+        PlacePreference: "must_visit" | "want_to_visit" | "if_time_allows";
+        SavedPlaceResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            tripId: string;
+            googlePlaceId?: string | null;
+            name: string;
+            address?: string | null;
+            tag: components["schemas"]["PlaceTag"];
+            preference: components["schemas"]["PlacePreference"];
+            note?: string | null;
+        };
+        /** @enum {string} */
+        SavePlaceStatus: "created" | "already_exists";
+        SavePlaceResultDto: {
+            status: components["schemas"]["SavePlaceStatus"];
+            place: components["schemas"]["SavedPlaceResponseDto"];
+        };
         TripResponseDto: {
             /** Format: uuid */
             id: string;
@@ -96,6 +134,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    PlacesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedPlaceResponseDto"][];
+                };
+            };
+        };
+    };
+    PlacesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavePlaceResultDto"];
                 };
             };
         };
