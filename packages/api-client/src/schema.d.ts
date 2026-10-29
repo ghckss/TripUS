@@ -68,6 +68,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trips/{tripId}/places/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlacesController_search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trips": {
         parameters: {
             query?: never;
@@ -110,6 +126,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["TripRecordsController_complete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trips/{tripId}/routes/transit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RoutesController_transit"];
         delete?: never;
         options?: never;
         head?: never;
@@ -196,6 +228,14 @@ export interface components {
             preference: components["schemas"]["PlacePreference"];
             note?: string | null;
         };
+        PlaceSearchCandidateDto: {
+            googlePlaceId: string;
+            name: string;
+            address?: string | null;
+            primaryType?: string | null;
+            latitude?: number | null;
+            longitude?: number | null;
+        };
         CreateSavedPlaceDto: {
             googlePlaceId?: string | null;
             /** @example 국립현대미술관 서울 */
@@ -258,6 +298,22 @@ export interface components {
         CompleteTripResponseDto: {
             trip: components["schemas"]["TripResponseDto"];
             itinerary: components["schemas"]["ItineraryResponseDto"];
+        };
+        TransitRouteRequestDto: {
+            /** Format: uuid */
+            originSavedPlaceId: string;
+            /** Format: uuid */
+            destinationSavedPlaceId: string;
+            /** Format: date-time */
+            departureTime?: string;
+        };
+        /** @enum {string} */
+        TransitRouteStatus: "available" | "unavailable";
+        TransitRouteResponseDto: {
+            status: components["schemas"]["TransitRouteStatus"];
+            durationMinutes?: number | null;
+            distanceMeters?: number | null;
+            reason?: string | null;
         };
     };
     responses: never;
@@ -404,6 +460,29 @@ export interface operations {
             };
         };
     };
+    PlacesController_search: {
+        parameters: {
+            query: {
+                query: string;
+            };
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaceSearchCandidateDto"][];
+                };
+            };
+        };
+    };
     TripsController_list: {
         parameters: {
             query?: {
@@ -490,6 +569,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CompleteTripResponseDto"];
+                };
+            };
+        };
+    };
+    RoutesController_transit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransitRouteRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransitRouteResponseDto"];
                 };
             };
         };

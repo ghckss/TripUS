@@ -5,6 +5,7 @@ import { apiErrorMessage, tripUsApi } from "@/shared/api/trip-us-api";
 export type Itinerary = components["schemas"]["ItineraryResponseDto"];
 export type ItineraryItem = components["schemas"]["ItineraryItemResponseDto"];
 export type TravelStyle = components["schemas"]["TravelStyle"];
+export type TransitRoute = components["schemas"]["TransitRouteResponseDto"];
 
 export async function getItinerary(tripId: string): Promise<Itinerary> {
   const { data, error } = await tripUsApi.GET("/v1/trips/{tripId}/itinerary", { params: { path: { tripId } } });
@@ -33,4 +34,17 @@ export async function replaceItinerary(
   if (error) throw new Error(apiErrorMessage(error));
   if (data.status === "conflict") throw new Error(`일정 충돌: ${data.conflicts.join(", ")}`);
   return data.itinerary;
+}
+
+export async function getTransitRoute(
+  tripId: string,
+  originSavedPlaceId: string,
+  destinationSavedPlaceId: string,
+): Promise<TransitRoute> {
+  const { data, error } = await tripUsApi.POST("/v1/trips/{tripId}/routes/transit", {
+    params: { path: { tripId } },
+    body: { originSavedPlaceId, destinationSavedPlaceId },
+  });
+  if (error) throw new Error(apiErrorMessage(error));
+  return data;
 }

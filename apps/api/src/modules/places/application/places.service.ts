@@ -5,8 +5,10 @@ import { QueryFailedError, Repository } from 'typeorm';
 import { IDENTITY_PORT, type IdentityPort } from '../../identity/domain/identity.port';
 import { TripEntity } from '../../trips/domain/entities/trip.entity';
 import { SavedPlaceEntity } from '../domain/entities/saved-place.entity';
+import { PLACE_SEARCH_PORT, type PlaceSearchPort } from '../domain/place-search.port';
 import { CreateSavedPlaceDto } from './dto/create-saved-place.dto';
 import { SavedPlaceResponseDto, SavePlaceResultDto, SavePlaceStatus } from './dto/saved-place-response.dto';
+import { PlaceSearchCandidateDto } from './dto/search-places.dto';
 
 @Injectable()
 export class PlacesService {
@@ -17,7 +19,14 @@ export class PlacesService {
     private readonly trips: Repository<TripEntity>,
     @Inject(IDENTITY_PORT)
     private readonly identity: IdentityPort,
+    @Inject(PLACE_SEARCH_PORT)
+    private readonly placeSearch: PlaceSearchPort,
   ) {}
+
+  async search(tripId: string, query: string): Promise<PlaceSearchCandidateDto[]> {
+    const trip = await this.assertOwnedActiveTrip(tripId);
+    return this.placeSearch.search(query, trip.destination);
+  }
 
   async list(tripId: string): Promise<SavedPlaceResponseDto[]> {
     await this.assertOwnedActiveTrip(tripId);
@@ -55,7 +64,7 @@ export class PlacesService {
     }
   }
 
-  private async assertOwnedActiveTrip(tripId: string): Promise<void> {
+  private async assertOwnedActiveTrip(tripId: string): Promise<TripEntity> {
     const trip = await this.trips.findOneBy({
       id: tripId,
       ownerId: this.identity.getCurrentUserId(),
@@ -64,6 +73,7 @@ export class PlacesService {
     if (!trip) {
       throw new NotFoundException('Trip not found');
     }
+    return trip;
   }
 
   private findByGooglePlaceId(tripId: string, googlePlaceId?: string): Promise<SavedPlaceEntity | null> {

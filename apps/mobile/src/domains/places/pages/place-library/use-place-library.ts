@@ -1,13 +1,28 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 
-import { listPlaces, savePlace, type SavedPlace } from "@/domains/places/api/places.api";
+import { listPlaces, savePlace, searchPlaces, type PlaceSearchCandidate, type SavedPlace } from "@/domains/places/api/places.api";
+
+function inferTag(primaryType: string | null): "attraction" | "food" | "cafe" | "shopping" | "lodging" | "transport" | "activity" | "other" {
+  if (!primaryType) return "other";
+  if (primaryType.includes("restaurant") || primaryType.includes("food")) return "food";
+  if (primaryType.includes("cafe")) return "cafe";
+  if (primaryType.includes("store") || primaryType.includes("shopping")) return "shopping";
+  if (primaryType.includes("lodging") || primaryType.includes("hotel")) return "lodging";
+  if (primaryType.includes("station") || primaryType.includes("airport")) return "transport";
+  if (primaryType.includes("attraction") || primaryType.includes("museum")) return "attraction";
+  if (primaryType.includes("park") || primaryType.includes("activity")) return "activity";
+  return "other";
+}
 
 export function usePlaceLibrary(tripId: string) {
   const [places, setPlaces] = useState<SavedPlace[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string>();
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<PlaceSearchCandidate[]>([]);
+  const [searching, setSearching] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -20,15 +35,27 @@ export function usePlaceLibrary(tripId: string) {
     }
   }, [tripId]);
 
-  const addMockPlace = useCallback(async () => {
+  const search = useCallback(async () => {
+    if (query.trim().length < 2) {
+      setMessage("두 글자 이상 입력해 주세요.");
+      return;
+    }
+    setSearching(true);
+    setMessage(undefined);
+    try { setResults(await searchPlaces(tripId, query.trim())); }
+    catch (caught) { setMessage(caught instanceof Error ? caught.message : "장소를 검색하지 못했어요."); }
+    finally { setSearching(false); }
+  }, [query, tripId]);
+
+  const saveCandidate = useCallback(async (candidate: PlaceSearchCandidate) => {
     setSaving(true);
     try {
       const result = await savePlace(tripId, {
-        googlePlaceId: "mock-seongsu-cafe",
-        name: "성수의 작은 카페",
-        tag: "cafe",
+        googlePlaceId: candidate.googlePlaceId,
+        name: candidate.name,
+        address: candidate.address ?? undefined,
+        tag: inferTag(candidate.primaryType ?? null),
         preference: "want_to_visit",
-        note: "목업 검색 결과에서 저장",
       });
       setMessage(result.status === "created" ? "장소를 저장했어요." : "이미 저장한 장소예요.");
       await reload();
@@ -43,5 +70,5 @@ export function usePlaceLibrary(tripId: string) {
     void reload();
   }, [reload]));
 
-  return { places, loading, saving, message, reload, addMockPlace };
+  return { places, loading, message, query, reload, results, saveCandidate, saving, search, searching, setQuery };
 }

@@ -10,6 +10,7 @@ import { ItinerariesModule } from './modules/itineraries/itineraries.module';
 import { PlacesModule } from './modules/places/places.module';
 import { TripsModule } from './modules/trips/trips.module';
 import { TripRecordsModule } from './modules/trip-records/trip-records.module';
+import { RoutesModule } from './modules/routes/routes.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { TripRecordsModule } from './modules/trip-records/trip-records.module';
     PlacesModule,
     TripsModule,
     TripRecordsModule,
+    RoutesModule,
   ],
 })
 export class AppModule {}

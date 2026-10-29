@@ -6,6 +6,11 @@ export enum AiPlannerProvider {
   OpenAi = 'openai',
 }
 
+export enum MapsProvider {
+  Mock = 'mock',
+  Google = 'google',
+}
+
 export function validateEnvironment(
   environment: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -38,10 +43,20 @@ export function validateEnvironment(
     }
   }
 
+  const mapsProvider = environment.MAPS_PROVIDER ?? MapsProvider.Mock;
+  if (!Object.values(MapsProvider).includes(mapsProvider as MapsProvider)) {
+    throw new Error('MAPS_PROVIDER must be mock or google');
+  }
+  if (mapsProvider === MapsProvider.Google &&
+      (typeof environment.GOOGLE_MAPS_API_KEY !== 'string' || environment.GOOGLE_MAPS_API_KEY.length === 0)) {
+    throw new Error('GOOGLE_MAPS_API_KEY is required when MAPS_PROVIDER=google');
+  }
+
   return {
     ...environment,
     DATABASE_URL: databaseUrl,
     AI_PLANNER_PROVIDER: aiPlannerProvider,
+    MAPS_PROVIDER: mapsProvider,
     PORT: port,
   };
 }

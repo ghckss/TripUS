@@ -11,6 +11,7 @@ import {
 } from '../domain/entities/saved-place.entity';
 import { SavePlaceStatus } from './dto/saved-place-response.dto';
 import { PlacesService } from './places.service';
+import type { PlaceSearchPort } from '../domain/place-search.port';
 
 const userId = '00000000-0000-4000-8000-000000000001';
 const tripId = '10000000-0000-4000-8000-000000000001';
@@ -24,6 +25,7 @@ function createService() {
   };
   const trips = { findOneBy: vi.fn() };
   const identity: IdentityPort = { getCurrentUserId: () => userId };
+  const placeSearch: PlaceSearchPort = { search: vi.fn() };
   return {
     places,
     trips,
@@ -31,6 +33,7 @@ function createService() {
       places as unknown as Repository<SavedPlaceEntity>,
       trips as unknown as Repository<TripEntity>,
       identity,
+      placeSearch,
     ),
   };
 }

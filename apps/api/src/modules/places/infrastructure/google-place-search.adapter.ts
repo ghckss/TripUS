@@ -1,0 +1,48 @@
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
+import { PlaceSearchCandidate, PlaceSearchPort } from '../domain/place-search.port';
+
+interface GoogleTextSearchResponse {
+  places?: Array<{
+    id?: string;
+    displayName?: { text?: string };
+    formattedAddress?: string;
+    primaryType?: string;
+    location?: { latitude?: number; longitude?: number };
+  }>;
+}
+
+@Injectable()
+export class GooglePlaceSearchAdapter implements PlaceSearchPort {
+  private readonly apiKey: string;
+
+  constructor(config: ConfigService) {
+    this.apiKey = config.getOrThrow<string>('GOOGLE_MAPS_API_KEY');
+  }
+
+  async search(query: string, destination: string): Promise<PlaceSearchCandidate[]> {
+    const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': this.apiKey,
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.primaryType,places.location',
+      },
+      body: JSON.stringify({ textQuery: `${query} ${destination}`, languageCode: 'ko', pageSize: 10 }),
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) {
+      throw new ServiceUnavailableException(`Google Places request failed (${response.status})`);
+    }
+    const body = await response.json() as GoogleTextSearchResponse;
+    return (body.places ?? []).flatMap((place) => place.id && place.displayName?.text ? [{
+      googlePlaceId: place.id,
+      name: place.displayName.text,
+      address: place.formattedAddress ?? null,
+      primaryType: place.primaryType ?? null,
+      latitude: place.location?.latitude ?? null,
+      longitude: place.location?.longitude ?? null,
+    }] : []);
+  }
+}

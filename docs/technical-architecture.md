@@ -207,6 +207,8 @@ POST /v1/trips/:tripId/completion
 - `PhotoStoragePort`: 원본·최적화본 업로드와 삭제
 - `AuthPort`: 소셜 로그인 식별자 검증
 
+Google 지도 연동은 `MAPS_PROVIDER=mock|google`로 전환한다. `google` 모드에서는 서버에만 `GOOGLE_MAPS_API_KEY`를 주입하고 Places API(New) Text Search와 Routes API Compute Routes를 호출한다. 응답 필드는 비용과 지연을 줄이도록 필요한 field mask만 요청한다. 경로를 찾지 못하거나 공급자 호출이 실패하면 500 오류 대신 `unavailable` 도메인 결과를 반환한다.
+
 ### OpenAI 일정 생성
 
 AI 공급자는 OpenAI로 확정한다. 모바일은 OpenAI API를 직접 호출하지 않으며 API 키, 프롬프트, 모델 설정은 NestJS 서버에만 둔다.

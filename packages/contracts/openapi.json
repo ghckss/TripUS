@@ -206,6 +206,49 @@
         ]
       }
     },
+    "/v1/trips/{tripId}/places/search": {
+      "get": {
+        "operationId": "PlacesController_search",
+        "parameters": [
+          {
+            "name": "query",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlaceSearchCandidateDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "places"
+        ]
+      }
+    },
     "/v1/trips": {
       "get": {
         "operationId": "TripsController_list",
@@ -342,6 +385,47 @@
         },
         "tags": [
           "trip-records"
+        ]
+      }
+    },
+    "/v1/trips/{tripId}/routes/transit": {
+      "post": {
+        "operationId": "RoutesController_transit",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitRouteRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransitRouteResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "routes"
         ]
       }
     }
@@ -675,6 +759,37 @@
           "preference"
         ]
       },
+      "PlaceSearchCandidateDto": {
+        "type": "object",
+        "properties": {
+          "googlePlaceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "primaryType": {
+            "type": "string",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "googlePlaceId",
+          "name"
+        ]
+      },
       "CreateSavedPlaceDto": {
         "type": "object",
         "properties": {
@@ -877,6 +992,61 @@
         "required": [
           "trip",
           "itinerary"
+        ]
+      },
+      "TransitRouteRequestDto": {
+        "type": "object",
+        "properties": {
+          "originSavedPlaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "destinationSavedPlaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "departureTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "originSavedPlaceId",
+          "destinationSavedPlaceId"
+        ]
+      },
+      "TransitRouteStatus": {
+        "type": "string",
+        "enum": [
+          "available",
+          "unavailable"
+        ]
+      },
+      "TransitRouteResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransitRouteStatus"
+              }
+            ]
+          },
+          "durationMinutes": {
+            "type": "number",
+            "nullable": true
+          },
+          "distanceMeters": {
+            "type": "number",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status"
         ]
       }
     }
