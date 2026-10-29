@@ -6,6 +6,8 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 
 ## 마일스톤
 
+상태 기준일: 2026-10-29
+
 ### M0. 기술 결정과 계약
 
 - Expo React Native + Expo Router 확정
@@ -17,6 +19,8 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 완료 조건: 모바일이 서버 구현에 직접 의존하지 않고 독립 실행·배포 가능한 구조가 문서와 코드에 일치한다.
 
 ### M1. 모노레포와 실행 기반
+
+상태: 완료
 
 - `apps/mobile`, `apps/api`, `packages/contracts` 생성
 - `packages/api-client`에 OpenAPI 기반 클라이언트 생성 경계 구성
@@ -31,6 +35,8 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 
 ### M2. 디자인 시스템과 목업 도메인
 
+상태: 완료(지도는 목업)
+
 - Figma 기반 색상·타이포·간격 토큰
 - 모바일 앱 셸, 스택, 탭과 공통 컴포넌트
 - 여행·저장 장소·일정·방문 기록 스키마
@@ -40,6 +46,8 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 완료 조건: iOS와 Android에서 핵심 라우트와 디자인 시스템을 확인할 수 있다.
 
 ### M3. 계획 핵심 흐름
+
+상태: 완료
 
 - 로그인 목업
 - 내 여행과 여행 생성
@@ -53,6 +61,8 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 
 ### M4. 여행 완료와 기록
 
+상태: 핵심 완료(사진 저장은 M5)
+
 - 상태 탭 없는 완료 정리
 - 방문 장소 별점 1~5점
 - 별도 미방문 지정과 되돌리기
@@ -63,6 +73,8 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 완료 조건: 일정의 모든 방문이 rated, unrated, not_visited 중 하나로 일관되게 전환된다.
 
 ### M5. 실제 연동
+
+상태: 준비됨(OpenAI 어댑터 구현, 인증·지도·사진은 미착수)
 
 - 소셜 인증과 보안 토큰 저장
 - Google Places/Routes 어댑터
@@ -86,6 +98,15 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 ## 첫 구현 범위
 
 기술 아키텍처 승인 후 M1부터 M4까지 진행한다. 실제 인증, 지도, AI와 사진 업로드는 포트와 계약을 먼저 만들고 런타임은 목업으로 유지한다.
+
+## 구현 결과
+
+- 로그인 목업 → 내 여행 → 여행 생성 → 장소 저장 → AI 일정 → 일정 편집 → 완료 정리 → 완료 여행 목록을 모바일과 API로 연결했다.
+- AI 일정은 결정적 목업이 기본이며 OpenAI Responses API + Structured Outputs 어댑터를 환경 설정으로 교체할 수 있다.
+- 일정 충돌은 정상 `conflict` 결과로 반환하고, 경로 실패와 일정 충돌 전용 모바일 화면을 제공한다.
+- 완료 정리에서 별점은 `rated`, 별도 미방문은 `not_visited`, 입력 없이 보관한 방문은 `unrated`로 저장한다.
+- Android Development Build에서 실제 PostgreSQL을 사용해 AI 일정 생성부터 미평가 보관 요약까지 확인했다.
+- 실제 소셜 인증, Google Places/Routes, 사진 저장과 배포 파이프라인은 M5/M6 범위다.
 
 ## 확정된 구현 기준
 

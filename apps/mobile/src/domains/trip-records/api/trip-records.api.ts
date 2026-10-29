@@ -1,7 +1,7 @@
 import type { components } from "@tripus/api-client";
 
 import { apiErrorMessage, tripUsApi } from "@/shared/api/trip-us-api";
-import type { Itinerary } from "@/domains/itineraries/api/itineraries.api";
+import type { Itinerary } from "@/domains/itineraries";
 import type { Trip } from "@/domains/trips";
 
 export type CompleteTripItem = components["schemas"]["CompleteTripItemDto"];

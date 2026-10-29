@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { getItinerary, type Itinerary } from "@/domains/itineraries/api/itineraries.api";
+import { getItinerary, type Itinerary } from "@/domains/itineraries";
 import { getTrip, type Trip } from "@/domains/trips";
 import { apiErrorMessage } from "@/shared/api/trip-us-api";
 

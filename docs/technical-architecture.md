@@ -228,14 +228,16 @@ ai-planning/
 
 - OpenAI 공식 JavaScript SDK와 Responses API를 사용한다.
 - 일정 결과는 Structured Outputs와 JSON Schema로 날짜, 장소 ID, 순서, 미배치 사유를 강제한다.
-- 생성 결과는 바로 DB에 덮어쓰지 않고 도메인 검증 후 임시 제안으로 반환한다.
+- MVP에서는 생성 결과를 도메인 검증한 뒤 현재 일정 전체에 원자적으로 반영한다. 향후 비교·승인이 필요해지면 제안 리소스를 별도로 둔다.
 - 모델명은 코드에 고정하지 않고 `OPENAI_MODEL` 환경 변수로 관리한다.
 - API 키는 `OPENAI_API_KEY`로 서버에만 주입하고 로그, OpenAPI, 모바일 번들에 노출하지 않는다.
-- 거부, 불완전 응답, 타임아웃과 스키마 오류는 정상적인 AI 생성 실패 결과로 변환한다.
+- 거부, 불완전 응답과 스키마 오류는 사용자에게 재시도 가능한 생성 실패로 전달한다.
 
 참고: [OpenAI Structured Outputs 공식 문서](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses)
 
 MVP 기반에서는 Google Maps와 OpenAI 포트에 결정적 목업 어댑터를 먼저 연결한다. 실제 OpenAI 어댑터는 배포 환경의 키와 모델이 정해진 뒤 같은 포트로 교체한다.
+
+환경 변수 기본값은 `AI_PLANNER_PROVIDER=mock`이다. 실제 어댑터는 `AI_PLANNER_PROVIDER=openai`, `OPENAI_API_KEY`, `OPENAI_MODEL` 세 값을 모두 서버에 설정했을 때만 활성화한다.
 
 ## 8. 테스트
 

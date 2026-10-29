@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 
-import { getItinerary, type Itinerary } from "@/domains/itineraries/api/itineraries.api";
+import { getItinerary, type Itinerary } from "@/domains/itineraries";
 import { apiErrorMessage } from "@/shared/api/trip-us-api";
 import { completeTrip, type CompleteTripItem } from "../../api/trip-records.api";
 
