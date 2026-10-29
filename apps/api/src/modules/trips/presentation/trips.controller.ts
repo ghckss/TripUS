@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiParam, ApiTags } from '@nestjs/swagger';
 
 import { CreateTripDto } from '../application/dto/create-trip.dto';
 import { TripResponseDto } from '../application/dto/trip-response.dto';
@@ -18,12 +18,14 @@ export class TripsController {
 
   @Post()
   @HttpCode(201)
+  @ApiBody({ type: CreateTripDto })
   @ApiCreatedResponse({ type: TripResponseDto })
   create(@Body() input: CreateTripDto): Promise<TripResponseDto> {
     return this.trips.create(input);
   }
 
   @Get(':tripId')
+  @ApiParam({ name: 'tripId', type: String, format: 'uuid' })
   @ApiOkResponse({ type: TripResponseDto })
   get(@Param('tripId', new ParseUUIDPipe()) tripId: string): Promise<TripResponseDto> {
     return this.trips.get(tripId);

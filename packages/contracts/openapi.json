@@ -25,7 +25,17 @@
     "/v1/trips/{tripId}/places": {
       "get": {
         "operationId": "PlacesController_list",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -47,7 +57,27 @@
       },
       "post": {
         "operationId": "PlacesController_create",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSavedPlaceDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": "",
@@ -91,6 +121,16 @@
       "post": {
         "operationId": "TripsController_create",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTripDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": "",
@@ -111,7 +151,17 @@
     "/v1/trips/{tripId}": {
       "get": {
         "operationId": "TripsController_get",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -214,6 +264,49 @@
           "preference"
         ]
       },
+      "CreateSavedPlaceDto": {
+        "type": "object",
+        "properties": {
+          "googlePlaceId": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "example": "국립현대미술관 서울",
+            "maxLength": 180
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 300,
+            "nullable": true
+          },
+          "tag": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlaceTag"
+              }
+            ]
+          },
+          "preference": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlacePreference"
+              }
+            ]
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "tag",
+          "preference"
+        ]
+      },
       "SavePlaceStatus": {
         "type": "string",
         "enum": [
@@ -282,6 +375,43 @@
           "startDate",
           "endDate",
           "active"
+        ]
+      },
+      "CreateTripDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "서울 가을 여행",
+            "maxLength": 120
+          },
+          "destination": {
+            "type": "string",
+            "example": "서울",
+            "maxLength": 120
+          },
+          "timezone": {
+            "type": "string",
+            "example": "Asia/Seoul",
+            "maxLength": 64
+          },
+          "startDate": {
+            "type": "string",
+            "example": "2026-10-31",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "example": "2026-11-02",
+            "format": "date"
+          }
+        },
+        "required": [
+          "title",
+          "destination",
+          "timezone",
+          "startDate",
+          "endDate"
         ]
       }
     }

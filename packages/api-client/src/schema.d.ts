@@ -89,6 +89,15 @@ export interface components {
             preference: components["schemas"]["PlacePreference"];
             note?: string | null;
         };
+        CreateSavedPlaceDto: {
+            googlePlaceId?: string | null;
+            /** @example 국립현대미술관 서울 */
+            name: string;
+            address?: string | null;
+            tag: components["schemas"]["PlaceTag"];
+            preference: components["schemas"]["PlacePreference"];
+            note?: string | null;
+        };
         /** @enum {string} */
         SavePlaceStatus: "created" | "already_exists";
         SavePlaceResultDto: {
@@ -109,6 +118,24 @@ export interface components {
             active: boolean;
             /** Format: date-time */
             archivedAt?: string | null;
+        };
+        CreateTripDto: {
+            /** @example 서울 가을 여행 */
+            title: string;
+            /** @example 서울 */
+            destination: string;
+            /** @example Asia/Seoul */
+            timezone: string;
+            /**
+             * Format: date
+             * @example 2026-10-31
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @example 2026-11-02
+             */
+            endDate: string;
         };
     };
     responses: never;
@@ -142,7 +169,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                tripId: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -161,10 +190,16 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                tripId: string;
+            };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSavedPlaceDto"];
+            };
+        };
         responses: {
             201: {
                 headers: {
@@ -202,7 +237,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTripDto"];
+            };
+        };
         responses: {
             201: {
                 headers: {
@@ -218,7 +257,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                tripId: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
