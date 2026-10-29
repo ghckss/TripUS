@@ -32,6 +32,13 @@ export interface AiPlannerPlacement {
 export interface AiPlannerOutput {
   placements: AiPlannerPlacement[];
   unplaced: Array<{ savedPlaceId: string; reason: string }>;
+  usage?: { inputTokens: number; outputTokens: number };
+}
+
+export class AiPlannerError extends Error {
+  constructor(public readonly reason: 'refused' | 'incomplete' | 'invalid_output' | 'provider_failure') {
+    super(`AI planner failed: ${reason}`);
+  }
 }
 
 export interface AiPlannerPort {

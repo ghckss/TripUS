@@ -12,12 +12,14 @@ import { AI_PLANNER_PORT } from './domain/ai-planner.port';
 import { MockAiPlannerAdapter } from './infrastructure/mock-ai-planner.adapter';
 import { OpenAiPlannerAdapter } from './infrastructure/openai-ai-planner.adapter';
 import { AiPlanningController } from './presentation/ai-planning.controller';
+import { AiPlanningRateLimiter } from './application/ai-planning-rate-limiter';
 
 @Module({
   imports: [TypeOrmModule.forFeature([TripEntity, SavedPlaceEntity]), IdentityModule, ItinerariesModule],
   controllers: [AiPlanningController],
   providers: [
     AiPlanningService,
+    AiPlanningRateLimiter,
     MockAiPlannerAdapter,
     {
       provide: AI_PLANNER_PORT,

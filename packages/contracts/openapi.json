@@ -660,11 +660,12 @@
           "style"
         ]
       },
-      "ItineraryUpdateStatus": {
+      "AiPlanGenerationStatus": {
         "type": "string",
         "enum": [
-          "updated",
-          "conflict"
+          "generated",
+          "conflict",
+          "unavailable"
         ]
       },
       "ItinerarySource": {
@@ -787,7 +788,14 @@
           "status": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/ItineraryUpdateStatus"
+                "$ref": "#/components/schemas/AiPlanGenerationStatus"
+              }
+            ]
+          },
+          "style": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TravelStyle"
               }
             ]
           },
@@ -800,19 +808,16 @@
           "itinerary": {
             "$ref": "#/components/schemas/ItineraryResponseDto"
           },
-          "style": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/TravelStyle"
-              }
-            ]
+          "failureReason": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
           "status",
+          "style",
           "conflicts",
-          "itinerary",
-          "style"
+          "itinerary"
         ]
       },
       "ReplaceItineraryItemDto": {
@@ -853,6 +858,13 @@
         },
         "required": [
           "items"
+        ]
+      },
+      "ItineraryUpdateStatus": {
+        "type": "string",
+        "enum": [
+          "updated",
+          "conflict"
         ]
       },
       "ItineraryUpdateResultDto": {

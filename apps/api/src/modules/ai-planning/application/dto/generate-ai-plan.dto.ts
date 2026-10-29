@@ -1,7 +1,7 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum } from 'class-validator';
 
-import { ItineraryUpdateResultDto } from '../../../itineraries/application/dto/itinerary.dto';
+import { ItineraryResponseDto } from '../../../itineraries/application/dto/itinerary.dto';
 import { TravelStyle } from '../../domain/ai-planner.port';
 
 export class GenerateAiPlanDto {
@@ -10,7 +10,25 @@ export class GenerateAiPlanDto {
   style!: TravelStyle;
 }
 
-export class GenerateAiPlanResponseDto extends ItineraryUpdateResultDto {
+export enum AiPlanGenerationStatus {
+  Generated = 'generated',
+  Conflict = 'conflict',
+  Unavailable = 'unavailable',
+}
+
+export class GenerateAiPlanResponseDto {
+  @ApiProperty({ enum: AiPlanGenerationStatus, enumName: 'AiPlanGenerationStatus' })
+  status!: AiPlanGenerationStatus;
+
   @ApiProperty({ enum: TravelStyle, enumName: 'TravelStyle' })
   style!: TravelStyle;
+
+  @ApiProperty({ type: String, isArray: true })
+  conflicts!: string[];
+
+  @ApiProperty({ type: ItineraryResponseDto })
+  itinerary!: ItineraryResponseDto;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  failureReason!: string | null;
 }

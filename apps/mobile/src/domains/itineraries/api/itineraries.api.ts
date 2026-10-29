@@ -20,6 +20,7 @@ export async function generateAiPlan(tripId: string, style: TravelStyle): Promis
   });
   if (error) throw new Error(apiErrorMessage(error));
   if (data.status === "conflict") throw new Error("AI 일정에 충돌이 있어요. 일정 편집에서 다시 배치해 주세요.");
+  if (data.status === "unavailable") throw new Error("AI 일정을 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
   return data.itinerary;
 }
 

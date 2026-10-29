@@ -72,6 +72,7 @@ export class ItinerariesService {
       slots.add(slot);
     }
     const ids = [...new Set(input.map((item) => item.savedPlaceId))];
+    if (ids.length !== input.length) conflicts.push('DUPLICATE_PLACE');
     if (ids.length > 0) {
       const owned = await this.places.countBy({ id: In(ids), tripId: trip.id });
       if (owned !== ids.length) conflicts.push('PLACE_NOT_IN_TRIP');

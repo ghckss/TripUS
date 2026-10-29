@@ -47,6 +47,9 @@ export function validateEnvironment(
       throw new Error('OPENAI_MODEL is required when AI_PLANNER_PROVIDER=openai');
     }
   }
+  const openAiTimeoutMs = positiveInteger(environment.OPENAI_TIMEOUT_MS ?? 15_000, 'OPENAI_TIMEOUT_MS');
+  const openAiMaxRetries = nonNegativeInteger(environment.OPENAI_MAX_RETRIES ?? 2, 'OPENAI_MAX_RETRIES');
+  const openAiMaxOutputTokens = positiveInteger(environment.OPENAI_MAX_OUTPUT_TOKENS ?? 1_200, 'OPENAI_MAX_OUTPUT_TOKENS');
 
   const mapsProvider = environment.MAPS_PROVIDER ?? MapsProvider.Mock;
   if (!Object.values(MapsProvider).includes(mapsProvider as MapsProvider)) {
@@ -82,8 +85,23 @@ export function validateEnvironment(
     ACCESS_TOKEN_SECRET: accessTokenSecret,
     ACCESS_TOKEN_ISSUER: environment.ACCESS_TOKEN_ISSUER ?? 'tripus-api',
     ACCESS_TOKEN_AUDIENCE: environment.ACCESS_TOKEN_AUDIENCE ?? 'tripus-mobile',
+    OPENAI_TIMEOUT_MS: openAiTimeoutMs,
+    OPENAI_MAX_RETRIES: openAiMaxRetries,
+    OPENAI_MAX_OUTPUT_TOKENS: openAiMaxOutputTokens,
     PORT: port,
   };
+}
+
+function positiveInteger(value: unknown, name: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`${name} must be a positive integer`);
+  return parsed;
+}
+
+function nonNegativeInteger(value: unknown, name: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`${name} must be a non-negative integer`);
+  return parsed;
 }
 
 export function getDatabaseUrl(

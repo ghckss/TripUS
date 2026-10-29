@@ -242,6 +242,8 @@ ai-planning/
 - 모델명은 코드에 고정하지 않고 `OPENAI_MODEL` 환경 변수로 관리한다.
 - API 키는 `OPENAI_API_KEY`로 서버에만 주입하고 로그, OpenAPI, 모바일 번들에 노출하지 않는다.
 - 거부, 불완전 응답과 스키마 오류는 사용자에게 재시도 가능한 생성 실패로 전달한다.
+- 요청은 15초 타임아웃, 2회 재시도, 1,200 출력 토큰을 기본 상한으로 하며 모두 환경 변수로 조정한다.
+- 한 번에 최대 100개 저장 장소와 사용자별 분당 5회 생성으로 비용 폭주를 막고, 프롬프트 내용 없이 입출력 토큰 수만 서버 로그에 남긴다.
 
 참고: [OpenAI Structured Outputs 공식 문서](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses)
 

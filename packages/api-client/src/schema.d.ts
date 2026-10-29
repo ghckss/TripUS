@@ -246,7 +246,7 @@ export interface components {
             style: components["schemas"]["TravelStyle"];
         };
         /** @enum {string} */
-        ItineraryUpdateStatus: "updated" | "conflict";
+        AiPlanGenerationStatus: "generated" | "conflict" | "unavailable";
         /** @enum {string} */
         ItinerarySource: "manual" | "ai";
         /** @enum {string} */
@@ -277,10 +277,11 @@ export interface components {
             unplaced: components["schemas"]["UnplacedPlaceResponseDto"][];
         };
         GenerateAiPlanResponseDto: {
-            status: components["schemas"]["ItineraryUpdateStatus"];
+            status: components["schemas"]["AiPlanGenerationStatus"];
+            style: components["schemas"]["TravelStyle"];
             conflicts: string[];
             itinerary: components["schemas"]["ItineraryResponseDto"];
-            style: components["schemas"]["TravelStyle"];
+            failureReason?: string | null;
         };
         ReplaceItineraryItemDto: {
             /** Format: uuid */
@@ -294,6 +295,8 @@ export interface components {
         ReplaceItineraryDto: {
             items: components["schemas"]["ReplaceItineraryItemDto"][];
         };
+        /** @enum {string} */
+        ItineraryUpdateStatus: "updated" | "conflict";
         ItineraryUpdateResultDto: {
             status: components["schemas"]["ItineraryUpdateStatus"];
             conflicts: string[];
