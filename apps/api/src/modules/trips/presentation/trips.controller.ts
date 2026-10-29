@@ -1,10 +1,11 @@
 import { Body, Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
-import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 
 import { CreateTripDto } from '../application/dto/create-trip.dto';
 import { TripResponseDto } from '../application/dto/trip-response.dto';
 import { TripsService } from '../application/trips.service';
 import { ListTripsQueryDto } from '../application/dto/list-trips-query.dto';
+import { TripListStatus } from '../application/dto/list-trips-query.dto';
 
 @ApiTags('trips')
 @Controller('trips')
@@ -12,6 +13,7 @@ export class TripsController {
   constructor(@Inject(TripsService) private readonly trips: TripsService) {}
 
   @Get()
+  @ApiQuery({ name: 'status', required: false, enum: TripListStatus })
   @ApiOkResponse({ type: TripResponseDto, isArray: true })
   list(@Query() query: ListTripsQueryDto): Promise<TripResponseDto[]> {
     return this.trips.list(query.status);

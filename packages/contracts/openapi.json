@@ -209,7 +209,21 @@
     "/v1/trips": {
       "get": {
         "operationId": "TripsController_list",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "current",
+                "completed",
+                "all"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",

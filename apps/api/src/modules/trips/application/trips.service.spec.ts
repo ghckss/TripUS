@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import type { Repository } from 'typeorm';
+import { IsNull, type Repository } from 'typeorm';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { IdentityPort } from '../../identity/domain/identity.port';
@@ -46,7 +46,7 @@ describe('TripsService', () => {
     await service.list();
 
     expect(repository.find).toHaveBeenCalledWith({
-      where: { ownerId: userId, active: true, archivedAt: expect.any(Object) },
+      where: { ownerId: userId, active: true, archivedAt: IsNull() },
       order: { startDate: 'ASC' },
     });
   });

@@ -406,7 +406,9 @@ export interface operations {
     };
     TripsController_list: {
         parameters: {
-            query?: never;
+            query?: {
+                status?: "current" | "completed" | "all";
+            };
             header?: never;
             path?: never;
             cookie?: never;
