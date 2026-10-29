@@ -3,15 +3,24 @@ import { useEffect, useState } from "react";
 import { getItinerary, type Itinerary } from "@/domains/itineraries";
 import { getTrip, type Trip } from "@/domains/trips";
 import { apiErrorMessage } from "@/shared/api/trip-us-api";
+import { getSession } from "@/shared/auth/session";
+import { listPhotos, type TripPhoto } from "../../api/photos.api";
 
 export function useTripSummary(tripId: string) {
   const [trip, setTrip] = useState<Trip>();
   const [itinerary, setItinerary] = useState<Itinerary>();
+  const [photos, setPhotos] = useState<TripPhoto[]>([]);
+  const [accessToken, setAccessToken] = useState<string>();
   const [error, setError] = useState<string>();
   useEffect(() => {
-    void Promise.all([getTrip(tripId), getItinerary(tripId)])
-      .then(([nextTrip, nextItinerary]) => { setTrip(nextTrip); setItinerary(nextItinerary); })
+    void Promise.all([getTrip(tripId), getItinerary(tripId), listPhotos(tripId), getSession()])
+      .then(([nextTrip, nextItinerary, nextPhotos, session]) => {
+        setTrip(nextTrip);
+        setItinerary(nextItinerary);
+        setPhotos(nextPhotos);
+        setAccessToken(session?.accessToken);
+      })
       .catch((caught) => setError(apiErrorMessage(caught)));
   }, [tripId]);
-  return { error, itinerary, trip };
+  return { accessToken, error, itinerary, photos, trip };
 }

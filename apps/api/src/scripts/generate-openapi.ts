@@ -22,4 +22,7 @@ async function generateOpenApi() {
   console.log(`OpenAPI document written to ${outputPath}`);
 }
 
-void generateOpenApi();
+void generateOpenApi().catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
+});

@@ -16,6 +16,11 @@ export enum AuthMode {
   Jwt = 'jwt',
 }
 
+export enum PhotoStorageProvider {
+  Local = 'local',
+  S3 = 's3',
+}
+
 export function validateEnvironment(
   environment: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -75,6 +80,18 @@ export function validateEnvironment(
       throw new Error('APPLE_OIDC_CLIENT_IDS is required when AUTH_MODE=jwt');
     }
   }
+  const photoStorageProvider = environment.PHOTO_STORAGE_PROVIDER ?? PhotoStorageProvider.Local;
+  if (!Object.values(PhotoStorageProvider).includes(photoStorageProvider as PhotoStorageProvider)) {
+    throw new Error('PHOTO_STORAGE_PROVIDER must be local or s3');
+  }
+  if (photoStorageProvider === PhotoStorageProvider.S3) {
+    if (typeof environment.PHOTO_S3_BUCKET !== 'string' || environment.PHOTO_S3_BUCKET.length === 0) {
+      throw new Error('PHOTO_S3_BUCKET is required when PHOTO_STORAGE_PROVIDER=s3');
+    }
+    if (typeof environment.AWS_REGION !== 'string' || environment.AWS_REGION.length === 0) {
+      throw new Error('AWS_REGION is required when PHOTO_STORAGE_PROVIDER=s3');
+    }
+  }
 
   return {
     ...environment,
@@ -88,6 +105,9 @@ export function validateEnvironment(
     OPENAI_TIMEOUT_MS: openAiTimeoutMs,
     OPENAI_MAX_RETRIES: openAiMaxRetries,
     OPENAI_MAX_OUTPUT_TOKENS: openAiMaxOutputTokens,
+    PHOTO_STORAGE_PROVIDER: photoStorageProvider,
+    PHOTO_LOCAL_DIRECTORY: environment.PHOTO_LOCAL_DIRECTORY ?? '.data/photos',
+    API_PUBLIC_URL: environment.API_PUBLIC_URL ?? `http://localhost:${port}`,
     PORT: port,
   };
 }

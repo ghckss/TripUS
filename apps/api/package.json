@@ -10,12 +10,14 @@
     "migration:revert": "pnpm typeorm migration:revert",
     "migration:run": "pnpm typeorm migration:run",
     "migration:show": "pnpm typeorm migration:show",
-    "openapi:generate": "tsx src/scripts/generate-openapi.ts",
+    "openapi:generate": "pnpm build && node dist/scripts/generate-openapi.js",
     "test": "vitest run --passWithNoTests",
     "typeorm": "tsx ./node_modules/typeorm/cli.js -d src/database/data-source.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1158.0",
+    "@aws-sdk/s3-request-presigner": "^3.1158.0",
     "@nestjs/common": "^12.3.2",
     "@nestjs/config": "^12.0.1",
     "@nestjs/core": "^12.3.2",
@@ -30,11 +32,13 @@
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "sharp": "^0.35.5",
     "typeorm": "^1.1.2",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.20.5",
     "eslint": "^9.39.5",

@@ -36,7 +36,7 @@ async function refreshAccessToken(): Promise<AuthSession | null> {
   return next;
 }
 
-const authenticatedFetch: typeof fetch = async (input, init) => {
+export const authenticatedFetch: typeof fetch = async (input, init) => {
   const session = await getSession();
   const headers = new Headers(init?.headers);
   if (session?.accessToken) headers.set("authorization", `Bearer ${session.accessToken}`);

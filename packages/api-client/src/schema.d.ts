@@ -212,6 +212,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trips/{tripId}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PhotosController_list"];
+        put?: never;
+        post: operations["PhotosController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trips/{tripId}/photos/{photoId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["PhotosController_upload"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trips/{tripId}/photos/{photoId}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PhotosController_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trips/{tripId}/photos/{photoId}/files/{variant}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PhotosController_file"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -341,6 +405,8 @@ export interface components {
             status: components["schemas"]["SavePlaceStatus"];
             place: components["schemas"]["SavedPlaceResponseDto"];
         };
+        /** @enum {string} */
+        TripListStatus: "current" | "completed" | "all";
         TripResponseDto: {
             /** Format: uuid */
             id: string;
@@ -404,6 +470,39 @@ export interface components {
             durationMinutes?: number | null;
             distanceMeters?: number | null;
             reason?: string | null;
+        };
+        CreatePhotoUploadDto: {
+            /** Format: uuid */
+            itineraryItemId?: string | null;
+            /** @example image/jpeg */
+            mimeType: string;
+            byteSize: number;
+            filename: string;
+        };
+        PhotoUploadTargetDto: {
+            /** Format: uuid */
+            photoId: string;
+            uploadUrl: string;
+            /** @enum {string} */
+            method: "PUT";
+            headers: {
+                [key: string]: string;
+            };
+        };
+        /** @enum {string} */
+        PhotoStatus: "pending" | "ready" | "failed";
+        PhotoResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            itineraryItemId?: string | null;
+            mimeType: string;
+            byteSize: number;
+            filename: string;
+            status: components["schemas"]["PhotoStatus"];
+            originalUrl?: string | null;
+            optimizedUrl?: string | null;
+            thumbnailUrl?: string | null;
         };
     };
     responses: never;
@@ -662,7 +761,7 @@ export interface operations {
     TripsController_list: {
         parameters: {
             query?: {
-                status?: "current" | "completed" | "all";
+                status?: components["schemas"]["TripListStatus"];
             };
             header?: never;
             path?: never;
@@ -771,6 +870,123 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TransitRouteResponseDto"];
                 };
+            };
+        };
+    };
+    PhotosController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoResponseDto"][];
+                };
+            };
+        };
+    };
+    PhotosController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePhotoUploadDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoUploadTargetDto"];
+                };
+            };
+        };
+    };
+    PhotosController_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+                photoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "image/jpeg": string;
+                "image/png": string;
+                "image/webp": string;
+                "image/heic": string;
+                "image/heif": string;
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PhotosController_confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+                photoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoResponseDto"];
+                };
+            };
+        };
+    };
+    PhotosController_file: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+                photoId: string;
+                variant: "original" | "optimized" | "thumbnail";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
