@@ -9,6 +9,7 @@ import { AiPlanningModule } from './modules/ai-planning/ai-planning.module';
 import { ItinerariesModule } from './modules/itineraries/itineraries.module';
 import { PlacesModule } from './modules/places/places.module';
 import { TripsModule } from './modules/trips/trips.module';
+import { TripRecordsModule } from './modules/trip-records/trip-records.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { TripsModule } from './modules/trips/trips.module';
     ItinerariesModule,
     PlacesModule,
     TripsModule,
+    TripRecordsModule,
   ],
 })
 export class AppModule {}

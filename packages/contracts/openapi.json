@@ -289,6 +289,47 @@
           "trips"
         ]
       }
+    },
+    "/v1/trips/{tripId}/completion": {
+      "post": {
+        "operationId": "TripRecordsController_complete",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteTripDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompleteTripResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "trip-records"
+        ]
+      }
     }
   },
   "info": {
@@ -768,6 +809,60 @@
           "timezone",
           "startDate",
           "endDate"
+        ]
+      },
+      "CompleteTripItemDto": {
+        "type": "object",
+        "properties": {
+          "itineraryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rating": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "notVisited": {
+            "type": "boolean",
+            "default": false
+          },
+          "review": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "itineraryItemId"
+        ]
+      },
+      "CompleteTripDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompleteTripItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "CompleteTripResponseDto": {
+        "type": "object",
+        "properties": {
+          "trip": {
+            "$ref": "#/components/schemas/TripResponseDto"
+          },
+          "itinerary": {
+            "$ref": "#/components/schemas/ItineraryResponseDto"
+          }
+        },
+        "required": [
+          "trip",
+          "itinerary"
         ]
       }
     }

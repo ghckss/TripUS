@@ -1,11 +1,12 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 
 import { IDENTITY_PORT, type IdentityPort } from '../../identity/domain/identity.port';
 import { CreateTripDto } from './dto/create-trip.dto';
 import { TripResponseDto } from './dto/trip-response.dto';
 import { TripEntity } from '../domain/entities/trip.entity';
+import { TripListStatus } from './dto/list-trips-query.dto';
 
 @Injectable()
 export class TripsService {
@@ -16,9 +17,14 @@ export class TripsService {
     private readonly identity: IdentityPort,
   ) {}
 
-  async list(): Promise<TripResponseDto[]> {
+  async list(status: TripListStatus = TripListStatus.Current): Promise<TripResponseDto[]> {
     const entities = await this.trips.find({
-      where: { ownerId: this.identity.getCurrentUserId(), active: true },
+      where: {
+        ownerId: this.identity.getCurrentUserId(),
+        active: true,
+        ...(status === TripListStatus.Current ? { archivedAt: IsNull() } : {}),
+        ...(status === TripListStatus.Completed ? { archivedAt: Not(IsNull()) } : {}),
+      },
       order: { startDate: 'ASC' },
     });
     return entities.map((entity) => TripResponseDto.fromEntity(entity));

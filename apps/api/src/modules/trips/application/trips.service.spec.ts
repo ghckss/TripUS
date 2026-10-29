@@ -46,7 +46,7 @@ describe('TripsService', () => {
     await service.list();
 
     expect(repository.find).toHaveBeenCalledWith({
-      where: { ownerId: userId, active: true },
+      where: { ownerId: userId, active: true, archivedAt: expect.any(Object) },
       order: { startDate: 'ASC' },
     });
   });
