@@ -67,3 +67,9 @@ pnpm deploy:synth
 ```
 
 실제 계정 bootstrap, 개발/운영 배포 순서와 비용 주의점은 [AWS 배포 가이드](./docs/aws-deployment.md)를 따른다.
+
+배포된 공개 endpoint의 DB readiness를 확인하려면 다음 smoke test를 실행한다.
+
+```bash
+pnpm deploy:smoke -- https://<ApiEndpointDomain>
+```

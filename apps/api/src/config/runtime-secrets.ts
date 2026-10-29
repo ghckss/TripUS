@@ -1,12 +1,12 @@
 import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
 
-interface SecretReader {
+export interface SecretReader {
   send(command: GetSecretValueCommand): Promise<{ SecretString?: string }>;
 }
 
-interface RdsSecret {
+export interface RdsSecret {
   readonly dbname?: string;
-  readonly host: string;
+  readonly host?: string;
   readonly password: string;
   readonly port?: number;
   readonly username: string;
@@ -14,11 +14,11 @@ interface RdsSecret {
 
 export async function loadRuntimeSecrets(
   environment: NodeJS.ProcessEnv = process.env,
-  reader: SecretReader = new SecretsManagerClient({}),
+  reader: SecretReader = createSecretReader(),
 ): Promise<void> {
   const runtimeSecretArn = environment.RUNTIME_SECRET_ARN;
   if (runtimeSecretArn) {
-    const runtimeSecret = await readJsonSecret(reader, runtimeSecretArn);
+    const runtimeSecret = await readJsonSecret(runtimeSecretArn, reader);
     for (const [key, value] of Object.entries(runtimeSecret)) {
       if (environment[key] === undefined && typeof value === 'string' && value.length > 0) {
         environment[key] = value;
@@ -28,10 +28,11 @@ export async function loadRuntimeSecrets(
 
   const databaseSecretArn = environment.DATABASE_SECRET_ARN;
   if (!environment.DATABASE_URL && databaseSecretArn) {
-    const secret = await readJsonSecret(reader, databaseSecretArn) as unknown as RdsSecret;
-    assertRdsSecret(secret);
+    const secret = await readJsonSecret(databaseSecretArn, reader) as unknown as RdsSecret;
+    assertRdsSecret(secret, Boolean(environment.DATABASE_PROXY_HOST));
 
     const host = environment.DATABASE_PROXY_HOST ?? secret.host;
+    if (!host) throw new Error('Database secret is missing host and DATABASE_PROXY_HOST is not configured');
     const port = secret.port ?? 5432;
     const database = environment.DATABASE_NAME ?? secret.dbname ?? 'tripus';
     environment.DATABASE_URL =
@@ -40,7 +41,10 @@ export async function loadRuntimeSecrets(
   }
 }
 
-async function readJsonSecret(reader: SecretReader, secretId: string): Promise<Record<string, unknown>> {
+export async function readJsonSecret(
+  secretId: string,
+  reader: SecretReader = createSecretReader(),
+): Promise<Record<string, unknown>> {
   const response = await reader.send(new GetSecretValueCommand({ SecretId: secretId }));
   if (!response.SecretString) throw new Error(`Secret ${secretId} does not contain a SecretString`);
 
@@ -51,8 +55,16 @@ async function readJsonSecret(reader: SecretReader, secretId: string): Promise<R
   return parsed as Record<string, unknown>;
 }
 
-function assertRdsSecret(secret: Partial<RdsSecret>): asserts secret is RdsSecret {
-  for (const key of ['host', 'username', 'password'] as const) {
+function createSecretReader(): SecretReader {
+  return new SecretsManagerClient({
+    maxAttempts: 3,
+    requestHandler: { connectionTimeout: 5_000, requestTimeout: 10_000 },
+  });
+}
+
+function assertRdsSecret(secret: Partial<RdsSecret>, proxyHostConfigured: boolean): asserts secret is RdsSecret {
+  const requiredKeys = proxyHostConfigured ? ['username', 'password'] as const : ['host', 'username', 'password'] as const;
+  for (const key of requiredKeys) {
     if (typeof secret[key] !== 'string' || secret[key].length === 0) {
       throw new Error(`Database secret is missing ${key}`);
     }

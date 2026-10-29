@@ -111,6 +111,7 @@ export class AuthService {
 
   private sessionResponse(user: UserEntity, refreshToken: string): AuthSessionDto {
     const accessToken = sign({}, this.config.getOrThrow<string>('ACCESS_TOKEN_SECRET'), {
+      algorithm: 'HS256',
       subject: user.id,
       issuer: this.config.getOrThrow<string>('ACCESS_TOKEN_ISSUER'),
       audience: this.config.getOrThrow<string>('ACCESS_TOKEN_AUDIENCE'),

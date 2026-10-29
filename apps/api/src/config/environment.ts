@@ -39,6 +39,19 @@ export function validateEnvironment(
   if (!['postgres:', 'postgresql:'].includes(parsedDatabaseUrl.protocol)) {
     throw new Error('DATABASE_URL must use the postgres or postgresql protocol');
   }
+  const databasePoolMax = positiveInteger(environment.DATABASE_POOL_MAX ?? 4, 'DATABASE_POOL_MAX');
+  const databaseConnectionTimeoutMs = positiveInteger(
+    environment.DATABASE_CONNECTION_TIMEOUT_MS ?? 5_000,
+    'DATABASE_CONNECTION_TIMEOUT_MS',
+  );
+  const databaseIdleTimeoutMs = positiveInteger(
+    environment.DATABASE_IDLE_TIMEOUT_MS ?? 30_000,
+    'DATABASE_IDLE_TIMEOUT_MS',
+  );
+  const databaseStatementTimeoutMs = positiveInteger(
+    environment.DATABASE_STATEMENT_TIMEOUT_MS ?? 15_000,
+    'DATABASE_STATEMENT_TIMEOUT_MS',
+  );
 
   const aiPlannerProvider = environment.AI_PLANNER_PROVIDER ?? AiPlannerProvider.Mock;
   if (!Object.values(AiPlannerProvider).includes(aiPlannerProvider as AiPlannerProvider)) {
@@ -96,6 +109,10 @@ export function validateEnvironment(
   return {
     ...environment,
     DATABASE_URL: databaseUrl,
+    DATABASE_POOL_MAX: databasePoolMax,
+    DATABASE_CONNECTION_TIMEOUT_MS: databaseConnectionTimeoutMs,
+    DATABASE_IDLE_TIMEOUT_MS: databaseIdleTimeoutMs,
+    DATABASE_STATEMENT_TIMEOUT_MS: databaseStatementTimeoutMs,
     AI_PLANNER_PROVIDER: aiPlannerProvider,
     MAPS_PROVIDER: mapsProvider,
     AUTH_MODE: authMode,

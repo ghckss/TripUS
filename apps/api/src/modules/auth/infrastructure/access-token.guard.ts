@@ -31,6 +31,7 @@ export class AccessTokenGuard implements CanActivate {
     if (!authorization?.startsWith('Bearer ')) throw new UnauthorizedException('Bearer token is required');
     try {
       const payload = verify(authorization.slice(7), this.config.getOrThrow<string>('ACCESS_TOKEN_SECRET'), {
+        algorithms: ['HS256'],
         issuer: this.config.getOrThrow<string>('ACCESS_TOKEN_ISSUER'),
         audience: this.config.getOrThrow<string>('ACCESS_TOKEN_AUDIENCE'),
       });

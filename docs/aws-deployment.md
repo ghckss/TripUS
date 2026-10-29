@@ -13,7 +13,7 @@ React Native
         -> Secrets Manager
 ```
 
-`dev`는 mock AI·지도와 development 인증이 기본이다. 외부에 공개하는 운영 환경에는 반드시 `prod`, JWT 인증, 실제 공급자 키를 사용한다.
+`dev`는 mock AI·지도와 development 인증이 기본이다. 이 endpoint는 인터넷에 공개된 개발 사용자 접근을 막기 위해 `IamAuth`로 생성된다. 외부에 공개하는 환경에는 반드시 JWT 인증과 실제 공급자 키를 사용한다.
 
 ## 사전 조건
 
@@ -50,6 +50,8 @@ pnpm deploy:diff -- --context stage=dev
 pnpm deploy:aws -- --context stage=dev
 ```
 
+기본 dev endpoint 호출에는 AWS SigV4 서명이 필요하므로 일반 모바일 앱의 API 주소로 직접 사용할 수 없다. 실제 기기에서 AWS dev 환경을 사용하려면 `authMode=jwt`로 데이터 스택을 먼저 배포하고 운영 환경과 같은 방식으로 OIDC Client ID를 runtime secret에 넣은 뒤 API 스택을 배포한다.
+
 배포 중 다음 작업이 자동으로 실행된다.
 
 1. 상태 저장 스택을 먼저 생성한다.
@@ -57,7 +59,7 @@ pnpm deploy:aws -- --context stage=dev
 3. 배포 전용 Lambda가 TypeORM migration을 트랜잭션으로 적용한다.
 4. migration 성공 후에만 새 Web Function revision과 endpoint를 활성화한다.
 
-출력된 `ApiEndpointDomain`에 `https://`를 붙여 모바일의 `EXPO_PUBLIC_API_URL`로 사용한다. `/v1/health`로 상태를 확인한다.
+JWT 모드에서 출력된 `ApiEndpointDomain`에 `https://`를 붙여 모바일의 `EXPO_PUBLIC_API_URL`로 사용한다. `/v1/health`는 DB 연결까지 확인하고 `/v1/health/live`는 프로세스 생존 여부만 확인한다.
 
 ## 운영 환경 배포
 
@@ -86,7 +88,21 @@ CloudFormation 출력의 `RuntimeSecretArn`을 AWS Secrets Manager 콘솔에서 
 pnpm --filter @tripus/infra exec cdk deploy TripUs-prod-Api --context stage=prod --require-approval broadening
 ```
 
+migration이 `tripus_app` 계정을 만든 것을 확인한 후 애플리케이션 계정의 자동 회전을 활성화한다. 최초 Data 스택부터 이 옵션을 켜면 아직 DB 계정이 없어 rotation 검증이 실패할 수 있으므로 이 순서를 지킨다.
+
+```bash
+pnpm --filter @tripus/infra exec cdk deploy TripUs-prod-Data --context stage=prod --context applicationDatabaseRotation=true --require-approval broadening
+```
+
 운영 endpoint를 앱에 넣기 전 로그인, 장소 검색, AI 일정, 사진 업로드와 migration 로그를 확인한다. 현재 사용자 지정 도메인, CloudFront와 WAF는 후속 운영 보강 범위다.
+
+공개 JWT endpoint는 배포 직후 smoke test를 실행한다.
+
+```bash
+pnpm deploy:smoke -- https://<ApiEndpointDomain>
+```
+
+API 런타임은 Aurora 관리자 계정을 읽지 않는다. migration Lambda만 관리자 secret을 사용하며, API는 `tripus_app` 전용 secret과 CRUD 권한만 사용한다. 관리자 비밀번호는 처음부터 자동 회전하고 앱 비밀번호는 위의 초기 계정 생성 이후 자동 회전을 활성화한다.
 
 ## 비용과 삭제 보호
 
@@ -101,5 +117,6 @@ Aurora와 S3 버킷은 보존 정책을 사용하고 DB 삭제 보호를 켠다.
 3. Web Function application/system 로그에서 부팅 오류를 확인한다.
 4. runtime secret에 선택한 공급자의 필수 키가 모두 있는지 확인한다.
 5. RDS Proxy와 Aurora 상태, VPC 보안 그룹을 확인한다.
+6. `ApiServerErrorAlarm`, `ApiThrottleAlarm`, `MigrationErrorAlarm` 상태를 확인한다. 세 알람은 `AlertTopicArn`으로 출력되는 암호화 SNS topic에 연결된다. 이메일·Chatbot·Incident Manager 같은 실제 구독 대상은 환경별 운영 연락처에 맞춰 연결한다.
 
 비밀값은 로그나 이슈 본문에 복사하지 않는다.

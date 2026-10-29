@@ -1,10 +1,14 @@
 import { CfnOutput, CustomResource, Duration, Fn, Stack, Validations, type StackProps } from 'aws-cdk-lib';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as cloudwatchActions from 'aws-cdk-lib/aws-cloudwatch-actions';
 import * as customResources from 'aws-cdk-lib/custom-resources';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as kms from 'aws-cdk-lib/aws-kms';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3deployment from 'aws-cdk-lib/aws-s3-deployment';
+import * as sns from 'aws-cdk-lib/aws-sns';
 import { NagSuppressions } from 'cdk-nag';
 import type { Construct } from 'constructs';
 
@@ -27,19 +31,26 @@ export class ApiStack extends Stack {
       logGroupName: `/aws/lambda/web/${functionName}`,
       retention: config.production ? logs.RetentionDays.THREE_MONTHS : logs.RetentionDays.ONE_MONTH,
     });
+    const localLogGroup = new logs.LogGroup(this, 'ApiLocalLogs', {
+      logGroupName: `/aws/lambda/web/${functionName}.local`,
+      retention: config.production ? logs.RetentionDays.ONE_MONTH : logs.RetentionDays.ONE_WEEK,
+    });
 
     const executionRole = new iam.Role(this, 'ApiExecutionRole', {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       description: 'TripUS Lambda Web Function runtime permissions',
     });
     logGroup.grantWrite(executionRole);
-    data.databaseSecret.grantRead(executionRole);
+    localLogGroup.grantWrite(executionRole);
+    data.applicationDatabaseSecret.grantRead(executionRole);
     data.runtimeSecret.grantRead(executionRole);
-    data.photoBucket.grantReadWrite(executionRole);
-    data.codeBucket.grantRead(executionRole);
+    executionRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['s3:GetObject', 's3:PutObject'],
+      resources: [data.photoBucket.arnForObjects('*')],
+    }));
     NagSuppressions.addResourceSuppressions(executionRole, [{
       id: 'AwsSolutions-IAM5',
-      reason: 'The API serves dynamic per-user photo object keys and reads versioned deployment objects; object-level S3 ARNs necessarily contain a key wildcard.',
+      reason: 'The API reads and writes dynamic per-user photo keys; object-level S3 ARNs necessarily contain a key wildcard.',
     }], true);
 
     const connectorOperatorRole = new iam.Role(this, 'ConnectorOperatorRole', {
@@ -116,6 +127,9 @@ export class ApiStack extends Stack {
       },
     ], true);
 
+    const migrationLogGroup = new logs.LogGroup(this, 'MigrationLogs', {
+      retention: config.production ? logs.RetentionDays.THREE_MONTHS : logs.RetentionDays.ONE_MONTH,
+    });
     const migrationFunction = new lambda.Function(this, 'MigrationFunction', {
       architecture: lambda.Architecture.ARM_64,
       code: lambda.Code.fromBucket(
@@ -128,9 +142,11 @@ export class ApiStack extends Stack {
         DATABASE_NAME: 'tripus',
         DATABASE_PROXY_HOST: data.databaseProxy.endpoint,
         DATABASE_SECRET_ARN: data.databaseSecret.secretArn,
+        APP_DATABASE_SECRET_ARN: data.applicationDatabaseSecret.secretArn,
         NODE_ENV: 'production',
       },
       handler: 'dist/database/migration-handler.handler',
+      logGroup: migrationLogGroup,
       memorySize: 512,
       runtime: lambda.Runtime.NODEJS_24_X,
       securityGroups: [data.apiSecurityGroup],
@@ -140,12 +156,17 @@ export class ApiStack extends Stack {
     });
     migrationFunction.node.addDependency(artifact);
     data.databaseSecret.grantRead(migrationFunction);
+    data.applicationDatabaseSecret.grantRead(migrationFunction);
     NagSuppressions.addResourceSuppressions(migrationFunction, [{
       id: 'AwsSolutions-IAM4',
       reason: 'CDK attaches the AWS-managed Lambda basic execution and VPC access policies required by this deployment-only migration function.',
     }], true);
 
+    const migrationProviderLogGroup = new logs.LogGroup(this, 'MigrationProviderLogs', {
+      retention: config.production ? logs.RetentionDays.THREE_MONTHS : logs.RetentionDays.ONE_MONTH,
+    });
     const migrationProvider = new customResources.Provider(this, 'MigrationProvider', {
+      logGroup: migrationProviderLogGroup,
       onEventHandler: migrationFunction,
     });
     NagSuppressions.addResourceSuppressions(migrationProvider, [
@@ -197,7 +218,7 @@ export class ApiStack extends Stack {
           AWS_LAMBDA_NODEJS_ENTRYPOINT: 'dist/main.js',
           DATABASE_NAME: 'tripus',
           DATABASE_PROXY_HOST: data.databaseProxy.endpoint,
-          DATABASE_SECRET_ARN: data.databaseSecret.secretArn,
+          DATABASE_SECRET_ARN: data.applicationDatabaseSecret.secretArn,
           MAPS_PROVIDER: config.mapsProvider,
           NODE_ENV: 'production',
           PHOTO_S3_BUCKET: data.photoBucket.bucketName,
@@ -231,7 +252,7 @@ export class ApiStack extends Stack {
     revision.node.addDependency(migration);
 
     const endpoint = new lambda.CfnWebFunctionEndpoint(this, 'ApiEndpoint', {
-      authType: 'ApplicationManaged',
+      authType: config.authMode === 'development' ? 'IamAuth' : 'ApplicationManaged',
       description: `TripUS ${config.stage} mobile API`,
       endpointName: 'api',
       endpointType: 'HomeRegion',
@@ -246,6 +267,55 @@ export class ApiStack extends Stack {
     });
     endpoint.addResourceDependency(revision);
 
+    const alertTopic = new sns.Topic(this, 'AlertTopic', {
+      displayName: `TripUS ${config.stage} deployment alerts`,
+      enforceSSL: true,
+      masterKey: kms.Alias.fromAliasName(this, 'SnsEncryptionKey', 'alias/aws/sns'),
+      topicName: `tripus-${config.stage}-alerts`,
+    });
+    const alertAction = new cloudwatchActions.SnsAction(alertTopic);
+    const requestMetricDimensions = { FunctionName: functionName, EndpointName: 'api' };
+    const apiServerErrorAlarm = new cloudwatch.Alarm(this, 'ApiServerErrorAlarm', {
+      alarmDescription: `TripUS ${config.stage} API returned one or more 5xx responses in five minutes`,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      evaluationPeriods: 1,
+      metric: new cloudwatch.Metric({
+        namespace: 'AWS/Lambda/Web',
+        metricName: 'HTTPResponseStatusClass5XX',
+        dimensionsMap: requestMetricDimensions,
+        period: Duration.minutes(5),
+        statistic: 'Sum',
+      }),
+      threshold: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    apiServerErrorAlarm.addAlarmAction(alertAction);
+    const apiThrottleAlarm = new cloudwatch.Alarm(this, 'ApiThrottleAlarm', {
+      alarmDescription: `TripUS ${config.stage} API endpoint throttled one or more requests`,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      evaluationPeriods: 1,
+      metric: new cloudwatch.Metric({
+        namespace: 'AWS/Lambda/Web/Usage',
+        metricName: 'EndpointRequestThrottles',
+        dimensionsMap: { ...requestMetricDimensions, ExecutionRegion: this.region },
+        period: Duration.minutes(5),
+        statistic: 'Sum',
+      }),
+      threshold: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    apiThrottleAlarm.addAlarmAction(alertAction);
+    const migrationErrorAlarm = new cloudwatch.Alarm(this, 'MigrationErrorAlarm', {
+      alarmDescription: `TripUS ${config.stage} database migration Lambda failed`,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      evaluationPeriods: 1,
+      metric: migrationFunction.metricErrors({ period: Duration.minutes(5), statistic: 'Sum' }),
+      threshold: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    migrationErrorAlarm.addAlarmAction(alertAction);
+
+    new CfnOutput(this, 'AlertTopicArn', { value: alertTopic.topicArn });
     new CfnOutput(this, 'ApiEndpointDomain', { value: endpoint.attrDomainName });
     new CfnOutput(this, 'PhotoBucketName', { value: data.photoBucket.bucketName });
   }

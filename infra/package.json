@@ -10,6 +10,7 @@
     "diff": "pnpm package:api && cdk diff --strict",
     "lint": "eslint .",
     "package:api": "node scripts/package-api.mjs",
+    "smoke": "node scripts/smoke-api.mjs",
     "synth": "pnpm package:api && cdk synth --strict",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

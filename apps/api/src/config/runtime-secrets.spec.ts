@@ -30,6 +30,20 @@ describe('loadRuntimeSecrets', () => {
       'postgresql://trip%40us:p%3Aa%2Fss@proxy.internal:5432/trip%20us?sslmode=require',
     );
   });
+
+  it('accepts an application secret without a host when a proxy endpoint is configured', async () => {
+    const environment: NodeJS.ProcessEnv = {
+      DATABASE_PROXY_HOST: 'proxy.internal',
+      DATABASE_SECRET_ARN: 'application-database-secret',
+    };
+    const reader = fakeReader({ username: 'tripus_app', password: 'secret' });
+
+    await loadRuntimeSecrets(environment, reader);
+
+    expect(environment.DATABASE_URL).toBe(
+      'postgresql://tripus_app:secret@proxy.internal:5432/tripus?sslmode=require',
+    );
+  });
 });
 
 function fakeReader(secret: Record<string, unknown>) {

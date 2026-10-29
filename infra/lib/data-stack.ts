@@ -20,6 +20,7 @@ export interface DataStackProps extends StackProps {
 }
 
 export class DataStack extends Stack {
+  public readonly applicationDatabaseSecret: secretsmanager.ISecret;
   public readonly apiSecurityGroup: ec2.SecurityGroup;
   public readonly codeBucket: s3.Bucket;
   public readonly databaseProxy: rds.DatabaseProxy;
@@ -109,6 +110,28 @@ export class DataStack extends Stack {
       endpoint: secretsManagerEndpoint,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
     });
+    const applicationDatabaseSecret = new rds.DatabaseSecret(this, 'ApplicationDatabaseSecret', {
+      dbname: 'tripus',
+      masterSecret: this.databaseSecret,
+      secretName: `tripus/${config.stage}/database/application`,
+      username: 'tripus_app',
+    });
+    if (!config.applicationDatabaseRotation) {
+      NagSuppressions.addResourceSuppressions(applicationDatabaseSecret, [{
+        id: 'AwsSolutions-SMG4',
+        reason: 'Rotation is deliberately enabled in a second deployment after migration provisions the tripus_app database role.',
+      }]);
+    }
+    this.applicationDatabaseSecret = applicationDatabaseSecret.attach(database);
+    if (config.applicationDatabaseRotation) {
+      database.addRotationMultiUser('ApplicationDatabaseSecretRotation', {
+        automaticallyAfter: Duration.days(30),
+        endpoint: secretsManagerEndpoint,
+        rotateImmediatelyOnUpdate: false,
+        secret: this.applicationDatabaseSecret,
+        vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      });
+    }
     const monitoringRole = database.node.tryFindChild('MonitoringRole');
     if (monitoringRole) {
       NagSuppressions.addResourceSuppressions(monitoringRole, [{
@@ -121,7 +144,7 @@ export class DataStack extends Stack {
       dbProxyName: `tripus-${config.stage}`,
       debugLogging: !config.production,
       requireTLS: true,
-      secrets: [this.databaseSecret],
+      secrets: [this.databaseSecret, this.applicationDatabaseSecret],
       securityGroups: [databaseSecurityGroup],
       vpc: this.vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },

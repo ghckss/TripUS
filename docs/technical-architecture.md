@@ -159,6 +159,7 @@ AI 일정 시작 화면은 여행 스타일 선택이다. 장소 보관함은 �
 - TripUS 액세스 토큰은 15분, 불투명 리프레시 토큰은 30일이며 리프레시할 때마다 DB 트랜잭션으로 회전하고 이전 토큰을 폐기한다.
 - 모바일 세션은 Expo SecureStore(Android Keystore/iOS Keychain)에만 저장한다.
 - `AUTH_MODE=development`에서만 개발용 사용자와 로그인 엔드포인트를 허용하며 운영은 `AUTH_MODE=jwt`를 사용한다.
+- AWS에 배포된 development 인증 endpoint는 `IamAuth`로 제한한다. `ApplicationManaged` 공개 endpoint는 JWT 모드에서만 생성한다.
 
 ### UI
 
@@ -284,9 +285,12 @@ NestJS API는 컨테이너 상시 서버가 아니라 Lambda Web Function으로 
 - `TripUs-<stage>-Api`: API 산출물, TypeORM 배포 마이그레이션, Web Function revision/endpoint
 - Web Function 런타임 제약에 맞춰 Linux arm64용 Sharp 바이너리를 포함한 zip을 생성한다.
 - DB는 격리 서브넷에 두고 API와 배포 전용 migration Lambda만 RDS Proxy를 통해 접근한다.
+- migration은 관리자 DB 계정을 사용하고 API는 CRUD 권한만 가진 `tripus_app` 계정을 사용한다. 두 비밀번호를 분리하며, 관리자 계정은 즉시 자동 회전하고 앱 계정은 최초 migration으로 역할을 만든 뒤 자동 회전을 활성화한다.
 - CloudFormation custom resource가 migration을 먼저 실행하며, 실패하면 새 API revision 배포도 실패한다.
 - 개발 stage는 목업 공급자를 기본값으로 사용해 NAT Gateway를 만들지 않는다. OpenAI, Google 또는 JWT/JWKS를 활성화하면 외부 통신용 NAT Gateway를 한 개 생성한다.
 - CDK strict synth와 `cdk-nag` AWS Solutions 검사를 CI에서 실행한다.
+- API는 요청 ID를 응답과 JSON 로그에 기록하고, 표준 오류 형식과 DB readiness endpoint를 제공한다.
+- Web Function 5xx·스로틀과 migration 실패를 CloudWatch Alarm으로 감시한다.
 
 운영 키 주입과 실제 명령은 [AWS 배포 가이드](./aws-deployment.md)를 따른다.
 

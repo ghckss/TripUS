@@ -24,7 +24,13 @@ import { PhotosModule } from './modules/photos/photos.module';
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) =>
-        createDataSourceOptions(configService.getOrThrow<string>('DATABASE_URL')),
+        createDataSourceOptions(configService.getOrThrow<string>('DATABASE_URL'), {
+          applicationName: 'tripus-api',
+          connectionTimeoutMs: configService.getOrThrow<number>('DATABASE_CONNECTION_TIMEOUT_MS'),
+          idleTimeoutMs: configService.getOrThrow<number>('DATABASE_IDLE_TIMEOUT_MS'),
+          poolMax: configService.getOrThrow<number>('DATABASE_POOL_MAX'),
+          statementTimeoutMs: configService.getOrThrow<number>('DATABASE_STATEMENT_TIMEOUT_MS'),
+        }),
     }),
     HealthModule,
     AuthModule,

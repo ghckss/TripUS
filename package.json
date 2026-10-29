@@ -16,6 +16,7 @@
     "deploy:bootstrap": "pnpm --filter @tripus/infra bootstrap",
     "deploy:aws": "pnpm --filter @tripus/infra deploy",
     "deploy:diff": "pnpm --filter @tripus/infra diff",
+    "deploy:smoke": "pnpm --filter @tripus/infra smoke",
     "deploy:synth": "pnpm --filter @tripus/infra synth",
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test",
