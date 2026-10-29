@@ -12,6 +12,7 @@ dist/
 build/
 coverage/
 .turbo/
+*.tsbuildinfo
 
 # Expo and generated native projects
 .expo/
