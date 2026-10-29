@@ -151,6 +151,14 @@ AI 일정 시작 화면은 여행 스타일 선택이다. 장소 보관함은 �
 
 전역 상태 라이브러리를 프로젝트 시작부터 모든 데이터에 사용하지 않는다. 서버 원본 데이터와 화면 편집 초안을 분리한다.
 
+### 인증
+
+- 모바일은 Google OAuth Authorization Code + PKCE와 iOS 네이티브 Sign in with Apple에서 ID 토큰을 얻는다.
+- 서버는 공급자 JWKS 서명, issuer, audience와 만료를 검증한 뒤에만 사용자를 연결한다.
+- TripUS 액세스 토큰은 15분, 불투명 리프레시 토큰은 30일이며 리프레시할 때마다 DB 트랜잭션으로 회전하고 이전 토큰을 폐기한다.
+- 모바일 세션은 Expo SecureStore(Android Keystore/iOS Keychain)에만 저장한다.
+- `AUTH_MODE=development`에서만 개발용 사용자와 로그인 엔드포인트를 허용하며 운영은 `AUTH_MODE=jwt`를 사용한다.
+
 ### UI
 
 - React Native `StyleSheet`와 디자인 토큰을 기본으로 사용한다.

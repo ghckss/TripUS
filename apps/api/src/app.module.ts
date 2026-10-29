@@ -11,6 +11,7 @@ import { PlacesModule } from './modules/places/places.module';
 import { TripsModule } from './modules/trips/trips.module';
 import { TripRecordsModule } from './modules/trip-records/trip-records.module';
 import { RoutesModule } from './modules/routes/routes.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { RoutesModule } from './modules/routes/routes.module';
         createDataSourceOptions(configService.getOrThrow<string>('DATABASE_URL')),
     }),
     HealthModule,
+    AuthModule,
     AiPlanningModule,
     ItinerariesModule,
     PlacesModule,

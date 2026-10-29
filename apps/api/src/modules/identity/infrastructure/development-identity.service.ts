@@ -1,20 +1,23 @@
-import { Injectable, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { UserEntity } from '../../users/domain/entities/user.entity';
-import type { IdentityPort } from '../domain/identity.port';
+import { AuthMode } from '../../../config/environment';
 
 export const DEVELOPMENT_USER_ID = '00000000-0000-4000-8000-000000000001';
 
 @Injectable()
-export class DevelopmentIdentityService implements IdentityPort, OnModuleInit {
+export class DevelopmentIdentityService implements OnModuleInit {
   constructor(
     @InjectRepository(UserEntity)
     private readonly users: Repository<UserEntity>,
+    @Inject(ConfigService) private readonly config: ConfigService,
   ) {}
 
   async onModuleInit(): Promise<void> {
+    if (this.config.get<string>('AUTH_MODE') !== AuthMode.Development) return;
     await this.users.upsert(
       {
         id: DEVELOPMENT_USER_ID,
@@ -25,7 +28,4 @@ export class DevelopmentIdentityService implements IdentityPort, OnModuleInit {
     );
   }
 
-  getCurrentUserId(): string {
-    return DEVELOPMENT_USER_ID;
-  }
 }
