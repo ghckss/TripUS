@@ -1,11 +1,14 @@
 packages:
   - apps/*
+  - infra
   - packages/*
 
 allowBuilds:
   '@scarf/scarf': false
   esbuild: true
   unrs-resolver: true
+
+injectWorkspacePackages: true
 
 minimumReleaseAgeExclude:
   - '@expo/cli@58.1.16'
@@ -19,3 +22,14 @@ minimumReleaseAgeExclude:
   - expo-auth-session@58.0.16
   - expo-constants@58.0.14
   - expo-linking@58.0.15
+
+supportedArchitectures:
+  os:
+    - current
+    - linux
+  cpu:
+    - current
+    - arm64
+  libc:
+    - current
+    - glibc

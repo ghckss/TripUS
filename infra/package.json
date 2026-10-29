@@ -1,0 +1,32 @@
+{
+  "name": "@tripus/infra",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bootstrap": "cdk bootstrap",
+    "build": "tsc -p tsconfig.json",
+    "deploy": "pnpm package:api && cdk deploy --all --require-approval broadening",
+    "diff": "pnpm package:api && cdk diff --strict",
+    "lint": "eslint .",
+    "package:api": "node scripts/package-api.mjs",
+    "synth": "pnpm package:api && cdk synth --strict",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.275.0",
+    "cdk-nag": "^2.38.2",
+    "constructs": "^10.8.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^24.19.2",
+    "aws-cdk": "2.1146.1",
+    "eslint": "^9.39.5",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5"
+  }
+}

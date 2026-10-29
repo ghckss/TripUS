@@ -13,6 +13,10 @@
     "db:logs": "docker compose logs -f postgres",
     "db:up": "docker compose up -d postgres",
     "dev": "pnpm -r --parallel --if-present dev",
+    "deploy:bootstrap": "pnpm --filter @tripus/infra bootstrap",
+    "deploy:aws": "pnpm --filter @tripus/infra deploy",
+    "deploy:diff": "pnpm --filter @tripus/infra diff",
+    "deploy:synth": "pnpm --filter @tripus/infra synth",
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck"

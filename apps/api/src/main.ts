@@ -2,9 +2,12 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
 import { AppModule } from './app.module';
+import { resolveHttpEndpoint } from './config/http-endpoint';
+import { loadRuntimeSecrets } from './config/runtime-secrets';
 import { setupOpenApi } from './openapi/openapi';
 
 async function bootstrap() {
+  await loadRuntimeSecrets();
   const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('v1');
@@ -19,8 +22,8 @@ async function bootstrap() {
 
   setupOpenApi(app);
 
-  const port = Number(process.env.PORT ?? 3000);
-  await app.listen(port, '0.0.0.0');
+  const endpoint = resolveHttpEndpoint(process.env);
+  await app.listen(endpoint.port, endpoint.host);
 }
 
 void bootstrap();

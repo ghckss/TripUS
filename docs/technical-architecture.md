@@ -10,6 +10,8 @@ TripUS 클라이언트는 Expo 기반 React Native 앱으로 개발한다. 서�
 - ORM/마이그레이션: TypeORM + 명시적 migration
 - API 계약: REST JSON + OpenAPI
 - 저장소: pnpm workspace 기반 모노레포, 앱과 서버는 독립 실행·배포
+- API 배포: AWS Lambda Web Function(Node.js 24/arm64) + AWS CDK
+- 운영 데이터: Aurora PostgreSQL Serverless v2 + RDS Proxy, S3
 - 네이티브 프로젝트 관리: Expo Development Build + CNG(Continuous Native Generation)
 - 빌드 운영: 초기 로컬 빌드, 배포 단계에서 EAS Build/Submit 도입
 - 외부 연동: Google Maps/Places, OpenAI, 사진 저장소를 포트와 어댑터로 분리
@@ -75,6 +77,7 @@ packages/
   api-client/             # OpenAPI에서 생성한 모바일 API 클라이언트
   contracts/              # 생성된 OpenAPI 문서
 docs/
+infra/                    # AWS CDK 데이터/API 스택과 배포 산출물 패키징
 ```
 
 `apps/mobile`은 `apps/api`의 소스에 직접 의존하지 않는다. 모바일은 `packages/contracts`의 공개 계약 또는 OpenAPI에서 생성한 클라이언트 타입만 사용한다.
@@ -273,11 +276,25 @@ MVP 기반에서는 Google Maps와 OpenAI 포트에 결정적 목업 어댑터�
 
 핵심 E2E는 로그인 → 내 여행 → 여행 생성 → 장소 저장 → AI 일정 → 일정 편집 → 완료 정리를 포함한다.
 
-## 9. 아직 유예한 선택
+## 9. AWS 서버리스 배포
 
-- API 배포 플랫폼과 컨테이너 오케스트레이션
-- PostgreSQL 호스팅 서비스
-- 운영 객체 저장소 사업자와 CDN 구성
+NestJS API는 컨테이너 상시 서버가 아니라 Lambda Web Function으로 배포한다. 일반적인 요청/응답 HTTP API이므로 API Gateway 이벤트 변환 없이 Node HTTP 서버를 실행하고, 예약 작업이나 큐 소비가 필요할 때는 별도의 Lambda Event Function을 추가한다.
+
+- `TripUs-<stage>-Data`: VPC, Aurora PostgreSQL Serverless v2, RDS Proxy, 사진/코드 S3, Secrets Manager
+- `TripUs-<stage>-Api`: API 산출물, TypeORM 배포 마이그레이션, Web Function revision/endpoint
+- Web Function 런타임 제약에 맞춰 Linux arm64용 Sharp 바이너리를 포함한 zip을 생성한다.
+- DB는 격리 서브넷에 두고 API와 배포 전용 migration Lambda만 RDS Proxy를 통해 접근한다.
+- CloudFormation custom resource가 migration을 먼저 실행하며, 실패하면 새 API revision 배포도 실패한다.
+- 개발 stage는 목업 공급자를 기본값으로 사용해 NAT Gateway를 만들지 않는다. OpenAI, Google 또는 JWT/JWKS를 활성화하면 외부 통신용 NAT Gateway를 한 개 생성한다.
+- CDK strict synth와 `cdk-nag` AWS Solutions 검사를 CI에서 실행한다.
+
+운영 키 주입과 실제 명령은 [AWS 배포 가이드](./aws-deployment.md)를 따른다.
+
+## 10. 아직 유예한 선택
+
+- 사진 CDN과 이미지 변환 비동기 파이프라인
+- 비동기 AI 일정 작업을 위한 SQS/Event Function
+- CloudFront/WAF 및 사용자 지정 API 도메인
 - OpenAI 모델과 요청별 비용·품질 기준
 - Google 지도 네이티브 지도 화면과 클라이언트 SDK 범위
 - 모노레포를 향후 별도 저장소로 분리할 시점
