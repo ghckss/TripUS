@@ -20,6 +20,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trips/{tripId}/ai-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AiPlanningController_generate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trips/{tripId}/itinerary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ItinerariesController_get"];
+        put: operations["ItinerariesController_replace"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trips/{tripId}/places": {
         parameters: {
             query?: never;
@@ -73,6 +105,65 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         HealthResponse: Record<string, never>;
+        /** @enum {string} */
+        TravelStyle: "balanced" | "food" | "highlights" | "relaxed";
+        GenerateAiPlanDto: {
+            style: components["schemas"]["TravelStyle"];
+        };
+        /** @enum {string} */
+        ItineraryUpdateStatus: "updated" | "conflict";
+        /** @enum {string} */
+        ItinerarySource: "manual" | "ai";
+        /** @enum {string} */
+        VisitStatus: "rated" | "unrated" | "not_visited";
+        ItineraryItemResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            savedPlaceId: string;
+            placeName: string;
+            address?: string | null;
+            /** Format: date */
+            date?: string | null;
+            position?: number | null;
+            locked: boolean;
+            source: components["schemas"]["ItinerarySource"];
+            visitStatus?: components["schemas"]["VisitStatus"] | null;
+            rating?: number | null;
+            review?: string | null;
+        };
+        UnplacedPlaceResponseDto: {
+            /** Format: uuid */
+            savedPlaceId: string;
+            placeName: string;
+        };
+        ItineraryResponseDto: {
+            items: components["schemas"]["ItineraryItemResponseDto"][];
+            unplaced: components["schemas"]["UnplacedPlaceResponseDto"][];
+        };
+        GenerateAiPlanResponseDto: {
+            status: components["schemas"]["ItineraryUpdateStatus"];
+            conflicts: string[];
+            itinerary: components["schemas"]["ItineraryResponseDto"];
+            style: components["schemas"]["TravelStyle"];
+        };
+        ReplaceItineraryItemDto: {
+            /** Format: uuid */
+            savedPlaceId: string;
+            /** Format: date */
+            date: string;
+            position: number;
+            /** @default false */
+            locked: boolean;
+        };
+        ReplaceItineraryDto: {
+            items: components["schemas"]["ReplaceItineraryItemDto"][];
+        };
+        ItineraryUpdateResultDto: {
+            status: components["schemas"]["ItineraryUpdateStatus"];
+            conflicts: string[];
+            itinerary: components["schemas"]["ItineraryResponseDto"];
+        };
         /** @enum {string} */
         PlaceTag: "attraction" | "food" | "cafe" | "shopping" | "lodging" | "transport" | "activity" | "other";
         /** @enum {string} */
@@ -161,6 +252,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    AiPlanningController_generate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateAiPlanDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerateAiPlanResponseDto"];
+                };
+            };
+        };
+    };
+    ItinerariesController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItineraryResponseDto"];
+                };
+            };
+        };
+    };
+    ItinerariesController_replace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceItineraryDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItineraryUpdateResultDto"];
                 };
             };
         };

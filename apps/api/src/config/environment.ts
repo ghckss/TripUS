@@ -1,6 +1,11 @@
 const DEFAULT_DATABASE_URL =
   'postgresql://tripus:tripus_local@localhost:5432/tripus';
 
+export enum AiPlannerProvider {
+  Mock = 'mock',
+  OpenAi = 'openai',
+}
+
 export function validateEnvironment(
   environment: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -20,9 +25,23 @@ export function validateEnvironment(
     throw new Error('DATABASE_URL must use the postgres or postgresql protocol');
   }
 
+  const aiPlannerProvider = environment.AI_PLANNER_PROVIDER ?? AiPlannerProvider.Mock;
+  if (!Object.values(AiPlannerProvider).includes(aiPlannerProvider as AiPlannerProvider)) {
+    throw new Error('AI_PLANNER_PROVIDER must be mock or openai');
+  }
+  if (aiPlannerProvider === AiPlannerProvider.OpenAi) {
+    if (typeof environment.OPENAI_API_KEY !== 'string' || environment.OPENAI_API_KEY.length === 0) {
+      throw new Error('OPENAI_API_KEY is required when AI_PLANNER_PROVIDER=openai');
+    }
+    if (typeof environment.OPENAI_MODEL !== 'string' || environment.OPENAI_MODEL.length === 0) {
+      throw new Error('OPENAI_MODEL is required when AI_PLANNER_PROVIDER=openai');
+    }
+  }
+
   return {
     ...environment,
     DATABASE_URL: databaseUrl,
+    AI_PLANNER_PROVIDER: aiPlannerProvider,
     PORT: port,
   };
 }

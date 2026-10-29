@@ -5,6 +5,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { validateEnvironment } from './config/environment';
 import { createDataSourceOptions } from './database/data-source-options';
 import { HealthModule } from './modules/health/health.module';
+import { AiPlanningModule } from './modules/ai-planning/ai-planning.module';
+import { ItinerariesModule } from './modules/itineraries/itineraries.module';
 import { PlacesModule } from './modules/places/places.module';
 import { TripsModule } from './modules/trips/trips.module';
 
@@ -21,6 +23,8 @@ import { TripsModule } from './modules/trips/trips.module';
         createDataSourceOptions(configService.getOrThrow<string>('DATABASE_URL')),
     }),
     HealthModule,
+    AiPlanningModule,
+    ItinerariesModule,
     PlacesModule,
     TripsModule,
   ],
