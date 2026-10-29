@@ -8,6 +8,9 @@
   },
   "scripts": {
     "build": "pnpm -r --if-present build",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "db:up": "docker compose up -d postgres",
     "dev": "pnpm -r --parallel --if-present dev",
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test",

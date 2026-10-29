@@ -7,18 +7,26 @@
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "lint": "eslint .",
+    "migration:revert": "pnpm typeorm migration:revert",
+    "migration:run": "pnpm typeorm migration:run",
+    "migration:show": "pnpm typeorm migration:show",
     "test": "vitest run --passWithNoTests",
+    "typeorm": "tsx ./node_modules/typeorm/cli.js -d src/database/data-source.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@nestjs/common": "^12.3.2",
+    "@nestjs/config": "^12.0.1",
     "@nestjs/core": "^12.3.2",
     "@nestjs/platform-express": "^12.3.2",
     "@nestjs/swagger": "^12.0.5",
+    "@nestjs/typeorm": "^12.0.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "typeorm": "^1.1.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
