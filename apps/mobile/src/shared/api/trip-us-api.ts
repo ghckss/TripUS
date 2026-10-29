@@ -38,16 +38,19 @@ async function refreshAccessToken(): Promise<AuthSession | null> {
 
 export const authenticatedFetch: typeof fetch = async (input, init) => {
   const session = await getSession();
-  const headers = new Headers(init?.headers);
-  if (session?.accessToken) headers.set("authorization", `Bearer ${session.accessToken}`);
-  let response = await fetch(input, { ...init, headers });
-  const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+  const request = new Request(input, init);
+  const withAccessToken = (accessToken?: string) => {
+    const headers = new Headers(request.headers);
+    if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
+    return new Request(request.clone(), { headers });
+  };
+  let response = await fetch(withAccessToken(session?.accessToken));
+  const url = request.url;
   if (response.status !== 401 || url.includes("/v1/auth/")) return response;
   refreshPromise ??= refreshAccessToken().finally(() => { refreshPromise = undefined; });
   const refreshed = await refreshPromise;
   if (!refreshed) return response;
-  headers.set("authorization", `Bearer ${refreshed.accessToken}`);
-  response = await fetch(input, { ...init, headers });
+  response = await fetch(withAccessToken(refreshed.accessToken));
   return response;
 };
 

@@ -23,7 +23,7 @@ export default function ItineraryScreen() {
       {error && <Card><AppText color={colors.danger}>{error}</AppText><Button label="다시 시도" variant="ghost" onPress={() => void reload()} /></Card>}
       {!itinerary && !error && <Card><AppText color={colors.muted}>일정을 불러오는 중이에요…</AppText></Card>}
       {dates.map((date, dayIndex) => {
-        const items = (grouped[date] ?? []).toSorted((left, right) => (left.position ?? 0) - (right.position ?? 0));
+        const items = [...(grouped[date] ?? [])].sort((left, right) => (left.position ?? 0) - (right.position ?? 0));
         return <Card key={date}>
           <View style={styles.row}><AppText variant="heading">Day {dayIndex + 1}</AppText><Pill label={date} /></View>
           {items.length === 0 && <AppText color={colors.muted}>아직 배치된 장소가 없어요.</AppText>}

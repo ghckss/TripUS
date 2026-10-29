@@ -20,8 +20,8 @@ function normalizePositions(itinerary: Itinerary): Itinerary {
   const positions = new Map<string, number>();
   return {
     ...itinerary,
-    items: itinerary.items
-      .toSorted((left, right) => `${left.date}:${left.position}`.localeCompare(`${right.date}:${right.position}`))
+    items: [...itinerary.items]
+      .sort((left, right) => `${left.date}:${left.position}`.localeCompare(`${right.date}:${right.position}`))
       .map((item) => {
         const date = item.date!;
         const position = positions.get(date) ?? 0;
@@ -69,7 +69,7 @@ export function useItineraryEdit(tripId: string) {
     if (!item) return;
     const sameDay = itinerary.items
       .filter((candidate) => candidate.date === item.date)
-      .toSorted((left, right) => (left.position ?? 0) - (right.position ?? 0));
+      .sort((left, right) => (left.position ?? 0) - (right.position ?? 0));
     const index = sameDay.findIndex((candidate) => candidate.id === itemId);
     const target = sameDay[index + direction];
     if (!target) return;
