@@ -1,8 +1,8 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 import { AppModule } from './app.module';
+import { setupOpenApi } from './openapi/openapi';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -17,13 +17,7 @@ async function bootstrap() {
     }),
   );
 
-  const openApiConfig = new DocumentBuilder()
-    .setTitle('TripUS API')
-    .setDescription('TripUS mobile application API')
-    .setVersion('0.1.0')
-    .build();
-  const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
-  SwaggerModule.setup('docs', app, openApiDocument);
+  setupOpenApi(app);
 
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port, '0.0.0.0');

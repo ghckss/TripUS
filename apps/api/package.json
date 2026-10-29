@@ -10,6 +10,7 @@
     "migration:revert": "pnpm typeorm migration:revert",
     "migration:run": "pnpm typeorm migration:run",
     "migration:show": "pnpm typeorm migration:show",
+    "openapi:generate": "tsx src/scripts/generate-openapi.ts",
     "test": "vitest run --passWithNoTests",
     "typeorm": "tsx ./node_modules/typeorm/cli.js -d src/database/data-source.ts",
     "typecheck": "tsc --noEmit"
