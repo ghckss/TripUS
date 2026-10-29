@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { validateEnvironment } from './config/environment';
 import { createDataSourceOptions } from './database/data-source-options';
 import { HealthModule } from './modules/health/health.module';
+import { TripsModule } from './modules/trips/trips.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { HealthModule } from './modules/health/health.module';
         createDataSourceOptions(configService.getOrThrow<string>('DATABASE_URL')),
     }),
     HealthModule,
+    TripsModule,
   ],
 })
 export class AppModule {}

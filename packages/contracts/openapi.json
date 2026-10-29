@@ -21,6 +21,70 @@
           "health"
         ]
       }
+    },
+    "/v1/trips": {
+      "get": {
+        "operationId": "TripsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TripResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "trips"
+        ]
+      },
+      "post": {
+        "operationId": "TripsController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/v1/trips/{tripId}": {
+      "get": {
+        "operationId": "TripsController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "trips"
+        ]
+      }
     }
   },
   "info": {
@@ -36,6 +100,50 @@
       "HealthResponse": {
         "type": "object",
         "properties": {}
+      },
+      "TripResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "Asia/Seoul"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "archivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "destination",
+          "timezone",
+          "startDate",
+          "endDate",
+          "active"
+        ]
       }
     }
   }
