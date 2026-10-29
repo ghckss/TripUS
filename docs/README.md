@@ -9,4 +9,4 @@ TripUS의 제품 기획과 디자인 요청사항을 관리하는 디렉터리�
 - [Figma AI용 2,000자 이하 분할 프롬프트](./figma-ai-prompts-2000.md)
 - [Figma AI 디자인 개선 프롬프트](./figma-ai-improvement-prompts-2000.md)
 
-현재 문서는 제품 방향과 MVP 범위를 정의하기 위한 기준 문서다. Google Maps Platform의 실제 지원 범위, 요금 및 정책은 개발 착수 시점의 공식 문서를 기준으로 다시 검증한다.
+현재 문서는 제품 방향, 구현된 MVP 범위와 운영 준비 항목을 정의하는 기준 문서다. Google Maps Platform, OpenAI, Apple·Google 로그인과 객체 저장소의 실제 지원 범위, 요금 및 정책은 배포 시점의 공식 문서를 기준으로 다시 검증한다.

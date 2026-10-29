@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "codex/**"
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: tripus
+          POSTGRES_USER: tripus
+          POSTGRES_PASSWORD: tripus_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tripus -d tripus"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://tripus:tripus_ci@127.0.0.1:5432/tripus
+      AUTH_MODE: development
+      ACCESS_TOKEN_SECRET: tripus-ci-secret-at-least-32-characters
+      AI_PLANNER_PROVIDER: mock
+      MAPS_PROVIDER: mock
+      PHOTO_STORAGE_PROVIDER: local
+      PHOTO_LOCAL_DIRECTORY: .data/photos
+      API_PUBLIC_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tripus/api migration:run
+      - run: pnpm contracts:generate
+      - name: Verify generated API contract
+        run: git diff --exit-code -- packages/contracts/openapi.json packages/api-client/src/schema.d.ts
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build

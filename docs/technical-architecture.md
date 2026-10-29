@@ -73,9 +73,7 @@ apps/
     src/config/           # 환경 설정과 검증
 packages/
   api-client/             # OpenAPI에서 생성한 모바일 API 클라이언트
-  contracts/              # API 요청·응답 스키마와 생성 타입
-  config/                 # 공유 TypeScript/ESLint 설정
-  test-fixtures/          # 목업 시나리오와 테스트 데이터
+  contracts/              # 생성된 OpenAPI 문서
 docs/
 ```
 
@@ -140,10 +138,10 @@ AI 일정 시작 화면은 여행 스타일 선택이다. 장소 보관함은 �
 
 ### 상태 관리
 
-- 서버 상태: TanStack Query
-- 폼: React Hook Form + 스키마 검증
-- 화면 임시 상태: React local state
-- 복잡한 일정 편집 초안: 필요성이 확인될 때만 Zustand 도입
+- 서버 상태: 도메인별 API 함수와 화면 전용 hook에서 관리하며 `@tripus/api-client` 생성 클라이언트를 사용
+- 폼과 화면 임시 상태: React local state
+- 복잡한 캐시 무효화가 필요해질 때 TanStack Query 도입
+- 복잡한 일정 편집 초안이 여러 화면으로 확장될 때만 Zustand 도입
 - 인증 토큰: OS 보안 저장소 사용, 일반 AsyncStorage에 저장하지 않음
 - 오프라인 최소 일정: SQLite 기반 읽기 캐시를 단계적으로 도입
 
@@ -184,7 +182,9 @@ Nest Controller
 - Nest Module은 기능 경계를 정의하고 외부 모듈은 공개된 Provider만 사용한다.
 - 인증과 소유권 검사는 데이터 접근 계층 가까이에서 반복 검증한다.
 - AI 일정 생성은 비동기 작업으로 확장할 수 있게 요청과 결과 모델을 분리한다.
-- 사진은 서버가 발급한 서명 업로드 URL을 사용하고 업로드 완료 후 서버에서 소유권과 메타데이터 제거 결과를 확정한다.
+- 사진은 서버가 발급한 업로드 URL을 사용한다. 로컬 개발은 API 스트리밍 업로드, 운영은 S3 호환 서명 PUT URL을 사용한다.
+- 원본은 변형 없이 보존하고 사용자별 총 저장 용량 한도를 두지 않는다. 안전을 위한 파일당 100MB 제한은 적용한다.
+- 화면 표시용 최적화본과 480px 썸네일은 Sharp로 회전 보정 후 JPEG로 생성하며 파생본에는 원본 메타데이터를 복사하지 않는다.
 
 ## 6. API 계약
 
@@ -202,9 +202,13 @@ Nest Controller
 POST /v1/trips
 GET  /v1/trips/:tripId
 POST /v1/trips/:tripId/places
+GET  /v1/trips/:tripId/places/search
 POST /v1/trips/:tripId/ai-plans
 PUT  /v1/trips/:tripId/itinerary
+POST /v1/trips/:tripId/routes/transit
 POST /v1/trips/:tripId/completion
+POST /v1/trips/:tripId/photos
+POST /v1/trips/:tripId/photos/:photoId/confirm
 ```
 
 ## 7. 외부 연동 경계
@@ -212,8 +216,8 @@ POST /v1/trips/:tripId/completion
 - `PlacesPort`: 장소 검색, 상세, 중복 식별
 - `RoutesPort`: 대중교통 예상 이동시간과 경로
 - `AIPlannerPort`: 여행 스타일 기반 날짜별 배치안
-- `PhotoStoragePort`: 원본·최적화본 업로드와 삭제
-- `AuthPort`: 소셜 로그인 식별자 검증
+- `PhotoStoragePort`: 원본·최적화본 업로드와 다운로드 URL 발급
+- `SocialIdentityPort`: Google·Apple ID 토큰 검증
 
 Google 지도 연동은 `MAPS_PROVIDER=mock|google`로 전환한다. `google` 모드에서는 서버에만 `GOOGLE_MAPS_API_KEY`를 주입하고 Places API(New) Text Search와 Routes API Compute Routes를 호출한다. 응답 필드는 비용과 지연을 줄이도록 필요한 field mask만 요청한다. 경로를 찾지 못하거나 공급자 호출이 실패하면 500 오류 대신 `unavailable` 도메인 결과를 반환한다.
 
@@ -251,6 +255,14 @@ MVP 기반에서는 Google Maps와 OpenAI 포트에 결정적 목업 어댑터�
 
 환경 변수 기본값은 `AI_PLANNER_PROVIDER=mock`이다. 실제 어댑터는 `AI_PLANNER_PROVIDER=openai`, `OPENAI_API_KEY`, `OPENAI_MODEL` 세 값을 모두 서버에 설정했을 때만 활성화한다.
 
+### 사진 저장
+
+- `PHOTO_STORAGE_PROVIDER=local|s3`로 저장소를 교체한다.
+- 로컬 모드는 `.data/photos` 아래에 원본과 파생본을 저장하고 인증된 API 파일 경로로 제공한다.
+- S3 모드는 AWS SDK v3의 `S3Client`와 presigner를 사용한다. 원본 업로드 URL은 10분, 조회 URL은 1시간 유효하며 업로드의 `content-type`도 서명한다.
+- S3 호환 개발 저장소는 `PHOTO_S3_ENDPOINT`와 path-style 요청으로 연결할 수 있다.
+- 원본 저장 용량 확대는 Plus 혜택이 아니며 사용자별 원본 총량 제한을 두지 않는다.
+
 ## 8. 테스트
 
 - 도메인과 API 단위 테스트: Vitest
@@ -263,12 +275,11 @@ MVP 기반에서는 Google Maps와 OpenAI 포트에 결정적 목업 어댑터�
 
 ## 9. 아직 유예한 선택
 
-- 소셜 인증 공급자와 로그인 제공자 범위
 - API 배포 플랫폼과 컨테이너 오케스트레이션
 - PostgreSQL 호스팅 서비스
-- 객체 저장소와 CDN
+- 운영 객체 저장소 사업자와 CDN 구성
 - OpenAI 모델과 요청별 비용·품질 기준
-- Google Maps 클라이언트/서버 API의 정확한 조합
+- Google 지도 네이티브 지도 화면과 클라이언트 SDK 범위
 - 모노레포를 향후 별도 저장소로 분리할 시점
 
 이 선택은 현재 기반 구현을 막지 않으며 각 포트 뒤에 둔다.

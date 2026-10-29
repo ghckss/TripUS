@@ -68,15 +68,16 @@ export class AuthService {
     return this.dataSource.transaction(async (manager) => {
       const token = await manager.findOne(RefreshTokenEntity, {
         where: { tokenHash: hashToken(input.refreshToken), revokedAt: IsNull(), expiresAt: MoreThan(new Date()) },
-        relations: { user: true },
         lock: { mode: 'pessimistic_write' },
       });
       if (!token) throw new UnauthorizedException('Refresh token is invalid or expired');
+      const user = await manager.findOneBy(UserEntity, { id: token.userId });
+      if (!user) throw new UnauthorizedException('Refresh token user is unavailable');
       const next = await this.createRefreshToken(token.userId, manager);
       token.revokedAt = new Date();
       token.replacedByTokenId = next.entity.id;
       await manager.save(RefreshTokenEntity, token);
-      return this.sessionResponse(token.user, next.raw);
+      return this.sessionResponse(user, next.raw);
     });
   }
 

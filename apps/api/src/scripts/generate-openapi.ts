@@ -7,7 +7,7 @@ import { AppModule } from '../app.module';
 import { createOpenApiDocument } from '../openapi/openapi';
 
 async function generateOpenApi() {
-  const app = await NestFactory.create(AppModule, { logger: false });
+  const app = await NestFactory.create(AppModule, { logger: ['error', 'warn'] });
   app.setGlobalPrefix('v1');
   await app.init();
 

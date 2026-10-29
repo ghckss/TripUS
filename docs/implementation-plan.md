@@ -61,34 +61,37 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 
 ### M4. 여행 완료와 기록
 
-상태: 핵심 완료(사진 저장은 M5)
+상태: 완료
 
 - 상태 탭 없는 완료 정리
 - 방문 장소 별점 1~5점
 - 별도 미방문 지정과 되돌리기
 - 별점 없는 완료/정리 없는 보관의 미평가 처리
 - 방문별 후기와 사진 인라인 UI
-- 완료 여행 요약
+- 로컬/S3 호환 원본 사진 저장, 최적화본과 썸네일 생성
+- 완료 여행 요약과 사진 갤러리
 
 완료 조건: 일정의 모든 방문이 rated, unrated, not_visited 중 하나로 일관되게 전환된다.
 
 ### M5. 실제 연동
 
-상태: 준비됨(OpenAI 어댑터 구현, 인증·지도·사진은 미착수)
+상태: 어댑터 구현 완료(실서비스 자격 증명 검증 대기)
 
 - 소셜 인증과 보안 토큰 저장
 - Google Places/Routes 어댑터
 - OpenAI Responses API와 Structured Outputs 기반 일정 생성 작업
-- 서명 URL 기반 사진 업로드, 최적화와 EXIF 제거
-- SQLite 기반 오프라인 최소 일정
-- 공유 메뉴 진입과 앱/유니버설 링크
+- 서명 URL 기반 사진 업로드, 원본 보존과 메타데이터 없는 파생본 생성
 
-완료 조건: 목업 어댑터를 환경 설정으로 실제 어댑터와 교체할 수 있다.
+실서비스 검증에는 Google/Apple Client ID, Google Maps API 키, OpenAI API 키·모델, S3 버킷·리전·자격 증명이 필요하다. 기본 로컬 실행은 개발 인증과 결정적 지도·AI 목업, 로컬 사진 저장소를 사용한다.
+
+완료 조건: 목업 어댑터를 환경 설정으로 실제 어댑터와 교체할 수 있고, 공급자 실패가 정상 예외 결과로 처리된다.
 
 ### M6. 품질과 출시
 
 - React Native Testing Library와 API 통합 테스트
 - Maestro 핵심 흐름 E2E
+- SQLite 기반 오프라인 최소 일정
+- 공유 메뉴 진입과 앱/유니버설 링크
 - 접근성, 저사양 기기, 느린 네트워크 점검
 - 관측성, 오류 추적과 제품 이벤트
 - iOS TestFlight와 Android 내부 테스트
@@ -101,12 +104,13 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 
 ## 구현 결과
 
-- 로그인 목업 → 내 여행 → 여행 생성 → 장소 저장 → AI 일정 → 일정 편집 → 완료 정리 → 완료 여행 목록을 모바일과 API로 연결했다.
+- Google/Apple 로그인과 개발 로그인 → 내 여행 → 여행 생성 → 장소 저장 → AI 일정 → 일정 편집 → 완료 정리 → 완료 여행 목록을 모바일과 API로 연결했다.
 - AI 일정은 결정적 목업이 기본이며 OpenAI Responses API + Structured Outputs 어댑터를 환경 설정으로 교체할 수 있다.
 - 일정 충돌은 정상 `conflict` 결과로 반환하고, 경로 실패와 일정 충돌 전용 모바일 화면을 제공한다.
 - 완료 정리에서 별점은 `rated`, 별도 미방문은 `not_visited`, 입력 없이 보관한 방문은 `unrated`로 저장한다.
-- Android Development Build에서 실제 PostgreSQL을 사용해 AI 일정 생성부터 미평가 보관 요약까지 확인했다.
-- 실제 소셜 인증, Google Places/Routes, 사진 저장과 배포 파이프라인은 M5/M6 범위다.
+- Google Places Text Search(New), Google Routes, OpenAI Responses API, S3 호환 사진 저장을 환경 설정으로 교체할 수 있다.
+- Android와 iOS Development Build에서 실제 PostgreSQL을 사용해 개발 로그인, AI 일정 생성, 일정 편집, 대중교통 목업 경로, 별점·미방문, 사진 업로드와 완료 기록 갤러리까지 확인했다.
+- 실제 공급자 자격 증명을 사용한 통합 검증과 EAS 배포 파이프라인은 운영 준비 단계에 남아 있다.
 
 ## 확정된 구현 기준
 
