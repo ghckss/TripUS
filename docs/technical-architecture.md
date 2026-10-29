@@ -12,7 +12,7 @@ TripUS 클라이언트는 Expo 기반 React Native 앱으로 개발한다. 서�
 - 저장소: pnpm workspace 기반 모노레포, 앱과 서버는 독립 실행·배포
 - 네이티브 프로젝트 관리: Expo Development Build + CNG(Continuous Native Generation)
 - 빌드 운영: 초기 로컬 빌드, 배포 단계에서 EAS Build/Submit 도입
-- 외부 연동: Google Maps/Places, AI, 사진 저장소를 포트와 어댑터로 분리
+- 외부 연동: Google Maps/Places, OpenAI, 사진 저장소를 포트와 어댑터로 분리
 
 의존성 버전은 프로젝트 생성 시점의 최신 버전을 무조건 사용하지 않는다. Expo SDK 호환표와 각 패키지의 안정 버전을 확인해 정확한 버전으로 고정하고 lockfile을 커밋한다.
 
@@ -49,18 +49,26 @@ TripUS 클라이언트는 Expo 기반 React Native 앱으로 개발한다. 서�
 ```text
 apps/
   mobile/                 # Expo React Native 앱
-    src/app/              # Expo Router 라우트
-    src/features/         # auth, trips, places, itinerary, completion
-    src/components/       # 디자인 시스템과 공통 UI
-    src/adapters/         # API, 지도, 로컬 저장소 어댑터
+    src/app/              # Expo Router 진입점만 유지
+    src/domains/          # 도메인별 페이지, 로직, 컴포넌트, API
+      trips/
+        pages/
+        components/
+        hooks/
+        api/
+        model/
+      places/
+      itineraries/
+      trip-records/
+    src/shared/           # 두 개 이상 도메인이 공유하는 UI와 기반 코드
   api/                    # NestJS API
-    src/modules/          # auth, trips, places, itinerary, visits, photos
+    src/modules/          # identity, trips, places, itineraries, trip-records, photos
       trips/
         trips.module.ts
-        trips.controller.ts
-        application/     # command/query service와 DTO
-        domain/          # 엔티티와 정책
-        infrastructure/  # TypeORM entity/repository adapter
+        application/      # 유스케이스와 입출력 DTO
+        domain/           # 엔티티, 값 객체, 정책, 포트
+        presentation/     # Nest Controller
+        infrastructure/   # TypeORM repository와 외부 서비스 어댑터
     src/common/           # guard, filter, interceptor, logging
     src/config/           # 환경 설정과 검증
 packages/
@@ -83,6 +91,34 @@ docs/
 - EAS Build와 EAS Submit은 내부 배포 또는 스토어 배포가 필요한 M6에서 도입한다.
 
 ## 4. 모바일 아키텍처
+
+### 도메인과 페이지 기준 배치
+
+모바일 코드는 화면 종류가 아니라 제품 도메인을 최상위 경계로 사용한다. `src/app`은 Expo Router가 요구하는 경로와 레이아웃만 가지며 실제 화면 구현을 소유하지 않는다.
+
+```text
+src/domains/trips/
+  pages/
+    trip-list-page.tsx
+    trip-detail-page.tsx
+    new-trip-page/
+      new-trip-page.tsx
+      trip-date-fields.tsx       # 이 페이지에서만 사용하는 컴포넌트
+      use-new-trip-form.ts       # 이 페이지에서만 사용하는 로직
+  components/                    # trips의 여러 페이지가 공유할 때만 사용
+  hooks/
+  api/
+  model/
+  index.ts                       # 다른 도메인에 공개하는 최소 API
+```
+
+배치 규칙은 다음과 같다.
+
+1. 한 페이지에서만 사용하는 로직과 컴포넌트는 해당 페이지 폴더에 둔다.
+2. 같은 도메인의 두 페이지 이상에서 재사용할 때만 도메인 공통 폴더로 올린다.
+3. 두 도메인 이상에서 의미가 동일할 때만 `src/shared`로 올린다.
+4. 도메인 간 참조는 상대 도메인의 공개 진입점만 사용하고 내부 파일을 임의로 참조하지 않는다.
+5. 서버 응답 타입은 `packages/api-client`에서 가져오며 모바일에 서버 Entity를 복제하지 않는다.
 
 ### 라우팅
 
@@ -169,7 +205,35 @@ POST /v1/trips/:tripId/completion
 - `PhotoStoragePort`: 원본·최적화본 업로드와 삭제
 - `AuthPort`: 소셜 로그인 식별자 검증
 
-MVP 기반에서는 Google Maps와 AI를 결정적 목업 어댑터로 구현한다. 목업도 실제 포트와 동일한 계약을 사용한다.
+### OpenAI 일정 생성
+
+AI 공급자는 OpenAI로 확정한다. 모바일은 OpenAI API를 직접 호출하지 않으며 API 키, 프롬프트, 모델 설정은 NestJS 서버에만 둔다.
+
+```text
+ai-planning/
+  domain/
+    ai-planner.port.ts
+    itinerary-proposal.ts
+  application/
+    generate-itinerary.service.ts
+  infrastructure/
+    mock-ai-planner.adapter.ts
+    openai-planner.adapter.ts
+    schemas/itinerary-proposal.schema.ts
+  presentation/
+    ai-planning.controller.ts
+```
+
+- OpenAI 공식 JavaScript SDK와 Responses API를 사용한다.
+- 일정 결과는 Structured Outputs와 JSON Schema로 날짜, 장소 ID, 순서, 미배치 사유를 강제한다.
+- 생성 결과는 바로 DB에 덮어쓰지 않고 도메인 검증 후 임시 제안으로 반환한다.
+- 모델명은 코드에 고정하지 않고 `OPENAI_MODEL` 환경 변수로 관리한다.
+- API 키는 `OPENAI_API_KEY`로 서버에만 주입하고 로그, OpenAPI, 모바일 번들에 노출하지 않는다.
+- 거부, 불완전 응답, 타임아웃과 스키마 오류는 정상적인 AI 생성 실패 결과로 변환한다.
+
+참고: [OpenAI Structured Outputs 공식 문서](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses)
+
+MVP 기반에서는 Google Maps와 OpenAI 포트에 결정적 목업 어댑터를 먼저 연결한다. 실제 OpenAI 어댑터는 배포 환경의 키와 모델이 정해진 뒤 같은 포트로 교체한다.
 
 ## 8. 테스트
 
@@ -187,7 +251,7 @@ MVP 기반에서는 Google Maps와 AI를 결정적 목업 어댑터로 구현한
 - API 배포 플랫폼과 컨테이너 오케스트레이션
 - PostgreSQL 호스팅 서비스
 - 객체 저장소와 CDN
-- AI 모델과 공급자
+- OpenAI 모델과 요청별 비용·품질 기준
 - Google Maps 클라이언트/서버 API의 정확한 조합
 - 모노레포를 향후 별도 저장소로 분리할 시점
 

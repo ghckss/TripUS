@@ -2,9 +2,9 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { IdentityModule } from '../identity/identity.module';
-import { TripEntity } from './entities/trip.entity';
-import { TripsController } from './trips.controller';
-import { TripsService } from './trips.service';
+import { TripsService } from './application/trips.service';
+import { TripEntity } from './domain/entities/trip.entity';
+import { TripsController } from './presentation/trips.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([TripEntity]), IdentityModule],

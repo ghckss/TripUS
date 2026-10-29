@@ -34,7 +34,7 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 - Figma 기반 색상·타이포·간격 토큰
 - 모바일 앱 셸, 스택, 탭과 공통 컴포넌트
 - 여행·저장 장소·일정·방문 기록 스키마
-- Google Places/Routes와 AI 목업 어댑터
+- Google Places/Routes와 OpenAI 일정 생성 목업 어댑터
 - 기능별 예외 UI 기반
 
 완료 조건: iOS와 Android에서 핵심 라우트와 디자인 시스템을 확인할 수 있다.
@@ -66,7 +66,7 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 
 - 소셜 인증과 보안 토큰 저장
 - Google Places/Routes 어댑터
-- AI 일정 생성 작업
+- OpenAI Responses API와 Structured Outputs 기반 일정 생성 작업
 - 서명 URL 기반 사진 업로드, 최적화와 EXIF 제거
 - SQLite 기반 오프라인 최소 일정
 - 공유 메뉴 진입과 앱/유니버설 링크

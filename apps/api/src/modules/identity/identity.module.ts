@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { UserEntity } from '../users/entities/user.entity';
-import { DevelopmentIdentityService } from './development-identity.service';
-import { IDENTITY_PORT } from './identity.port';
+import { UserEntity } from '../users/domain/entities/user.entity';
+import { IDENTITY_PORT } from './domain/identity.port';
+import { DevelopmentIdentityService } from './infrastructure/development-identity.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([UserEntity])],

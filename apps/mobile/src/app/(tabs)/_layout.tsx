@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
-import { AppText } from "@/components/ui/app-text";
-import { colors } from "@/design/tokens";
+import { AppText } from "@/shared/ui/app-text";
+import { colors } from "@/shared/design/tokens";
 
 export default function TabsLayout() {
   return (
