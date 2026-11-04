@@ -6,7 +6,7 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 
 ## 마일스톤
 
-상태 기준일: 2026-10-29
+상태 기준일: 2026-11-04
 
 ### M0. 기술 결정과 계약
 
@@ -88,15 +88,16 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 
 ### M6. 품질과 출시
 
-상태: 진행 중(모바일 컴포넌트 테스트와 iOS·Android Maestro 핵심 흐름 구축 완료)
+상태: 진행 중(코드 기반 완료, 실제 배포 계정 검증 대기)
 
 - React Native Testing Library와 API 통합 테스트 — 모바일 기반 구축, API 통합 범위 확장 진행 중
 - Maestro 핵심 흐름 E2E — 로컬 iOS·Android Development Build flow 통과
-- SQLite 기반 오프라인 최소 일정
-- 공유 메뉴 진입과 앱/유니버설 링크
-- 접근성, 저사양 기기, 느린 네트워크 점검
-- 관측성, 오류 추적과 제품 이벤트
-- iOS TestFlight와 Android 내부 테스트
+- SQLite 기반 오프라인 최소 일정 — 완료
+- 장소 저장 custom scheme 딥링크와 외부 검색어 전달 — 완료
+- 네이티브 공유 확장과 실제 도메인 유니버설 링크 — 배포 도메인·서명 설정 대기
+- 접근성 기본 속성, 오프라인 배너와 오류 복구 — 완료, 실제 저사양 기기 점검 대기
+- 관측성, 오류 추적과 제품 이벤트 — 구조화 서버 로그·모바일 오류 경계·운영 대시보드 완료
+- iOS TestFlight와 Android 내부 테스트 — EAS 프로필·수동 CI 완료, Expo/스토어 계정 연결 대기
 
 완료 조건: 양 플랫폼에서 출시 후보가 핵심 시나리오와 비기능 기준을 통과한다.
 
@@ -112,7 +113,12 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 - 완료 정리에서 별점은 `rated`, 별도 미방문은 `not_visited`, 입력 없이 보관한 방문은 `unrated`로 저장한다.
 - Google Places Text Search(New), Google Routes, OpenAI Responses API, S3 호환 사진 저장을 환경 설정으로 교체할 수 있다.
 - Android와 iOS Development Build에서 실제 PostgreSQL을 사용해 개발 로그인, AI 일정 생성, 일정 편집, 대중교통 목업 경로, 별점·미방문, 사진 업로드와 완료 기록 갤러리까지 확인했다.
-- 실제 공급자 자격 증명을 사용한 통합 검증과 EAS 배포 파이프라인은 운영 준비 단계에 남아 있다.
+- 실제 공급자 자격 증명 통합 검증과 EAS 빌드 실행은 외부 계정 연결 단계에 남아 있다.
+- Free/Plus의 여행·AI 생성 한도를 서버에서 강제하고 프로필과 행동 맥락에서 사용량을 표시한다. AI 공급자 실패는 무료 횟수를 차감하지 않는다.
+- 날짜별 활동 시간과 출발·종료 숙소를 저장하고 AI 입력에 반영한다. 잠근 일정은 AI 재생성에서도 유지하며 최근 AI 변경은 기기에서 한 번 되돌릴 수 있다.
+- 대중교통 경로 확인 후 Google Maps의 대중교통 길 찾기로 연결한다.
+- SQLite 오프라인 스냅샷, `tripus://save-place` 딥링크, 로컬 여행 알림, 제품 이벤트와 전역 오류 복구를 추가했다.
+- AWS와 EAS의 수동 배포 워크플로를 추가했다. 실제 배포는 AWS OIDC 역할, Expo project ID·token, Apple·Google 배포 자격 증명 연결 후 수행한다.
 
 ## 확정된 구현 기준
 
