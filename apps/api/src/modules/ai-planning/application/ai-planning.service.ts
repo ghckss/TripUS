@@ -11,6 +11,7 @@ import { TripEntity } from '../../trips/domain/entities/trip.entity';
 import { AI_PLANNER_PORT, AiPlannerError, type AiPlannerPort, TravelStyle } from '../domain/ai-planner.port';
 import { AiPlanGenerationStatus, GenerateAiPlanResponseDto } from './dto/generate-ai-plan.dto';
 import { AiPlanningRateLimiter } from './ai-planning-rate-limiter';
+import { EntitlementsService } from '../../entitlements/application/entitlements.service';
 
 @Injectable()
 export class AiPlanningService {
@@ -22,10 +23,12 @@ export class AiPlanningService {
     @Inject(ItinerariesService) private readonly itineraries: ItinerariesService,
     @Inject(IDENTITY_PORT) private readonly identity: IdentityPort,
     @Inject(AiPlanningRateLimiter) private readonly rateLimiter: AiPlanningRateLimiter,
+    @Inject(EntitlementsService) private readonly entitlements: EntitlementsService,
   ) {}
 
   async generate(tripId: string, style: TravelStyle): Promise<GenerateAiPlanResponseDto> {
     this.rateLimiter.assertAllowed(this.identity.getCurrentUserId());
+    await this.entitlements.assertCanGenerateAiPlan();
     const trip = await this.trips.findOneBy({ id: tripId, ownerId: this.identity.getCurrentUserId(), active: true });
     if (!trip) throw new NotFoundException('Trip not found');
     const places = await this.places.find({ where: { tripId }, order: { createdAt: 'ASC' } });
@@ -43,6 +46,7 @@ export class AiPlanningService {
       const allowed = new Set(places.map((place) => place.id));
       const placements = output.placements.filter((item) => allowed.has(item.savedPlaceId));
       const result = await this.itineraries.replace(tripId, placements, ItinerarySource.Ai);
+      await this.entitlements.recordSuccessfulAiGeneration();
       return {
         status: result.status === ItineraryUpdateStatus.Updated ? AiPlanGenerationStatus.Generated : AiPlanGenerationStatus.Conflict,
         style,

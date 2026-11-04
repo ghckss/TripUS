@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { IdentityPort } from '../../identity/domain/identity.port';
 import { TripEntity } from '../domain/entities/trip.entity';
 import { TripsService } from './trips.service';
+import type { EntitlementsService } from '../../entitlements/application/entitlements.service';
 
 const userId = '00000000-0000-4000-8000-000000000001';
 
@@ -16,11 +17,13 @@ function createService() {
     save: vi.fn(),
   };
   const identity: IdentityPort = { getCurrentUserId: () => userId };
+  const entitlements = { assertCanCreateTrip: vi.fn() };
   const service = new TripsService(
     repository as unknown as Repository<TripEntity>,
     identity,
+    entitlements as unknown as EntitlementsService,
   );
-  return { repository, service };
+  return { entitlements, repository, service };
 }
 
 describe('TripsService', () => {

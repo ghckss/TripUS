@@ -14,6 +14,7 @@ import { RoutesModule } from './modules/routes/routes.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PhotosModule } from './modules/photos/photos.module';
 import { TelemetryModule } from './modules/telemetry/telemetry.module';
+import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { TelemetryModule } from './modules/telemetry/telemetry.module';
     RoutesModule,
     PhotosModule,
     TelemetryModule,
+    EntitlementsModule,
   ],
 })
 export class AppModule {}

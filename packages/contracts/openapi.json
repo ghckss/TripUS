@@ -261,6 +261,27 @@
         ]
       }
     },
+    "/v1/me/entitlements": {
+      "get": {
+        "operationId": "EntitlementsController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntitlementsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "entitlements"
+        ]
+      }
+    },
     "/v1/trips/{tripId}/places": {
       "get": {
         "operationId": "PlacesController_list",
@@ -1305,6 +1326,50 @@
           "status",
           "conflicts",
           "itinerary"
+        ]
+      },
+      "SubscriptionTier": {
+        "type": "string",
+        "enum": [
+          "free",
+          "plus"
+        ]
+      },
+      "EntitlementsResponseDto": {
+        "type": "object",
+        "properties": {
+          "tier": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubscriptionTier"
+              }
+            ]
+          },
+          "tripLimit": {
+            "type": "number",
+            "nullable": true,
+            "example": 1
+          },
+          "tripCount": {
+            "type": "number",
+            "example": 0
+          },
+          "aiGenerationLimit": {
+            "type": "number",
+            "nullable": true,
+            "example": 1
+          },
+          "aiGenerationsUsed": {
+            "type": "number",
+            "example": 0
+          }
+        },
+        "required": [
+          "tier",
+          "tripLimit",
+          "tripCount",
+          "aiGenerationLimit",
+          "aiGenerationsUsed"
         ]
       },
       "PlaceTag": {

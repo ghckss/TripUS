@@ -7,6 +7,10 @@ const mockCreateTrip = jest.fn();
 
 jest.mock("expo-router", () => ({
   router: { replace: jest.fn() },
+  useFocusEffect: jest.fn(),
+}));
+jest.mock("@/domains/entitlements/api/entitlements.api", () => ({
+  getEntitlements: jest.fn().mockResolvedValue({ tier: "free", tripLimit: 1, tripCount: 0, aiGenerationLimit: 1, aiGenerationsUsed: 0 }),
 }));
 jest.mock("@/domains/trips/api/trips.api", () => ({
   createTrip: (...args: unknown[]) => mockCreateTrip(...args),

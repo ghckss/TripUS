@@ -8,6 +8,7 @@ import { TripResponseDto } from './dto/trip-response.dto';
 import { TripEntity } from '../domain/entities/trip.entity';
 import { TripListStatus } from './dto/list-trips-query.dto';
 import { UpdateTripDto } from './dto/update-trip.dto';
+import { EntitlementsService } from '../../entitlements/application/entitlements.service';
 
 @Injectable()
 export class TripsService {
@@ -16,6 +17,8 @@ export class TripsService {
     private readonly trips: Repository<TripEntity>,
     @Inject(IDENTITY_PORT)
     private readonly identity: IdentityPort,
+    @Inject(EntitlementsService)
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async list(status: TripListStatus = TripListStatus.Current): Promise<TripResponseDto[]> {
@@ -35,6 +38,7 @@ export class TripsService {
     if (input.endDate < input.startDate) {
       throw new BadRequestException('endDate must be on or after startDate');
     }
+    await this.entitlements.assertCanCreateTrip();
     const entity = this.trips.create({
       ...input,
       ownerId: this.identity.getCurrentUserId(),

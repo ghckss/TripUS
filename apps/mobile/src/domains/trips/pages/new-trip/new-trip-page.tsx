@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { router } from "expo-router";
+import { useCallback, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
 import { StyleSheet, TextInput } from "react-native";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
@@ -7,6 +7,7 @@ import { Card } from "@/shared/ui/card";
 import { Screen } from "@/shared/ui/screen";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { createTrip } from "@/domains/trips/api/trips.api";
+import { getEntitlements, type Entitlements } from "@/domains/entitlements/api/entitlements.api";
 
 export default function NewTripScreen() {
   const [title, setTitle] = useState("서울 가을 여행");
@@ -15,6 +16,9 @@ export default function NewTripScreen() {
   const [endDate, setEndDate] = useState("2026-11-02");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
+  const [entitlements, setEntitlements] = useState<Entitlements>();
+  useFocusEffect(useCallback(() => { void getEntitlements().then(setEntitlements).catch(() => undefined); }, []));
+  const limitReached = entitlements?.tripLimit !== null && entitlements !== undefined && entitlements.tripCount >= entitlements.tripLimit;
 
   const submit = async () => {
     setSaving(true);
@@ -39,8 +43,13 @@ export default function NewTripScreen() {
         <AppText variant="label">시작일</AppText><TextInput testID="new-trip-start-date" value={startDate} onChangeText={setStartDate} placeholder="YYYY-MM-DD" style={styles.input} />
         <AppText variant="label">종료일</AppText><TextInput testID="new-trip-end-date" value={endDate} onChangeText={setEndDate} placeholder="YYYY-MM-DD" style={styles.input} />
       </Card>
+      {limitReached && <Card>
+        <AppText variant="heading">무료 여행 한도에 도달했어요</AppText>
+        <AppText color={colors.muted}>기존 여행을 삭제하거나 Plus를 이용하면 새 여행을 만들 수 있어요.</AppText>
+        <Button label="내 여행에서 확인" variant="ghost" onPress={() => router.replace("/(tabs)/trips")} />
+      </Card>}
       {error && <AppText color={colors.danger}>{error}</AppText>}
-      <Button label={saving ? "여행 만드는 중…" : "여행 만들기"} disabled={saving} testID="new-trip-submit" onPress={() => void submit()} />
+      <Button label={saving ? "여행 만드는 중…" : "여행 만들기"} disabled={saving || limitReached} testID="new-trip-submit" onPress={() => void submit()} />
     </Screen>
   );
 }
