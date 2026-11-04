@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -19,15 +19,25 @@ const stylesList: { label: string; value: TravelStyle; description: string }[] =
 export default function AiPlanScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const [selected, setSelected] = useState<TravelStyle>("relaxed");
-  const { error, generate, loading } = useAiPlan(tripId);
+  const { entitlements, error, generate, loading } = useAiPlan(tripId);
   const selectedStyle = stylesList.find((item) => item.value === selected)!;
+  const createPlan = () => void generate(selected).then((created) => { if (created) router.replace(`/trips/${tripId}/itinerary`); });
+  const confirmPlan = () => {
+    const freeAttempt = entitlements?.tier === "free" && entitlements.aiGenerationsUsed === 0;
+    if (!freeAttempt) { createPlan(); return; }
+    Alert.alert("무료 AI 생성 1회를 사용할까요?", "성공한 일정 생성에만 횟수가 차감되며, 오류가 나면 차감하지 않아요.", [
+      { text: "취소", style: "cancel" },
+      { text: "일정 만들기", onPress: createPlan },
+    ]);
+  };
   return (
     <Screen>
       <AppText variant="title">어떤 여행을 원하나요?</AppText><AppText color={colors.muted}>AI 일정은 여행 스타일 선택부터 시작합니다.</AppText>
       <View style={styles.wrap}>{stylesList.map((item) => <Pill key={item.value} label={item.label} selected={selected === item.value} onPress={() => setSelected(item.value)} />)}</View>
       <Card><AppText variant="heading">{selectedStyle.label} 둘러보는 일정</AppText><AppText color={colors.muted}>{selectedStyle.description}</AppText><AppText variant="caption" color={colors.secondary}>개발 환경에서는 같은 입력에 같은 결과를 주는 AI 목업을 사용해요.</AppText></Card>
+      <Button label="숙소·날짜 설정 확인" variant="ghost" onPress={() => router.push(`/trips/${tripId}/settings`)} />
       {error && <Card><AppText color={colors.danger}>{error}</AppText></Card>}
-      <Button label={loading ? "일정 만드는 중…" : "AI 일정 만들기"} disabled={loading} testID="ai-plan-generate" onPress={() => void generate(selected).then((created) => { if (created) router.replace(`/trips/${tripId}/itinerary`); })} />
+      <Button label={loading ? "일정 만드는 중…" : "AI 일정 만들기"} disabled={loading} testID="ai-plan-generate" onPress={confirmPlan} />
     </Screen>
   );
 }

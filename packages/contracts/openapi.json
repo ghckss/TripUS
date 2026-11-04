@@ -282,6 +282,82 @@
         ]
       }
     },
+    "/v1/trips/{tripId}/day-settings": {
+      "get": {
+        "operationId": "TripDaySettingsController_get",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TripDaySettingResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "trip-day-settings"
+        ]
+      },
+      "put": {
+        "operationId": "TripDaySettingsController_replace",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceTripDaySettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TripDaySettingResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "trip-day-settings"
+        ]
+      }
+    },
     "/v1/trips/{tripId}/places": {
       "get": {
         "operationId": "PlacesController_list",
@@ -1370,6 +1446,99 @@
           "tripCount",
           "aiGenerationLimit",
           "aiGenerationsUsed"
+        ]
+      },
+      "TripDaySettingResponseDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "startTime": {
+            "type": "string",
+            "example": "09:00",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "endTime": {
+            "type": "string",
+            "example": "21:00",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "startPlaceId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "endPlaceId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "startPlaceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "endPlaceName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "date",
+          "startTime",
+          "endTime",
+          "startPlaceName",
+          "endPlaceName"
+        ]
+      },
+      "TripDaySettingInputDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "startTime": {
+            "type": "string",
+            "example": "09:00",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "endTime": {
+            "type": "string",
+            "example": "21:00",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "startPlaceId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "endPlaceId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "required": [
+          "date",
+          "startTime",
+          "endTime"
+        ]
+      },
+      "ReplaceTripDaySettingsDto": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "maxItems": 31,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripDaySettingInputDto"
+            }
+          }
+        },
+        "required": [
+          "settings"
         ]
       },
       "PlaceTag": {

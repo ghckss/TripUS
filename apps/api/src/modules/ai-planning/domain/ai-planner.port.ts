@@ -21,6 +21,14 @@ export interface AiPlannerInput {
   endDate: string;
   style: TravelStyle;
   places: AiPlannerPlace[];
+  daySettings: Array<{
+    date: string;
+    startTime: string;
+    endTime: string;
+    startPlaceName: string | null;
+    endPlaceName: string | null;
+  }>;
+  lockedPlacements: AiPlannerPlacement[];
 }
 
 export interface AiPlannerPlacement {

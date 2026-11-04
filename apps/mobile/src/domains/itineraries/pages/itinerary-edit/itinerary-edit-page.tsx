@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Linking, Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -11,7 +11,7 @@ import type { ItineraryItem } from "../../api/itineraries.api";
 
 export default function ItineraryScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { addUnplaced, dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, moveWithinDay, reload, removeFromItinerary, routes, save, saving, toggleLocked } = useItineraryEdit(tripId);
+  const { addUnplaced, dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, moveWithinDay, reload, removeFromItinerary, routes, save, saving, toggleLocked, undoAiChange, undoing } = useItineraryEdit(tripId);
   const grouped = (itinerary?.items ?? []).reduce<Record<string, ItineraryItem[]>>((groups, item) => {
     const date = item.date ?? "미배치";
     (groups[date] ??= []).push(item);
@@ -42,6 +42,7 @@ export default function ItineraryScreen() {
             </View>
             {nextItem && <View style={styles.route}>
               {route && route !== "loading" && route.status === "available" && <AppText variant="caption" color={colors.secondary}>대중교통 약 {route.durationMinutes}분{route.distanceMeters ? ` · ${(route.distanceMeters / 1000).toFixed(1)}km` : ""}</AppText>}
+              {route && route !== "loading" && route.status === "available" && <Button label="Google Maps에서 길 찾기" variant="ghost" onPress={() => void Linking.openURL(`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(item.address ?? item.placeName)}&destination=${encodeURIComponent(nextItem.address ?? nextItem.placeName)}&travelmode=transit`)} />}
               {route && route !== "loading" && route.status === "unavailable" && <Pressable onPress={() => router.push(`/trips/${tripId}/exceptions/route-failure`)}><AppText variant="caption" color={colors.danger}>경로를 찾지 못했어요 · 자세히 보기</AppText></Pressable>}
               {!route || route === "loading" ? <Button label={route === "loading" ? "경로 확인 중…" : "다음 장소까지 대중교통"} disabled={route === "loading"} variant="ghost" onPress={() => void loadTransitRoute(item.savedPlaceId, nextItem.savedPlaceId)} /> : null}
             </View>}
@@ -54,6 +55,7 @@ export default function ItineraryScreen() {
       <Pressable onPress={() => router.push(`/trips/${tripId}/exceptions/schedule-conflict`)}><Card><AppText variant="label">일정 충돌 화면 →</AppText></Card></Pressable>
       <Pressable onPress={() => router.push(`/trips/${tripId}/exceptions/route-failure`)}><Card><AppText variant="label">대중교통 경로 실패 화면 →</AppText></Card></Pressable>
       <Button label={saving ? "저장 중…" : "일정 저장"} disabled={!itinerary || saving} testID="itinerary-save" onPress={() => void save().then((saved) => { if (saved) router.back(); })} />
+      <Button label={undoing ? "되돌리는 중…" : "최근 AI 변경 한 번 되돌리기"} disabled={undoing} variant="ghost" onPress={() => void undoAiChange()} />
     </Screen>
   );
 }

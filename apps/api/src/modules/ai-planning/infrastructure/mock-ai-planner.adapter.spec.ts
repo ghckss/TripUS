@@ -20,6 +20,8 @@ describe('MockAiPlannerAdapter', () => {
       endDate: '2026-11-01',
       style: TravelStyle.Relaxed,
       places,
+      daySettings: [],
+      lockedPlacements: [],
     });
 
     expect(result.placements).toHaveLength(4);

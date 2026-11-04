@@ -3,7 +3,7 @@ import { useFocusEffect } from "expo-router";
 
 import { apiErrorMessage } from "@/shared/api/trip-us-api";
 import { getTrip } from "@/domains/trips";
-import { getItinerary, getTransitRoute, replaceItinerary, type Itinerary, type TransitRoute } from "../../api/itineraries.api";
+import { getItinerary, getTransitRoute, replaceItinerary, undoAiPlan, type Itinerary, type TransitRoute } from "../../api/itineraries.api";
 
 function enumerateDates(startDate: string, endDate: string): string[] {
   const dates: string[] = [];
@@ -37,6 +37,7 @@ export function useItineraryEdit(tripId: string) {
   const [saving, setSaving] = useState(false);
   const [dates, setDates] = useState<string[]>([]);
   const [routes, setRoutes] = useState<Record<string, TransitRoute | "loading">>({});
+  const [undoing, setUndoing] = useState(false);
 
   const reload = useCallback(async () => {
     setError(undefined);
@@ -135,5 +136,15 @@ export function useItineraryEdit(tripId: string) {
     } catch (caught) { setError(apiErrorMessage(caught)); return false; } finally { setSaving(false); }
   };
 
-  return { addUnplaced, dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, moveWithinDay, reload, removeFromItinerary, routes, save, saving, toggleLocked };
+  const undoAiChange = async () => {
+    setUndoing(true); setError(undefined);
+    try {
+      const restored = await undoAiPlan(tripId);
+      if (!restored) { setError("되돌릴 AI 변경이 없어요."); return; }
+      setItinerary(restored);
+    } catch (caught) { setError(apiErrorMessage(caught)); }
+    finally { setUndoing(false); }
+  };
+
+  return { addUnplaced, dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, moveWithinDay, reload, removeFromItinerary, routes, save, saving, toggleLocked, undoAiChange, undoing };
 }

@@ -1,7 +1,7 @@
 import type { components } from "@tripus/api-client";
 
 import { apiErrorMessage, tripUsApi } from "@/shared/api/trip-us-api";
-import { cachedRequest, cacheKeys, writeCache } from "@/shared/offline/cache";
+import { cachedRequest, cacheKeys, deleteCache, readCache, writeCache } from "@/shared/offline/cache";
 import { trackEvent } from "@/shared/telemetry/telemetry";
 
 export type Itinerary = components["schemas"]["ItineraryResponseDto"];
@@ -18,6 +18,7 @@ export async function getItinerary(tripId: string): Promise<Itinerary> {
 }
 
 export async function generateAiPlan(tripId: string, style: TravelStyle): Promise<Itinerary> {
+  const previous = await getItinerary(tripId);
   const { data, error } = await tripUsApi.POST("/v1/trips/{tripId}/ai-plans", {
     params: { path: { tripId } },
     body: { style },
@@ -26,8 +27,22 @@ export async function generateAiPlan(tripId: string, style: TravelStyle): Promis
   if (data.status === "conflict") throw new Error("AI 일정에 충돌이 있어요. 일정 편집에서 다시 배치해 주세요.");
   if (data.status === "unavailable") throw new Error("AI 일정을 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
   await writeCache(cacheKeys.itinerary(tripId), data.itinerary);
+  await writeCache(cacheKeys.aiUndo(tripId), previous);
   trackEvent("ai_plan.generated", { tripId, style, itemCount: data.itinerary.items.length });
   return data.itinerary;
+}
+
+export async function undoAiPlan(tripId: string): Promise<Itinerary | undefined> {
+  const previous = await readCache<Itinerary>(cacheKeys.aiUndo(tripId));
+  if (!previous) return undefined;
+  const restored = await replaceItinerary(tripId, previous.items.map((item) => ({
+    savedPlaceId: item.savedPlaceId,
+    date: item.date!,
+    position: item.position!,
+    locked: item.locked,
+  })));
+  await deleteCache(cacheKeys.aiUndo(tripId));
+  return restored;
 }
 
 export async function replaceItinerary(

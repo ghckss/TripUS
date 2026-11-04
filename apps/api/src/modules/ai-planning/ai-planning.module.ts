@@ -14,9 +14,10 @@ import { OpenAiPlannerAdapter } from './infrastructure/openai-ai-planner.adapter
 import { AiPlanningController } from './presentation/ai-planning.controller';
 import { AiPlanningRateLimiter } from './application/ai-planning-rate-limiter';
 import { EntitlementsModule } from '../entitlements/entitlements.module';
+import { TripDaySettingsModule } from '../trip-day-settings/trip-day-settings.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([TripEntity, SavedPlaceEntity]), IdentityModule, ItinerariesModule, EntitlementsModule],
+  imports: [TypeOrmModule.forFeature([TripEntity, SavedPlaceEntity]), IdentityModule, ItinerariesModule, EntitlementsModule, TripDaySettingsModule],
   controllers: [AiPlanningController],
   providers: [
     AiPlanningService,

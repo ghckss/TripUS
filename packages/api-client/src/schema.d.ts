@@ -148,6 +148,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trips/{tripId}/day-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TripDaySettingsController_get"];
+        put: operations["TripDaySettingsController_replace"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trips/{tripId}/places": {
         parameters: {
             query?: never;
@@ -442,6 +458,35 @@ export interface components {
             aiGenerationLimit: number | null;
             /** @example 0 */
             aiGenerationsUsed: number;
+        };
+        TripDaySettingResponseDto: {
+            /** Format: date */
+            date: string;
+            /** @example 09:00 */
+            startTime: string;
+            /** @example 21:00 */
+            endTime: string;
+            /** Format: uuid */
+            startPlaceId?: string | null;
+            /** Format: uuid */
+            endPlaceId?: string | null;
+            startPlaceName: string | null;
+            endPlaceName: string | null;
+        };
+        TripDaySettingInputDto: {
+            /** Format: date */
+            date: string;
+            /** @example 09:00 */
+            startTime: string;
+            /** @example 21:00 */
+            endTime: string;
+            /** Format: uuid */
+            startPlaceId?: string | null;
+            /** Format: uuid */
+            endPlaceId?: string | null;
+        };
+        ReplaceTripDaySettingsDto: {
+            settings: components["schemas"]["TripDaySettingInputDto"][];
         };
         /** @enum {string} */
         PlaceTag: "attraction" | "food" | "cafe" | "shopping" | "lodging" | "transport" | "activity" | "other";
@@ -828,6 +873,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EntitlementsResponseDto"];
+                };
+            };
+        };
+    };
+    TripDaySettingsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TripDaySettingResponseDto"][];
+                };
+            };
+        };
+    };
+    TripDaySettingsController_replace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceTripDaySettingsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TripDaySettingResponseDto"][];
                 };
             };
         };

@@ -39,6 +39,7 @@ export default function RootLayout() {
         <Stack.Screen name="trips/[tripId]/index" options={{ title: "여행" }} />
         <Stack.Screen name="trips/[tripId]/edit" options={{ title: "여행 수정" }} />
         <Stack.Screen name="trips/[tripId]/places" options={{ title: "장소 보관함" }} />
+        <Stack.Screen name="trips/[tripId]/settings" options={{ title: "숙소와 날짜 설정" }} />
         <Stack.Screen name="trips/[tripId]/ai-plan" options={{ title: "여행 스타일" }} />
         <Stack.Screen name="trips/[tripId]/itinerary" options={{ title: "일정 편집" }} />
         <Stack.Screen name="trips/[tripId]/complete" options={{ title: "여행 완료 정리" }} />
