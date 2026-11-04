@@ -4,6 +4,7 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/ui": "~58.0.24",
+    "@react-native-community/netinfo": "12.0.1",
     "@tripus/api-client": "workspace:*",
     "expo": "~58.0.20",
     "expo-apple-authentication": "~58.0.2",
@@ -17,9 +18,11 @@
     "expo-image": "~58.0.17",
     "expo-image-picker": "~58.0.10",
     "expo-linking": "~58.0.14",
+    "expo-notifications": "~58.1.8",
     "expo-router": "~58.0.27",
     "expo-secure-store": "~58.0.2",
     "expo-splash-screen": "~58.0.11",
+    "expo-sqlite": "~58.0.15",
     "expo-status-bar": "~58.0.4",
     "expo-symbols": "~58.0.4",
     "expo-system-ui": "~58.0.6",
@@ -59,6 +62,9 @@
   },
   "jest": {
     "preset": "jest-expo",
+    "setupFiles": [
+      "<rootDir>/jest.setup.ts"
+    ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1"
     },

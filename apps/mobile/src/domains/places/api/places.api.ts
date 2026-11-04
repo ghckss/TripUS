@@ -1,6 +1,7 @@
 import type { components } from "@tripus/api-client";
 
 import { apiErrorMessage, tripUsApi } from "@/shared/api/trip-us-api";
+import { cachedRequest, cacheKeys, deleteCache, readCache, writeCache } from "@/shared/offline/cache";
 
 export type SavedPlace = components["schemas"]["SavedPlaceResponseDto"];
 export type CreateSavedPlaceInput = components["schemas"]["CreateSavedPlaceDto"];
@@ -9,11 +10,13 @@ export type PlaceSearchCandidate = components["schemas"]["PlaceSearchCandidateDt
 export type UpdateSavedPlaceInput = components["schemas"]["UpdateSavedPlaceDto"];
 
 export async function listPlaces(tripId: string): Promise<SavedPlace[]> {
-  const { data, error } = await tripUsApi.GET("/v1/trips/{tripId}/places", {
-    params: { path: { tripId } },
+  return cachedRequest(cacheKeys.places(tripId), async () => {
+    const { data, error } = await tripUsApi.GET("/v1/trips/{tripId}/places", {
+      params: { path: { tripId } },
+    });
+    if (error) throw new Error(apiErrorMessage(error));
+    return data;
   });
-  if (error) throw new Error(apiErrorMessage(error));
-  return data;
 }
 
 export async function savePlace(
@@ -25,6 +28,10 @@ export async function savePlace(
     body: input,
   });
   if (error) throw new Error(apiErrorMessage(error));
+  if (data.status === "created") {
+    const places = await readCache<SavedPlace[]>(cacheKeys.places(tripId));
+    if (places) await writeCache(cacheKeys.places(tripId), [...places, data.place]);
+  }
   return data;
 }
 
@@ -46,6 +53,8 @@ export async function updatePlace(
     body: input,
   });
   if (error) throw new Error(apiErrorMessage(error));
+  const places = await readCache<SavedPlace[]>(cacheKeys.places(tripId));
+  if (places) await writeCache(cacheKeys.places(tripId), places.map((place) => place.id === placeId ? data : place));
   return data;
 }
 
@@ -54,4 +63,7 @@ export async function deletePlace(tripId: string, placeId: string): Promise<void
     params: { path: { tripId, placeId } },
   });
   if (error) throw new Error(apiErrorMessage(error));
+  const places = await readCache<SavedPlace[]>(cacheKeys.places(tripId));
+  if (places) await writeCache(cacheKeys.places(tripId), places.filter((place) => place.id !== placeId));
+  await deleteCache(cacheKeys.itinerary(tripId));
 }
