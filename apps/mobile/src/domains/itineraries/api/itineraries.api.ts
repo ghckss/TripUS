@@ -2,6 +2,7 @@ import type { components } from "@tripus/api-client";
 
 import { apiErrorMessage, tripUsApi } from "@/shared/api/trip-us-api";
 import { cachedRequest, cacheKeys, writeCache } from "@/shared/offline/cache";
+import { trackEvent } from "@/shared/telemetry/telemetry";
 
 export type Itinerary = components["schemas"]["ItineraryResponseDto"];
 export type ItineraryItem = components["schemas"]["ItineraryItemResponseDto"];
@@ -25,6 +26,7 @@ export async function generateAiPlan(tripId: string, style: TravelStyle): Promis
   if (data.status === "conflict") throw new Error("AI 일정에 충돌이 있어요. 일정 편집에서 다시 배치해 주세요.");
   if (data.status === "unavailable") throw new Error("AI 일정을 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
   await writeCache(cacheKeys.itinerary(tripId), data.itinerary);
+  trackEvent("ai_plan.generated", { tripId, style, itemCount: data.itinerary.items.length });
   return data.itinerary;
 }
 

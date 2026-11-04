@@ -6,6 +6,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { colors } from "@/shared/design/tokens";
 import "@/shared/notifications/configure-notifications";
+import { AppErrorBoundary } from "@/shared/errors/app-error-boundary";
 
 export default function RootLayout() {
   const notificationResponse = useLastNotificationResponse();
@@ -18,6 +19,7 @@ export default function RootLayout() {
   }, [notificationResponse]);
 
   return (
+    <AppErrorBoundary>
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <Stack
@@ -45,5 +47,6 @@ export default function RootLayout() {
         <Stack.Screen name="trips/[tripId]/exceptions/route-failure" options={{ title: "경로를 찾지 못했어요" }} />
       </Stack>
     </SafeAreaProvider>
+    </AppErrorBoundary>
   );
 }

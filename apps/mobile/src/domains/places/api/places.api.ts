@@ -2,6 +2,7 @@ import type { components } from "@tripus/api-client";
 
 import { apiErrorMessage, tripUsApi } from "@/shared/api/trip-us-api";
 import { cachedRequest, cacheKeys, deleteCache, readCache, writeCache } from "@/shared/offline/cache";
+import { trackEvent } from "@/shared/telemetry/telemetry";
 
 export type SavedPlace = components["schemas"]["SavedPlaceResponseDto"];
 export type CreateSavedPlaceInput = components["schemas"]["CreateSavedPlaceDto"];
@@ -31,6 +32,7 @@ export async function savePlace(
   if (data.status === "created") {
     const places = await readCache<SavedPlace[]>(cacheKeys.places(tripId));
     if (places) await writeCache(cacheKeys.places(tripId), [...places, data.place]);
+    trackEvent("place.saved", { tripId, placeId: data.place.id, tag: data.place.tag });
   }
   return data;
 }

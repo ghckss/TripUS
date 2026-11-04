@@ -925,6 +925,30 @@
           "photos"
         ]
       }
+    },
+    "/v1/telemetry/events": {
+      "post": {
+        "operationId": "TelemetryController_ingest",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestEventsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Events accepted for structured application logging"
+          }
+        },
+        "tags": [
+          "telemetry"
+        ]
+      }
     }
   },
   "info": {
@@ -1821,6 +1845,44 @@
           "byteSize",
           "filename",
           "status"
+        ]
+      },
+      "ProductEventDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "trip.created",
+            "maxLength": 80,
+            "pattern": "^[a-z][a-z0-9_.-]+$"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "properties": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "name",
+          "occurredAt"
+        ]
+      },
+      "IngestEventsDto": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductEventDto"
+            }
+          }
+        },
+        "required": [
+          "events"
         ]
       }
     }

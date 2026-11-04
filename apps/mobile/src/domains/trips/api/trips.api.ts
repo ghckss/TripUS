@@ -2,6 +2,7 @@ import type { components } from "@tripus/api-client";
 
 import { apiErrorMessage, tripUsApi } from "@/shared/api/trip-us-api";
 import { cachedRequest, cacheKeys, deleteCache, readCache, writeCache } from "@/shared/offline/cache";
+import { trackEvent } from "@/shared/telemetry/telemetry";
 
 export type Trip = components["schemas"]["TripResponseDto"];
 export type CreateTripInput = components["schemas"]["CreateTripDto"];
@@ -21,6 +22,7 @@ export async function createTrip(input: CreateTripInput): Promise<Trip> {
   const trips = await readCache<Trip[]>(cacheKeys.trips);
   if (trips) await writeCache(cacheKeys.trips, [data, ...trips.filter((trip) => trip.id !== data.id)]);
   await writeCache(cacheKeys.trip(data.id), data);
+  trackEvent("trip.created", { tripId: data.id, destination: data.destination });
   return data;
 }
 
@@ -56,4 +58,5 @@ export async function deleteTrip(tripId: string): Promise<void> {
   await deleteCache(cacheKeys.itinerary(tripId));
   const trips = await readCache<Trip[]>(cacheKeys.trips);
   if (trips) await writeCache(cacheKeys.trips, trips.filter((trip) => trip.id !== tripId));
+  trackEvent("trip.deleted", { tripId });
 }

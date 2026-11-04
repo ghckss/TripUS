@@ -308,6 +308,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/telemetry/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TelemetryController_ingest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -551,6 +567,18 @@ export interface components {
             originalUrl?: string | null;
             optimizedUrl?: string | null;
             thumbnailUrl?: string | null;
+        };
+        ProductEventDto: {
+            /** @example trip.created */
+            name: string;
+            /** Format: date-time */
+            occurredAt: string;
+            properties?: {
+                [key: string]: unknown;
+            };
+        };
+        IngestEventsDto: {
+            events: components["schemas"]["ProductEventDto"][];
         };
     };
     responses: never;
@@ -1140,6 +1168,28 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TelemetryController_ingest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngestEventsDto"];
+            };
+        };
+        responses: {
+            /** @description Events accepted for structured application logging */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };

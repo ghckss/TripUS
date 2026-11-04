@@ -13,6 +13,7 @@ import { TripRecordsModule } from './modules/trip-records/trip-records.module';
 import { RoutesModule } from './modules/routes/routes.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PhotosModule } from './modules/photos/photos.module';
+import { TelemetryModule } from './modules/telemetry/telemetry.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { PhotosModule } from './modules/photos/photos.module';
     TripRecordsModule,
     RoutesModule,
     PhotosModule,
+    TelemetryModule,
   ],
 })
 export class AppModule {}
