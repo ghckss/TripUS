@@ -50,4 +50,31 @@ describe('TripsService', () => {
       order: { startDate: 'ASC' },
     });
   });
+
+  it('validates the effective date range when updating a trip', async () => {
+    const { repository, service } = createService();
+    repository.findOneBy.mockResolvedValue({
+      id: '10000000-0000-4000-8000-000000000001',
+      ownerId: userId,
+      active: true,
+      startDate: '2026-11-10',
+      endDate: '2026-11-12',
+    });
+
+    await expect(service.update('10000000-0000-4000-8000-000000000001', { endDate: '2026-11-09' }))
+      .rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it('soft deletes only an owned active trip', async () => {
+    const { repository, service } = createService();
+    const trip = { id: '10000000-0000-4000-8000-000000000001', ownerId: userId, active: true } as TripEntity;
+    repository.findOneBy.mockResolvedValue(trip);
+    repository.save.mockResolvedValue(trip);
+
+    await service.remove(trip.id);
+
+    expect(trip.active).toBe(false);
+    expect(repository.save).toHaveBeenCalledWith(trip);
+  });
 });

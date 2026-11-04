@@ -9,6 +9,7 @@ import { PLACE_SEARCH_PORT, type PlaceSearchPort } from '../domain/place-search.
 import { CreateSavedPlaceDto } from './dto/create-saved-place.dto';
 import { SavedPlaceResponseDto, SavePlaceResultDto, SavePlaceStatus } from './dto/saved-place-response.dto';
 import { PlaceSearchCandidateDto } from './dto/search-places.dto';
+import { UpdateSavedPlaceDto } from './dto/update-saved-place.dto';
 
 @Injectable()
 export class PlacesService {
@@ -64,6 +65,19 @@ export class PlacesService {
     }
   }
 
+  async update(tripId: string, placeId: string, input: UpdateSavedPlaceDto): Promise<SavedPlaceResponseDto> {
+    await this.assertOwnedActiveTrip(tripId);
+    const entity = await this.findSavedPlace(tripId, placeId);
+    Object.assign(entity, input);
+    return SavedPlaceResponseDto.fromEntity(await this.places.save(entity));
+  }
+
+  async remove(tripId: string, placeId: string): Promise<void> {
+    await this.assertOwnedActiveTrip(tripId);
+    const entity = await this.findSavedPlace(tripId, placeId);
+    await this.places.remove(entity);
+  }
+
   private async assertOwnedActiveTrip(tripId: string): Promise<TripEntity> {
     const trip = await this.trips.findOneBy({
       id: tripId,
@@ -80,6 +94,12 @@ export class PlacesService {
     return googlePlaceId
       ? this.places.findOneBy({ tripId, googlePlaceId })
       : Promise.resolve(null);
+  }
+
+  private async findSavedPlace(tripId: string, placeId: string): Promise<SavedPlaceEntity> {
+    const entity = await this.places.findOneBy({ id: placeId, tripId });
+    if (!entity) throw new NotFoundException('Saved place not found');
+    return entity;
   }
 
   private isUniqueViolation(error: unknown): boolean {

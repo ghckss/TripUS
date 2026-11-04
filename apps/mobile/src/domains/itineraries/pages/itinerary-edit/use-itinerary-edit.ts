@@ -107,6 +107,11 @@ export function useItineraryEdit(tripId: string) {
     }));
   };
 
+  const toggleLocked = (itemId: string) => {
+    if (!itinerary) return;
+    setItinerary({ ...itinerary, items: itinerary.items.map((item) => item.id === itemId ? { ...item, locked: !item.locked } : item) });
+  };
+
   const loadTransitRoute = async (originSavedPlaceId: string, destinationSavedPlaceId: string) => {
     const key = `${originSavedPlaceId}:${destinationSavedPlaceId}`;
     setRoutes((current) => ({ ...current, [key]: "loading" }));
@@ -130,5 +135,5 @@ export function useItineraryEdit(tripId: string) {
     } catch (caught) { setError(apiErrorMessage(caught)); return false; } finally { setSaving(false); }
   };
 
-  return { addUnplaced, dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, moveWithinDay, reload, removeFromItinerary, routes, save, saving };
+  return { addUnplaced, dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, moveWithinDay, reload, removeFromItinerary, routes, save, saving, toggleLocked };
 }

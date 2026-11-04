@@ -52,7 +52,7 @@ export class ItineraryItemEntity {
   @Column({ name: 'saved_place_id', type: 'uuid' })
   savedPlaceId!: string;
 
-  @ManyToOne(() => SavedPlaceEntity, (place) => place.itineraryItems, { onDelete: 'RESTRICT' })
+  @ManyToOne(() => SavedPlaceEntity, (place) => place.itineraryItems, { onDelete: 'CASCADE' })
   @JoinColumn({
     name: 'saved_place_id',
     foreignKeyConstraintName: 'fk_itinerary_items_saved_place',

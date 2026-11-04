@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
-import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { ApiBody, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 
 import { CreateSavedPlaceDto } from '../application/dto/create-saved-place.dto';
 import { SavedPlaceResponseDto, SavePlaceResultDto } from '../application/dto/saved-place-response.dto';
 import { PlacesService } from '../application/places.service';
 import { PlaceSearchCandidateDto, SearchPlacesQueryDto } from '../application/dto/search-places.dto';
+import { UpdateSavedPlaceDto } from '../application/dto/update-saved-place.dto';
 
 @ApiTags('places')
 @Controller('trips/:tripId/places')
@@ -38,5 +39,30 @@ export class PlacesController {
     @Body() input: CreateSavedPlaceDto,
   ): Promise<SavePlaceResultDto> {
     return this.places.create(tripId, input);
+  }
+
+  @Patch(':placeId')
+  @ApiParam({ name: 'tripId', type: String, format: 'uuid' })
+  @ApiParam({ name: 'placeId', type: String, format: 'uuid' })
+  @ApiBody({ type: UpdateSavedPlaceDto })
+  @ApiOkResponse({ type: SavedPlaceResponseDto })
+  update(
+    @Param('tripId', new ParseUUIDPipe()) tripId: string,
+    @Param('placeId', new ParseUUIDPipe()) placeId: string,
+    @Body() input: UpdateSavedPlaceDto,
+  ): Promise<SavedPlaceResponseDto> {
+    return this.places.update(tripId, placeId, input);
+  }
+
+  @Delete(':placeId')
+  @HttpCode(204)
+  @ApiParam({ name: 'tripId', type: String, format: 'uuid' })
+  @ApiParam({ name: 'placeId', type: String, format: 'uuid' })
+  @ApiNoContentResponse()
+  remove(
+    @Param('tripId', new ParseUUIDPipe()) tripId: string,
+    @Param('placeId', new ParseUUIDPipe()) placeId: string,
+  ): Promise<void> {
+    return this.places.remove(tripId, placeId);
   }
 }

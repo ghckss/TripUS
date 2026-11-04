@@ -21,6 +21,7 @@ function createService() {
     create: vi.fn((value: Partial<SavedPlaceEntity>) => value as SavedPlaceEntity),
     find: vi.fn(),
     findOneBy: vi.fn(),
+    remove: vi.fn(),
     save: vi.fn(),
   };
   const trips = { findOneBy: vi.fn() };
@@ -71,5 +72,17 @@ describe('PlacesService', () => {
     await expect(service.list(tripId)).rejects.toBeInstanceOf(NotFoundException);
     expect(trips.findOneBy).toHaveBeenCalledWith({ id: tripId, ownerId: userId, active: true });
     expect(places.find).not.toHaveBeenCalled();
+  });
+
+  it('deletes a saved place only after checking trip ownership', async () => {
+    const { places, service, trips } = createService();
+    const place = { id: '20000000-0000-4000-8000-000000000001', tripId } as SavedPlaceEntity;
+    trips.findOneBy.mockResolvedValue({ id: tripId });
+    places.findOneBy.mockResolvedValue(place);
+
+    await service.remove(tripId, place.id);
+
+    expect(trips.findOneBy).toHaveBeenCalledWith({ id: tripId, ownerId: userId, active: true });
+    expect(places.remove).toHaveBeenCalledWith(place);
   });
 });

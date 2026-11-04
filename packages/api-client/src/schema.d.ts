@@ -20,6 +20,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/health/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["HealthController_getLiveness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/social": {
         parameters: {
             query?: never;
@@ -148,6 +164,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trips/{tripId}/places/{placeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["PlacesController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["PlacesController_update"];
+        trace?: never;
+    };
     "/v1/trips": {
         parameters: {
             query?: never;
@@ -174,10 +206,10 @@ export interface paths {
         get: operations["TripsController_get"];
         put?: never;
         post?: never;
-        delete?: never;
+        delete: operations["TripsController_remove"];
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["TripsController_update"];
         trace?: never;
     };
     "/v1/trips/{tripId}/completion": {
@@ -405,6 +437,13 @@ export interface components {
             status: components["schemas"]["SavePlaceStatus"];
             place: components["schemas"]["SavedPlaceResponseDto"];
         };
+        UpdateSavedPlaceDto: {
+            name?: string;
+            address?: string | null;
+            tag?: components["schemas"]["PlaceTag"];
+            preference?: components["schemas"]["PlacePreference"];
+            note?: string | null;
+        };
         /** @enum {string} */
         TripListStatus: "current" | "completed" | "all";
         TripResponseDto: {
@@ -439,6 +478,15 @@ export interface components {
              * @example 2026-11-02
              */
             endDate: string;
+        };
+        UpdateTripDto: {
+            title?: string;
+            destination?: string;
+            timezone?: string;
+            /** Format: date */
+            startDate?: string;
+            /** Format: date */
+            endDate?: string;
         };
         CompleteTripItemDto: {
             /** Format: uuid */
@@ -514,6 +562,25 @@ export interface components {
 export type $defs = Record<string, never>;
 export interface operations {
     HealthController_getHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    HealthController_getLiveness: {
         parameters: {
             query?: never;
             header?: never;
@@ -758,6 +825,52 @@ export interface operations {
             };
         };
     };
+    PlacesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+                placeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlacesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+                placeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSavedPlaceDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedPlaceResponseDto"];
+                };
+            };
+        };
+    };
     TripsController_list: {
         parameters: {
             query?: {
@@ -812,6 +925,50 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TripResponseDto"];
+                };
+            };
+        };
+    };
+    TripsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TripsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTripDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {

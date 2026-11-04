@@ -11,7 +11,7 @@ import type { ItineraryItem } from "../../api/itineraries.api";
 
 export default function ItineraryScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { addUnplaced, dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, moveWithinDay, reload, removeFromItinerary, routes, save, saving } = useItineraryEdit(tripId);
+  const { addUnplaced, dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, moveWithinDay, reload, removeFromItinerary, routes, save, saving, toggleLocked } = useItineraryEdit(tripId);
   const grouped = (itinerary?.items ?? []).reduce<Record<string, ItineraryItem[]>>((groups, item) => {
     const date = item.date ?? "미배치";
     (groups[date] ??= []).push(item);
@@ -37,6 +37,7 @@ export default function ItineraryScreen() {
               <Button label="↓" variant="ghost" disabled={placeIndex === items.length - 1} onPress={() => moveWithinDay(item.id, 1)} style={styles.action} />
               <Button label="이전 날" variant="ghost" disabled={dayIndex === 0} onPress={() => moveToAdjacentDay(item.id, -1)} style={styles.dayAction} />
               <Button label="다음 날" variant="ghost" disabled={dayIndex === dates.length - 1} onPress={() => moveToAdjacentDay(item.id, 1)} style={styles.dayAction} />
+              <Button label={item.locked ? "잠금 해제" : "일정 잠금"} variant="secondary" onPress={() => toggleLocked(item.id)} style={styles.dayAction} />
               <Button label="제외" variant="danger" onPress={() => removeFromItinerary(item.id)} style={styles.dayAction} />
             </View>
             {nextItem && <View style={styles.route}>

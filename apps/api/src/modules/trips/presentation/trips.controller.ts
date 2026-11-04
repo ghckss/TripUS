@@ -1,11 +1,12 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
-import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { ApiBody, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 
 import { CreateTripDto } from '../application/dto/create-trip.dto';
 import { TripResponseDto } from '../application/dto/trip-response.dto';
 import { TripsService } from '../application/trips.service';
 import { ListTripsQueryDto } from '../application/dto/list-trips-query.dto';
 import { TripListStatus } from '../application/dto/list-trips-query.dto';
+import { UpdateTripDto } from '../application/dto/update-trip.dto';
 
 @ApiTags('trips')
 @Controller('trips')
@@ -32,5 +33,24 @@ export class TripsController {
   @ApiOkResponse({ type: TripResponseDto })
   get(@Param('tripId', new ParseUUIDPipe()) tripId: string): Promise<TripResponseDto> {
     return this.trips.get(tripId);
+  }
+
+  @Patch(':tripId')
+  @ApiParam({ name: 'tripId', type: String, format: 'uuid' })
+  @ApiBody({ type: UpdateTripDto })
+  @ApiOkResponse({ type: TripResponseDto })
+  update(
+    @Param('tripId', new ParseUUIDPipe()) tripId: string,
+    @Body() input: UpdateTripDto,
+  ): Promise<TripResponseDto> {
+    return this.trips.update(tripId, input);
+  }
+
+  @Delete(':tripId')
+  @HttpCode(204)
+  @ApiParam({ name: 'tripId', type: String, format: 'uuid' })
+  @ApiNoContentResponse()
+  remove(@Param('tripId', new ParseUUIDPipe()) tripId: string): Promise<void> {
+    return this.trips.remove(tripId);
   }
 }

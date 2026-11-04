@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 
-import { listPlaces, savePlace, searchPlaces, type PlaceSearchCandidate, type SavedPlace } from "@/domains/places/api/places.api";
+import { deletePlace, listPlaces, savePlace, searchPlaces, updatePlace, type PlaceSearchCandidate, type SavedPlace, type UpdateSavedPlaceInput } from "@/domains/places/api/places.api";
 
 function inferTag(primaryType: string | null): "attraction" | "food" | "cafe" | "shopping" | "lodging" | "transport" | "activity" | "other" {
   if (!primaryType) return "other";
@@ -66,9 +66,23 @@ export function usePlaceLibrary(tripId: string) {
     }
   }, [reload, tripId]);
 
+  const editPlace = useCallback(async (placeId: string, input: UpdateSavedPlaceInput) => {
+    setSaving(true); setMessage(undefined);
+    try { await updatePlace(tripId, placeId, input); setMessage("장소 정보를 변경했어요."); await reload(); }
+    catch (caught) { setMessage(caught instanceof Error ? caught.message : "장소를 변경하지 못했어요."); }
+    finally { setSaving(false); }
+  }, [reload, tripId]);
+
+  const removePlace = useCallback(async (placeId: string) => {
+    setSaving(true); setMessage(undefined);
+    try { await deletePlace(tripId, placeId); setMessage("장소를 삭제했어요."); await reload(); }
+    catch (caught) { setMessage(caught instanceof Error ? caught.message : "장소를 삭제하지 못했어요."); }
+    finally { setSaving(false); }
+  }, [reload, tripId]);
+
   useFocusEffect(useCallback(() => {
     void reload();
   }, [reload]));
 
-  return { places, loading, message, query, reload, results, saveCandidate, saving, search, searching, setQuery };
+  return { editPlace, places, loading, message, query, reload, removePlace, results, saveCandidate, saving, search, searching, setQuery };
 }
