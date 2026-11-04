@@ -1,10 +1,22 @@
-import { Stack } from "expo-router";
+import { Href, router, Stack } from "expo-router";
+import { clearLastNotificationResponseAsync, useLastNotificationResponse } from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { colors } from "@/shared/design/tokens";
+import "@/shared/notifications/configure-notifications";
 
 export default function RootLayout() {
+  const notificationResponse = useLastNotificationResponse();
+
+  useEffect(() => {
+    const path = notificationResponse?.notification.request.content.data?.path;
+    if (typeof path !== "string" || !path.startsWith("/trips/")) return;
+    router.push(path as Href);
+    void clearLastNotificationResponseAsync();
+  }, [notificationResponse]);
+
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
@@ -20,6 +32,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="save-place" options={{ title: "장소 저장" }} />
         <Stack.Screen name="trips/new" options={{ title: "새 여행" }} />
         <Stack.Screen name="trips/[tripId]/index" options={{ title: "여행" }} />
         <Stack.Screen name="trips/[tripId]/edit" options={{ title: "여행 수정" }} />

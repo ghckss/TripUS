@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 
 import { deletePlace, listPlaces, savePlace, searchPlaces, updatePlace, type PlaceSearchCandidate, type SavedPlace, type UpdateSavedPlaceInput } from "@/domains/places/api/places.api";
@@ -15,14 +15,15 @@ function inferTag(primaryType: string | null): "attraction" | "food" | "cafe" | 
   return "other";
 }
 
-export function usePlaceLibrary(tripId: string) {
+export function usePlaceLibrary(tripId: string, initialQuery = "") {
   const [places, setPlaces] = useState<SavedPlace[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string>();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<PlaceSearchCandidate[]>([]);
   const [searching, setSearching] = useState(false);
+  const searchedInitialQuery = useRef(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -83,6 +84,12 @@ export function usePlaceLibrary(tripId: string) {
   useFocusEffect(useCallback(() => {
     void reload();
   }, [reload]));
+
+  useEffect(() => {
+    if (!initialQuery || searchedInitialQuery.current) return;
+    searchedInitialQuery.current = true;
+    void search();
+  }, [initialQuery, search]);
 
   return { editPlace, places, loading, message, query, reload, removePlace, results, saveCandidate, saving, search, searching, setQuery };
 }

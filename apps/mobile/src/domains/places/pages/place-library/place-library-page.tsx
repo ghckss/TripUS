@@ -9,8 +9,9 @@ import { colors, radius, spacing } from "@/shared/design/tokens";
 import { usePlaceLibrary } from "./use-place-library";
 
 export default function PlacesScreen() {
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { editPlace, places, loading, saving, searching, message, query, results, reload, removePlace, saveCandidate, search, setQuery } = usePlaceLibrary(tripId);
+  const { tripId, query: linkedQuery } = useLocalSearchParams<{ tripId: string; query?: string | string[] }>();
+  const initialQuery = Array.isArray(linkedQuery) ? linkedQuery[0] : linkedQuery;
+  const { editPlace, places, loading, saving, searching, message, query, results, reload, removePlace, saveCandidate, search, setQuery } = usePlaceLibrary(tripId, initialQuery);
   return (
     <Screen>
       <AppText variant="title">저장한 모든 장소</AppText>
