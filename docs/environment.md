@@ -119,7 +119,7 @@ Apple 로그인에는 별도 모바일 비밀값이 필요하지 않으며 앱�
 배포 환경에서는 데이터베이스 URL, 버킷 이름과 공개 API URL을 CDK가 주입한다. OpenAI 키, Google Maps 키, OIDC Client ID 같은 비밀값은 CDK가 생성한 런타임 Secrets Manager secret에 저장한다. 모바일 배포 빌드에는 아래 공개값만 설정한다.
 
 ```dotenv
-EXPO_PUBLIC_API_URL=https://<배포된 API Gateway 도메인>
+EXPO_PUBLIC_API_URL=https://<배포된 Lambda Web Function endpoint 도메인>
 EXPO_PUBLIC_AUTH_MODE=production
 EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=<iOS OAuth Client ID>
 EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=<Android OAuth Client ID>

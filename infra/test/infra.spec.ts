@@ -74,6 +74,9 @@ describe('TripUS infrastructure', () => {
     });
     template.resourceCountIs('AWS::CloudFormation::CustomResource', 1);
     template.resourceCountIs('AWS::CloudWatch::Alarm', 3);
+    template.hasResourceProperties('AWS::CloudWatch::Dashboard', {
+      DashboardName: 'tripus-test-operations',
+    });
     template.hasResourceProperties('AWS::SNS::Topic', {
       KmsMasterKeyId: Match.anyValue(),
       TopicName: 'tripus-test-alerts',

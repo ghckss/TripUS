@@ -1,0 +1,59 @@
+name: Deploy AWS API
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Deployment stage
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+          - prod
+      operation:
+        description: CDK operation
+        required: true
+        default: diff
+        type: choice
+        options:
+          - diff
+          - deploy
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aws-${{ inputs.stage }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.stage }}
+    env:
+      AWS_REGION: ap-northeast-2
+      CDK_DEFAULT_REGION: ap-northeast-2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-region: ap-northeast-2
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tripus/infra test
+      - run: pnpm deploy:synth -- --context stage=${{ inputs.stage }}
+      - name: Show infrastructure diff
+        if: inputs.operation == 'diff'
+        run: pnpm deploy:diff -- --context stage=${{ inputs.stage }}
+      - name: Deploy infrastructure
+        if: inputs.operation == 'deploy'
+        run: pnpm deploy:aws -- --context stage=${{ inputs.stage }} --require-approval never

@@ -315,8 +315,47 @@ export class ApiStack extends Stack {
     });
     migrationErrorAlarm.addAlarmAction(alertAction);
 
+    const dashboard = new cloudwatch.Dashboard(this, 'OperationsDashboard', {
+      dashboardName: `tripus-${config.stage}-operations`,
+    });
+    dashboard.addWidgets(new cloudwatch.AlarmStatusWidget({
+      alarms: [apiServerErrorAlarm, apiThrottleAlarm, migrationErrorAlarm],
+      height: 3,
+      title: 'TripUS API alarms',
+      width: 24,
+    }));
+    dashboard.addWidgets(
+      new cloudwatch.LogQueryWidget({
+        height: 6,
+        logGroupNames: [logGroup.logGroupName],
+        queryLines: [
+          'fields @timestamp, level, method, path, statusCode, durationMs, requestId, message',
+          'filter level = "error" or statusCode >= 500',
+          'sort @timestamp desc',
+          'limit 50',
+        ],
+        title: 'Recent API errors',
+        view: cloudwatch.LogQueryVisualizationType.TABLE,
+        width: 16,
+      }),
+      new cloudwatch.LogQueryWidget({
+        height: 6,
+        logGroupNames: [migrationLogGroup.logGroupName],
+        queryLines: [
+          'fields @timestamp, @message',
+          'filter @message like /ERROR|Error|failed/',
+          'sort @timestamp desc',
+          'limit 20',
+        ],
+        title: 'Migration errors',
+        view: cloudwatch.LogQueryVisualizationType.TABLE,
+        width: 8,
+      }),
+    );
+
     new CfnOutput(this, 'AlertTopicArn', { value: alertTopic.topicArn });
     new CfnOutput(this, 'ApiEndpointDomain', { value: endpoint.attrDomainName });
+    new CfnOutput(this, 'OperationsDashboardName', { value: dashboard.dashboardName });
     new CfnOutput(this, 'PhotoBucketName', { value: data.photoBucket.bucketName });
   }
 }

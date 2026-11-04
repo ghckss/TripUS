@@ -6,6 +6,7 @@ TripUS의 제품 기획과 디자인 요청사항을 관리하는 디렉터리�
 - [기술 아키텍처](./technical-architecture.md)
 - [구현 계획과 마일스톤](./implementation-plan.md)
 - [AWS 배포 가이드](./aws-deployment.md)
+- [모바일 배포 가이드](./mobile-deployment.md)
 - [환경 변수 설정](./environment.md)
 - [테스트 가이드](./testing.md)
 - [Figma AI 디자인 요청서](./figma-ai-request.md)

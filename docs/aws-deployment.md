@@ -102,6 +102,14 @@ pnpm --filter @tripus/infra exec cdk deploy TripUs-prod-Data --context stage=pro
 pnpm deploy:smoke -- https://<ApiEndpointDomain>
 ```
 
+## GitHub Actions 배포
+
+`Deploy AWS API` 워크플로는 수동 실행만 허용하며 `diff`와 `deploy`를 분리한다. GitHub의 `dev`, `prod` Environment 각각에 `AWS_DEPLOY_ROLE_ARN` 변수를 등록한다. 이 역할은 GitHub OIDC 공급자를 신뢰하고 해당 저장소와 Environment에서 발급된 토큰만 수락해야 한다. 장기 AWS access key는 GitHub secret에 저장하지 않는다.
+
+최초 CDK bootstrap과 GitHub OIDC 역할 생성은 AWS 관리자 권한으로 별도 수행한다. `prod` Environment에는 required reviewer를 설정하고, 배포 전 `diff` 실행 결과와 IAM 변경을 검토한다. 워크플로 배포는 `cdk synth --strict`, 인프라 테스트, `cdk-nag`를 먼저 통과해야 시작된다.
+
+배포 후 CloudFormation 출력의 `OperationsDashboardName`에서 API 5xx, endpoint throttling, migration 오류 알람 상태와 최근 오류 로그를 한 화면에서 확인한다. `AlertTopicArn`에는 환경별 이메일, Chatbot 또는 incident 관리 구독을 별도로 연결한다.
+
 API 런타임은 Aurora 관리자 계정을 읽지 않는다. migration Lambda만 관리자 secret을 사용하며, API는 `tripus_app` 전용 secret과 CRUD 권한만 사용한다. 관리자 비밀번호는 처음부터 자동 회전하고 앱 비밀번호는 위의 초기 계정 생성 이후 자동 회전을 활성화한다.
 
 ## 비용과 삭제 보호
