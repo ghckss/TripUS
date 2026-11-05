@@ -3,13 +3,13 @@ import { ArrayMaxSize, IsArray, IsDateString, IsObject, IsOptional, IsString, Ma
 import { Type } from 'class-transformer';
 
 export class ProductEventDto {
-  @ApiProperty({ example: 'trip.created', maxLength: 80, pattern: '^[a-z][a-z0-9_.-]+$' })
+  @ApiProperty({ example: 'trip.created', maxLength: 80, pattern: '^[a-z][a-z0-9_.-]+$', type: String })
   @IsString()
   @MaxLength(80)
   @Matches(/^[a-z][a-z0-9_.-]+$/)
   name!: string;
 
-  @ApiProperty({ format: 'date-time' })
+  @ApiProperty({ format: 'date-time', type: String })
   @IsDateString()
   occurredAt!: string;
 

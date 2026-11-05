@@ -9,12 +9,12 @@ export class EntitlementsResponseDto {
   @ApiProperty({ nullable: true, example: 1, type: Number })
   tripLimit!: number | null;
 
-  @ApiProperty({ example: 0 })
+  @ApiProperty({ example: 0, type: Number })
   tripCount!: number;
 
   @ApiProperty({ nullable: true, example: 1, type: Number })
   aiGenerationLimit!: number | null;
 
-  @ApiProperty({ example: 0 })
+  @ApiProperty({ example: 0, type: Number })
   aiGenerationsUsed!: number;
 }
