@@ -38,7 +38,7 @@ export default function ExternalPlaceSavePage() {
       <Button
         label="이 여행에 저장"
         onPress={() => router.replace({
-          pathname: "/trips/[tripId]/places",
+          pathname: "/trips/[tripId]/places/new",
           params: { tripId: trip.id, ...(query ? { query } : {}) },
         })}
       />
