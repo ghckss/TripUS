@@ -29,6 +29,10 @@ export class PlacesService {
     return this.placeSearch.search(query, trip.destination);
   }
 
+  searchByDestination(query: string, destination: string): Promise<PlaceSearchCandidateDto[]> {
+    return this.placeSearch.search(query, destination);
+  }
+
   async list(tripId: string): Promise<SavedPlaceResponseDto[]> {
     await this.assertOwnedActiveTrip(tripId);
     const entities = await this.places.find({ where: { tripId }, order: { createdAt: 'DESC' } });

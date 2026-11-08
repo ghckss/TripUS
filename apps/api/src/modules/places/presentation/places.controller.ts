@@ -4,7 +4,7 @@ import { ApiBody, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiPa
 import { CreateSavedPlaceDto } from '../application/dto/create-saved-place.dto';
 import { SavedPlaceResponseDto, SavePlaceResultDto } from '../application/dto/saved-place-response.dto';
 import { PlacesService } from '../application/places.service';
-import { PlaceSearchCandidateDto, SearchPlacesQueryDto } from '../application/dto/search-places.dto';
+import { PlaceSearchCandidateDto, SearchPlacesByDestinationQueryDto, SearchPlacesQueryDto } from '../application/dto/search-places.dto';
 import { UpdateSavedPlaceDto } from '../application/dto/update-saved-place.dto';
 
 @ApiTags('places')
@@ -64,5 +64,19 @@ export class PlacesController {
     @Param('placeId', new ParseUUIDPipe()) placeId: string,
   ): Promise<void> {
     return this.places.remove(tripId, placeId);
+  }
+}
+
+@ApiTags('places')
+@Controller('places')
+export class PlaceDiscoveryController {
+  constructor(@Inject(PlacesService) private readonly places: PlacesService) {}
+
+  @Get('search')
+  @ApiQuery({ name: 'query', type: String, minLength: 2 })
+  @ApiQuery({ name: 'destination', type: String, minLength: 1, maxLength: 120 })
+  @ApiOkResponse({ type: PlaceSearchCandidateDto, isArray: true })
+  search(@Query() input: SearchPlacesByDestinationQueryDto): Promise<PlaceSearchCandidateDto[]> {
+    return this.places.searchByDestination(input.query, input.destination);
   }
 }

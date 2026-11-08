@@ -212,6 +212,22 @@ export interface paths {
         patch: operations["PlacesController_update"];
         trace?: never;
     };
+    "/v1/places/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlaceDiscoveryController_search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trips": {
         parameters: {
             query?: never;
@@ -528,6 +544,7 @@ export interface components {
             place: components["schemas"]["SavedPlaceResponseDto"];
         };
         UpdateSavedPlaceDto: {
+            googlePlaceId?: string | null;
             name?: string;
             address?: string | null;
             tag?: components["schemas"]["PlaceTag"];
@@ -1034,6 +1051,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SavedPlaceResponseDto"];
+                };
+            };
+        };
+    };
+    PlaceDiscoveryController_search: {
+        parameters: {
+            query: {
+                query: string;
+                destination: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaceSearchCandidateDto"][];
                 };
             };
         };

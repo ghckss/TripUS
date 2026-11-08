@@ -7,6 +7,7 @@ import {
 } from "./places.api";
 
 export type LodgingDraft = {
+  googlePlaceId?: string;
   name: string;
   address: string;
 };
@@ -30,10 +31,16 @@ export async function savePrimaryLodging(
   }
 
   if (existing) {
-    return updatePlace(tripId, existing.id, { name, address, tag: "lodging" });
+    return updatePlace(tripId, existing.id, {
+      ...(draft.googlePlaceId ? { googlePlaceId: draft.googlePlaceId } : {}),
+      name,
+      address,
+      tag: "lodging",
+    });
   }
 
   const result = await savePlace(tripId, {
+    ...(draft.googlePlaceId ? { googlePlaceId: draft.googlePlaceId } : {}),
     name,
     address: address || undefined,
     tag: "lodging",

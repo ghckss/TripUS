@@ -555,6 +555,51 @@
         ]
       }
     },
+    "/v1/places/search": {
+      "get": {
+        "operationId": "PlaceDiscoveryController_search",
+        "parameters": [
+          {
+            "name": "query",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "name": "destination",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "example": "일본",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlaceSearchCandidateDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "places"
+        ]
+      }
+    },
     "/v1/trips": {
       "get": {
         "operationId": "TripsController_list",
@@ -1714,6 +1759,11 @@
       "UpdateSavedPlaceDto": {
         "type": "object",
         "properties": {
+          "googlePlaceId": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true
+          },
           "name": {
             "type": "string",
             "maxLength": 180

@@ -4,6 +4,12 @@ import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-valid
 import { PlacePreference, PlaceTag } from '../../domain/entities/saved-place.entity';
 
 export class UpdateSavedPlaceDto {
+  @ApiPropertyOptional({ type: String, maxLength: 255, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  googlePlaceId?: string;
+
   @ApiPropertyOptional({ type: String, maxLength: 180 })
   @IsOptional()
   @IsString()

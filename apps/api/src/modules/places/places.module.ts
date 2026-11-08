@@ -5,7 +5,7 @@ import { IdentityModule } from '../identity/identity.module';
 import { TripEntity } from '../trips/domain/entities/trip.entity';
 import { PlacesService } from './application/places.service';
 import { SavedPlaceEntity } from './domain/entities/saved-place.entity';
-import { PlacesController } from './presentation/places.controller';
+import { PlaceDiscoveryController, PlacesController } from './presentation/places.controller';
 import { ConfigService } from '@nestjs/config';
 import { MapsProvider } from '../../config/environment';
 import { PLACE_SEARCH_PORT } from './domain/place-search.port';
@@ -14,7 +14,7 @@ import { MockPlaceSearchAdapter } from './infrastructure/mock-place-search.adapt
 
 @Module({
   imports: [TypeOrmModule.forFeature([SavedPlaceEntity, TripEntity]), IdentityModule],
-  controllers: [PlacesController],
+  controllers: [PlacesController, PlaceDiscoveryController],
   providers: [
     PlacesService,
     MockPlaceSearchAdapter,

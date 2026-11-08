@@ -26,9 +26,11 @@ function createService() {
   };
   const trips = { findOneBy: vi.fn() };
   const identity: IdentityPort = { getCurrentUserId: () => userId };
-  const placeSearch: PlaceSearchPort = { search: vi.fn() };
+  const placeSearchSearch = vi.fn<PlaceSearchPort['search']>();
+  const placeSearch: PlaceSearchPort = { search: placeSearchSearch };
   return {
     places,
+    placeSearchSearch,
     trips,
     service: new PlacesService(
       places as unknown as Repository<SavedPlaceEntity>,
@@ -40,6 +42,14 @@ function createService() {
 }
 
 describe('PlacesService', () => {
+  it('searches a destination before a trip is created', async () => {
+    const { placeSearchSearch, service } = createService();
+    placeSearchSearch.mockResolvedValue([]);
+
+    await expect(service.searchByDestination('도쿄 호텔', '일본')).resolves.toEqual([]);
+    expect(placeSearchSearch).toHaveBeenCalledWith('도쿄 호텔', '일본');
+  });
+
   it('returns the existing place for a duplicate Google Place ID', async () => {
     const { places, service, trips } = createService();
     trips.findOneBy.mockResolvedValue({ id: tripId });

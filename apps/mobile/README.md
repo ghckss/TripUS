@@ -23,6 +23,8 @@ pnpm --filter @tripus/mobile ios:reset
 
 이 명령은 iOS 생성 산출물을 지우고 `app.json`과 config plugin에서 재생성한 뒤, Pod 설치를 중복 실행하지 않고 Simulator 빌드를 시작한다. 네이티브 변경은 `ios` 내부가 아니라 앱 설정 또는 config plugin에 반영한다.
 
+로컬 Simulator에서는 Apple 개발 인증서 없이 실행할 수 있도록 Sign in with Apple entitlement를 제외한다. EAS 빌드에서는 자동 활성화되며, 인증서가 준비된 로컬 환경에서는 `TRIPUS_ENABLE_APPLE_SIGN_IN=true`로 활성화할 수 있다.
+
 ## 품질 검사
 
 ```bash
