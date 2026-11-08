@@ -1,56 +1,32 @@
-# Welcome to your Expo app 👋
+# TripUS Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo SDK 58과 React Native로 만든 TripUS Development Build다. 화면과 도메인 로직은 `src/domains`에, Expo Router 진입점은 `src/app`에 둔다.
 
-## Get started
+## 로컬 실행
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+루트에서 의존성과 모바일 환경 변수를 준비한 뒤 실행한다.
 
 ```bash
-npm run reset-project
+cp apps/mobile/.env.example apps/mobile/.env
+pnpm --filter @tripus/mobile ios
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+iOS Simulator가 호스트의 로컬 API에 연결할 때 `EXPO_PUBLIC_API_URL`은 `http://127.0.0.1:3000`을 사용한다. 전체 환경 변수는 `../../docs/environment.md`를 참고한다.
 
-### Other setup steps
+## iOS 네이티브 프로젝트 복구
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+`ios` 디렉터리는 CNG가 생성하며 Git에서 추적하지 않는다. Expo 또는 React Native 의존성이 바뀐 뒤 CocoaPods가 오래된 `Podfile.lock`을 갱신하느라 첫 실행이 오래 걸릴 수 있다. 진행 상황을 포함해 완전히 다시 생성하려면 다음 명령을 사용한다.
 
-## Learn more
+```bash
+pnpm --filter @tripus/mobile ios:reset
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+이 명령은 iOS 생성 산출물을 지우고 `app.json`과 config plugin에서 재생성한 뒤, Pod 설치를 중복 실행하지 않고 Simulator 빌드를 시작한다. 네이티브 변경은 `ios` 내부가 아니라 앱 설정 또는 config plugin에 반영한다.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## 품질 검사
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+pnpm --filter @tripus/mobile typecheck
+pnpm --filter @tripus/mobile lint
+pnpm --filter @tripus/mobile test
+```

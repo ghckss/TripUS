@@ -40,6 +40,12 @@ iOS Simulator용 로컬 빌드는 다음과 같다.
 EXPO_PUBLIC_API_URL=http://127.0.0.1:3000 pnpm --filter @tripus/mobile ios
 ```
 
+Expo 또는 React Native 버전을 변경한 뒤 CocoaPods 동기화가 오래 걸리거나 네이티브 빌드가 실패하면 CNG 산출물을 다시 생성한다. `apps/mobile/ios`는 생성 파일이므로 직접 수정하지 않는다.
+
+```bash
+EXPO_PUBLIC_API_URL=http://127.0.0.1:3000 pnpm --filter @tripus/mobile ios:reset
+```
+
 AI 일정은 기본적으로 결정적 목업을 사용한다. 실제 OpenAI 어댑터는 서버 환경에 `AI_PLANNER_PROVIDER=openai`, `OPENAI_API_KEY`, `OPENAI_MODEL`을 설정했을 때 활성화된다.
 
 지도 검색과 대중교통은 기본 목업이며 `MAPS_PROVIDER=google`과 `GOOGLE_MAPS_API_KEY`로 Google 어댑터를 활성화한다. 사진은 기본적으로 `.data/photos`에 저장한다. 운영 S3 호환 저장소는 `PHOTO_STORAGE_PROVIDER=s3`, `PHOTO_S3_BUCKET`, `AWS_REGION`을 설정한다. 원본 사진은 사용자별 총량 제한 없이 보존하되 파일당 100MB 안전 제한을 적용한다.
