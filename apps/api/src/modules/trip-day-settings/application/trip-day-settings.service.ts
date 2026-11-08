@@ -22,14 +22,15 @@ export class TripDaySettingsService {
     const trip = await this.ownedTrip(tripId);
     const [stored, lodgings] = await Promise.all([
       this.settings.find({ where: { tripId }, order: { date: 'ASC' } }),
-      this.places.find({ where: { tripId, tag: PlaceTag.Lodging } }),
+      this.places.find({ where: { tripId, tag: PlaceTag.Lodging }, order: { createdAt: 'ASC' } }),
     ]);
     const byDate = new Map(stored.map((setting) => [setting.date, setting]));
     const names = new Map(lodgings.map((place) => [place.id, place.name]));
+    const defaultLodgingId = lodgings[0]?.id ?? null;
     return enumerateDates(trip.startDate, trip.endDate).map((date) => {
       const setting = byDate.get(date);
-      const startPlaceId = setting?.startPlaceId ?? null;
-      const endPlaceId = setting?.endPlaceId ?? null;
+      const startPlaceId = setting ? setting.startPlaceId : defaultLodgingId;
+      const endPlaceId = setting ? setting.endPlaceId : defaultLodgingId;
       return {
         date,
         startTime: setting?.startTime.slice(0, 5) ?? '09:00',

@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import NewTripScreen from "./new-trip-page";
 
 const mockCreateTrip = jest.fn();
+const mockSavePrimaryLodging = jest.fn();
 
 jest.mock("expo-router", () => ({
   router: { replace: jest.fn() },
@@ -14,6 +15,9 @@ jest.mock("@/domains/entitlements/api/entitlements.api", () => ({
 }));
 jest.mock("@/domains/trips/api/trips.api", () => ({
   createTrip: (...args: unknown[]) => mockCreateTrip(...args),
+}));
+jest.mock("@/domains/places/api/lodgings.api", () => ({
+  savePrimaryLodging: (...args: unknown[]) => mockSavePrimaryLodging(...args),
 }));
 
 describe("NewTripScreen", () => {
@@ -35,6 +39,22 @@ describe("NewTripScreen", () => {
       startDate: "2026-10-31",
       timezone: "Asia/Seoul",
       title: "부산 주말 여행",
+    }));
+    expect(router.replace).toHaveBeenCalledWith("/trips/trip-1");
+  });
+
+  it("saves the optional default lodging with the new trip", async () => {
+    mockCreateTrip.mockResolvedValue({ id: "trip-1" });
+    mockSavePrimaryLodging.mockResolvedValue({ id: "lodging-1" });
+    const screen = await render(<NewTripScreen />);
+
+    await fireEvent.changeText(screen.getByTestId("new-trip-lodging-name"), "부산 바다 호텔");
+    await fireEvent.changeText(screen.getByTestId("new-trip-lodging-address"), "부산광역시 해운대구");
+    await fireEvent.press(screen.getByTestId("new-trip-submit"));
+
+    await waitFor(() => expect(mockSavePrimaryLodging).toHaveBeenCalledWith("trip-1", {
+      address: "부산광역시 해운대구",
+      name: "부산 바다 호텔",
     }));
     expect(router.replace).toHaveBeenCalledWith("/trips/trip-1");
   });

@@ -35,7 +35,6 @@ export default function AiPlanScreen() {
       <AppText variant="title">어떤 여행을 원하나요?</AppText><AppText color={colors.muted}>AI 일정은 여행 스타일 선택부터 시작합니다.</AppText>
       <View style={styles.wrap}>{stylesList.map((item) => <Pill key={item.value} label={item.label} selected={selected === item.value} onPress={() => setSelected(item.value)} />)}</View>
       <Card><AppText variant="heading">{selectedStyle.label} 둘러보는 일정</AppText><AppText color={colors.muted}>{selectedStyle.description}</AppText></Card>
-      <Button label="숙소·날짜 설정 확인" variant="ghost" onPress={() => router.push(`/trips/${tripId}/settings`)} />
       {error && <Card><AppText color={colors.danger}>{error}</AppText></Card>}
       <Button label={loading ? "일정 만드는 중…" : "AI 일정 만들기"} disabled={loading} testID="ai-plan-generate" onPress={confirmPlan} />
     </Screen>

@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { router, useFocusEffect } from "expo-router";
-import { StyleSheet, TextInput } from "react-native";
+import { Alert, StyleSheet, TextInput } from "react-native";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -8,12 +8,15 @@ import { Screen } from "@/shared/ui/screen";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { createTrip } from "@/domains/trips/api/trips.api";
 import { getEntitlements, type Entitlements } from "@/domains/entitlements/api/entitlements.api";
+import { savePrimaryLodging } from "@/domains/places/api/lodgings.api";
 
 export default function NewTripScreen() {
   const [title, setTitle] = useState("서울 가을 여행");
   const [destination, setDestination] = useState("서울");
   const [startDate, setStartDate] = useState("2026-10-31");
   const [endDate, setEndDate] = useState("2026-11-02");
+  const [lodgingName, setLodgingName] = useState("");
+  const [lodgingAddress, setLodgingAddress] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
   const [entitlements, setEntitlements] = useState<Entitlements>();
@@ -25,6 +28,15 @@ export default function NewTripScreen() {
     setError(undefined);
     try {
       const trip = await createTrip({ title, destination, timezone: "Asia/Seoul", startDate, endDate });
+      if (lodgingName.trim()) {
+        try {
+          await savePrimaryLodging(trip.id, { name: lodgingName, address: lodgingAddress });
+        } catch {
+          Alert.alert("숙소 저장 실패", "여행은 생성됐지만 숙소를 저장하지 못했어요. 여행 정보에서 다시 입력해 주세요.");
+          router.replace(`/trips/${trip.id}/edit`);
+          return;
+        }
+      }
       router.replace(`/trips/${trip.id}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "여행을 만들지 못했어요.");
@@ -42,6 +54,10 @@ export default function NewTripScreen() {
         <AppText variant="label">여행지</AppText><TextInput testID="new-trip-destination" value={destination} onChangeText={setDestination} style={styles.input} />
         <AppText variant="label">시작일</AppText><TextInput testID="new-trip-start-date" value={startDate} onChangeText={setStartDate} placeholder="YYYY-MM-DD" style={styles.input} />
         <AppText variant="label">종료일</AppText><TextInput testID="new-trip-end-date" value={endDate} onChangeText={setEndDate} placeholder="YYYY-MM-DD" style={styles.input} />
+        <AppText variant="heading">기본 숙소</AppText>
+        <AppText color={colors.muted}>선택 사항이며 일정 편집에서 날짜별로 변경할 수 있어요.</AppText>
+        <AppText variant="label">숙소명</AppText><TextInput testID="new-trip-lodging-name" value={lodgingName} onChangeText={setLodgingName} placeholder="예: 서울 시청 호텔" style={styles.input} />
+        <AppText variant="label">숙소 주소</AppText><TextInput testID="new-trip-lodging-address" value={lodgingAddress} onChangeText={setLodgingAddress} placeholder="선택 입력" style={styles.input} />
       </Card>
       {limitReached && <Card>
         <AppText variant="heading">무료 여행 한도에 도달했어요</AppText>

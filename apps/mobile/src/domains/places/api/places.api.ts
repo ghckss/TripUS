@@ -31,7 +31,7 @@ export async function savePlace(
   if (error) throw new Error(apiErrorMessage(error));
   if (data.status === "created") {
     const places = await readCache<SavedPlace[]>(cacheKeys.places(tripId));
-    if (places) await writeCache(cacheKeys.places(tripId), [...places, data.place]);
+    if (places) await writeCache(cacheKeys.places(tripId), [data.place, ...places]);
     trackEvent("place.saved", { tripId, placeId: data.place.id, tag: data.place.tag });
   }
   return data;
