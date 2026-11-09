@@ -45,7 +45,7 @@ export function LodgingSearchField({ destination, value, onChange }: LodgingSear
 
   return <View style={styles.container}>
     <AppText variant="heading">기본 숙소</AppText>
-    <AppText color={colors.muted}>지도 검색 결과에서 선택하세요. 날짜별 숙소는 일정 편집에서 변경할 수 있어요.</AppText>
+    <AppText color={colors.muted}>지도 검색 결과에서 선택하세요. 기본 숙소는 매일 일정의 시작과 끝에 자동 추가돼요.</AppText>
     {value && <Card style={styles.selected}>
       <AppText variant="label">선택한 숙소</AppText>
       <AppText variant="heading">{value.name}</AppText>

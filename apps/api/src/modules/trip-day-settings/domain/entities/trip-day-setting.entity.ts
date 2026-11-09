@@ -19,10 +19,4 @@ export class TripDaySettingEntity {
 
   @Column({ name: 'end_time', type: 'time' })
   endTime!: string;
-
-  @Column({ name: 'start_place_id', type: 'uuid', nullable: true })
-  startPlaceId!: string | null;
-
-  @Column({ name: 'end_place_id', type: 'uuid', nullable: true })
-  endPlaceId!: string | null;
 }

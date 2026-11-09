@@ -37,7 +37,7 @@ export class OpenAiPlannerAdapter implements AiPlannerPort {
         model: this.model,
         max_output_tokens: this.maxOutputTokens,
         input: [
-          { role: 'system', content: 'You create practical travel itineraries. Use only supplied savedPlaceId values, include each at most once, keep every placement within the supplied trip dates, respect each day setting, lodging start/end point, and available time window, and plan around lockedPlacements without returning them.' },
+          { role: 'system', content: 'You create practical travel itineraries. Use only supplied savedPlaceId values, include each at most once, keep every placement within the supplied trip dates and available time window, and plan around lockedPlacements without returning them.' },
           { role: 'user', content: JSON.stringify(input) },
         ],
         text: { format: zodTextFormat(AiPlanSchema, 'trip_itinerary') },

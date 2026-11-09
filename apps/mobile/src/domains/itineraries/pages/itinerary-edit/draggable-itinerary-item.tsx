@@ -11,6 +11,7 @@ type Props = PropsWithChildren<{
   index: number;
   itemCount: number;
   placeName: string;
+  fixedLabel?: string;
   canMoveToPreviousDay: boolean;
   canMoveToNextDay: boolean;
   onMoveToDay: (direction: -1 | 1) => void;
@@ -22,6 +23,7 @@ export function DraggableItineraryItem({
   canMoveToNextDay,
   canMoveToPreviousDay,
   children,
+  fixedLabel,
   index,
   itemCount,
   onMoveToDay,
@@ -67,7 +69,9 @@ export function DraggableItineraryItem({
     transform: [...offset.getTranslateTransform(), { scale: dragging.interpolate({ inputRange: [0, 1], outputRange: [1, 1.025] }) }],
   }]}>
     <View style={styles.header}>
-      <View
+      {fixedLabel ? <View style={styles.fixedEndpoint}>
+        <AppText variant="caption" color={colors.secondary}>{fixedLabel}</AppText>
+      </View> : <View
         accessibilityActions={accessibilityActions}
         accessibilityLabel={`${placeName} 순서 이동`}
         accessibilityRole="adjustable"
@@ -80,12 +84,12 @@ export function DraggableItineraryItem({
         {...panResponder.panHandlers}
       >
         <AppText variant="heading" color={colors.primary}>⠇</AppText>
-      </View>
+      </View>}
       <View style={styles.order}><AppText variant="caption" color={colors.white}>{index + 1}</AppText></View>
       <AppText variant="label" style={styles.name}>{placeName}</AppText>
-      <Pressable accessibilityLabel={`${placeName} 일정에서 제외`} hitSlop={8} onPress={onRemove} style={styles.remove}>
+      {!fixedLabel && <Pressable accessibilityLabel={`${placeName} 일정에서 제외`} hitSlop={8} onPress={onRemove} style={styles.remove}>
         <AppText variant="heading" color={colors.muted}>×</AppText>
-      </Pressable>
+      </Pressable>}
     </View>
     {children}
   </Animated.View>;
@@ -95,6 +99,7 @@ const styles = StyleSheet.create({
   card: { gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface, shadowColor: colors.ink, shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
   header: { minHeight: 36, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingRight: spacing.lg },
   dragHandle: { width: 32, minHeight: 40, alignItems: "center", justifyContent: "center" },
+  fixedEndpoint: { minHeight: 32, justifyContent: "center", borderRadius: radius.pill, backgroundColor: colors.secondarySoft, paddingHorizontal: spacing.sm },
   order: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary },
   name: { flex: 1 },
   remove: { position: "absolute", right: -4, top: -5, width: 40, height: 40, alignItems: "center", justifyContent: "center" },

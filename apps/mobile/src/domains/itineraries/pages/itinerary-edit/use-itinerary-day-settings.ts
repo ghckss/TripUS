@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 
-import { listPlaces, type SavedPlace } from "@/domains/places/api/places.api";
 import {
   getTripDaySettings,
   replaceTripDaySettings,
@@ -11,7 +10,6 @@ import {
 
 export function useItineraryDaySettings(tripId: string) {
   const [settings, setSettings] = useState<TripDaySetting[]>([]);
-  const [lodgings, setLodgings] = useState<SavedPlace[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string>();
@@ -20,14 +18,10 @@ export function useItineraryDaySettings(tripId: string) {
     setLoading(true);
     setMessage(undefined);
     try {
-      const [nextSettings, places] = await Promise.all([
-        getTripDaySettings(tripId),
-        listPlaces(tripId),
-      ]);
+      const nextSettings = await getTripDaySettings(tripId);
       setSettings(nextSettings);
-      setLodgings(places.filter((place) => place.tag === "lodging"));
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "날짜별 숙소를 불러오지 못했어요.");
+      setMessage(caught instanceof Error ? caught.message : "날짜별 활동 시간을 불러오지 못했어요.");
     } finally {
       setLoading(false);
     }
@@ -44,21 +38,15 @@ export function useItineraryDaySettings(tripId: string) {
     setSaving(true);
     setMessage(undefined);
     try {
-      const input = settings.map(({ date, startTime, endTime, startPlaceId, endPlaceId }) => ({
-        date,
-        startTime,
-        endTime,
-        startPlaceId,
-        endPlaceId,
-      }));
+      const input = settings.map(({ date, startTime, endTime }) => ({ date, startTime, endTime }));
       setSettings(await replaceTripDaySettings(tripId, input));
-      setMessage("날짜별 숙소와 활동 시간을 저장했어요.");
+      setMessage("날짜별 활동 시간을 저장했어요.");
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "날짜별 숙소를 저장하지 못했어요.");
+      setMessage(caught instanceof Error ? caught.message : "날짜별 활동 시간을 저장하지 못했어요.");
     } finally {
       setSaving(false);
     }
   }, [settings, tripId]);
 
-  return { loading, lodgings, message, reload, save, saving, settings, update };
+  return { loading, message, reload, save, saving, settings, update };
 }

@@ -40,6 +40,7 @@ export default function ItineraryScreen() {
   }, {});
   const items = [...(grouped[selectedDate] ?? [])].sort((left, right) => (left.position ?? 0) - (right.position ?? 0));
   const setting = daySettings.settings.find((candidate) => candidate.date === selectedDate);
+  const primaryLodgingId = places.find((place) => place.isPrimaryLodging)?.id;
 
   return <Screen>
     <AppText variant="title">일정을 다듬어 보세요</AppText>
@@ -69,16 +70,6 @@ export default function ItineraryScreen() {
           <AppText color={colors.muted}>–</AppText>
           <TextInput accessibilityLabel={`${selectedDate} 종료 시간`} value={setting.endTime} onChangeText={(endTime) => daySettings.update(selectedDate, { endTime })} placeholder="21:00" style={styles.timeInput} />
         </View>
-        <AppText variant="label">출발 숙소</AppText>
-        <View style={styles.pills}>
-          <Pill label="지정 안 함" selected={!setting.startPlaceId} onPress={() => daySettings.update(selectedDate, { startPlaceId: null })} />
-          {daySettings.lodgings.map((place) => <Pill key={`start-${selectedDate}-${place.id}`} label={place.name} selected={setting.startPlaceId === place.id} onPress={() => daySettings.update(selectedDate, { startPlaceId: place.id })} />)}
-        </View>
-        <AppText variant="label">종료 숙소</AppText>
-        <View style={styles.pills}>
-          <Pill label="지정 안 함" selected={!setting.endPlaceId} onPress={() => daySettings.update(selectedDate, { endPlaceId: null })} />
-          {daySettings.lodgings.map((place) => <Pill key={`end-${selectedDate}-${place.id}`} label={place.name} selected={setting.endPlaceId === place.id} onPress={() => daySettings.update(selectedDate, { endPlaceId: place.id })} />)}
-        </View>
       </View>}
 
       <View style={styles.scheduleHeader}>
@@ -90,12 +81,16 @@ export default function ItineraryScreen() {
         {items.map((item, placeIndex) => {
           const nextItem = items[placeIndex + 1];
           const route = nextItem ? routes[`${item.savedPlaceId}:${nextItem.savedPlaceId}`] : undefined;
+          const fixedLodgingLabel = item.savedPlaceId === primaryLodgingId
+            ? placeIndex === 0 ? "하루 시작 숙소" : placeIndex === items.length - 1 ? "하루 종료 숙소" : undefined
+            : undefined;
           return <DraggableItineraryItem
             canMoveToNextDay={dayIndex < dates.length - 1}
             canMoveToPreviousDay={dayIndex > 0}
             index={placeIndex}
             itemCount={items.length}
             key={item.id}
+            fixedLabel={fixedLodgingLabel}
             onMoveToDay={(direction) => {
               const targetDate = dates[dayIndex + direction];
               moveToAdjacentDay(item.id, direction);
@@ -118,16 +113,11 @@ export default function ItineraryScreen() {
       <Button label="＋ 여행 장소 추가" variant="ghost" testID={`itinerary-add-places-${selectedDate}`} onPress={() => setPlacePickerDay({ date: selectedDate, index: dayIndex })} />
     </Card>}
 
-    {!daySettings.loading && daySettings.lodgings.length === 0 && <Card>
-      <AppText variant="heading">등록된 숙소가 없어요</AppText>
-      <AppText color={colors.muted}>여행 정보에서 기본 숙소를 등록하면 날짜별 출발·종료 숙소로 선택할 수 있어요.</AppText>
-      <Button label="여행 정보에서 숙소 등록" variant="ghost" onPress={() => router.push(`/trips/${tripId}/edit`)} />
-    </Card>}
     {daySettings.message && <AppText color={colors.secondary}>{daySettings.message}</AppText>}
-    <Button label={daySettings.saving ? "숙소 저장 중…" : "날짜별 숙소·시간 저장"} disabled={daySettings.loading || daySettings.saving || daySettings.settings.length === 0} variant="secondary" testID="itinerary-day-settings-save" onPress={() => void daySettings.save()} />
+    <Button label={daySettings.saving ? "시간 저장 중…" : "날짜별 활동 시간 저장"} disabled={daySettings.loading || daySettings.saving || daySettings.settings.length === 0} variant="secondary" testID="itinerary-day-settings-save" onPress={() => void daySettings.save()} />
     <Button label={saving ? "저장 중…" : "일정 저장"} disabled={!itinerary || saving} testID="itinerary-save" onPress={() => void save().then((saved) => { if (saved) router.back(); })} />
     <Button label={undoing ? "되돌리는 중…" : "최근 AI 변경 한 번 되돌리기"} disabled={undoing} variant="ghost" onPress={() => void undoAiChange()} />
-    {placePickerDay && <DayPlacePicker date={placePickerDay.date} dayIndex={placePickerDay.index} items={itinerary?.items ?? []} places={places} onApply={setPlacesForDate} onClose={() => setPlacePickerDay(undefined)} />}
+    {placePickerDay && <DayPlacePicker tripId={tripId} date={placePickerDay.date} dayIndex={placePickerDay.index} items={itinerary?.items ?? []} places={places} onApply={setPlacesForDate} onClose={() => setPlacePickerDay(undefined)} />}
   </Screen>;
 }
 
@@ -140,7 +130,6 @@ const styles = StyleSheet.create({
   daySettings: { gap: spacing.sm, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
   timeRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   timeInput: { flex: 1, minHeight: 44, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, paddingHorizontal: spacing.md, color: colors.ink },
-  pills: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
   scheduleHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: spacing.sm },
   placeList: { gap: spacing.sm },
   route: { gap: spacing.xs, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.line },

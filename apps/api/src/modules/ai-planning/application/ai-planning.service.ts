@@ -35,6 +35,7 @@ export class AiPlanningService {
     const trip = await this.trips.findOneBy({ id: tripId, ownerId: this.identity.getCurrentUserId(), active: true });
     if (!trip) throw new NotFoundException('Trip not found');
     const places = await this.places.find({ where: { tripId }, order: { createdAt: 'ASC' } });
+    const primaryLodging = places.find((place) => place.isPrimaryLodging);
     const current = await this.itineraries.get(tripId);
     const locked = current.items.filter((item) => item.locked && item.date !== null && item.position !== null);
     const lockedIds = new Set(locked.map((item) => item.savedPlaceId));
@@ -49,13 +50,17 @@ export class AiPlanningService {
       endDate: trip.endDate,
       style,
       places: planningPlaces.map((place) => ({ id: place.id, name: place.name, tag: place.tag, preference: place.preference, note: place.note })),
-      daySettings: settings.map(({ date, startTime, endTime, startPlaceName, endPlaceName }) => ({ date, startTime, endTime, startPlaceName, endPlaceName })),
+      daySettings: settings.map(({ date, startTime, endTime }) => ({ date, startTime, endTime })),
       lockedPlacements: locked.map((item) => ({ savedPlaceId: item.savedPlaceId, date: item.date!, position: item.position! })),
       });
       if (output.usage) this.logger.log(`AI itinerary generated inputTokens=${output.usage.inputTokens} outputTokens=${output.usage.outputTokens}`);
       const allowed = new Set(planningPlaces.map((place) => place.id));
       const generated = output.placements.filter((item) => allowed.has(item.savedPlaceId));
-      const placements = mergeLockedPlacements(locked, generated);
+      const placements = addLodgingEndpoints(
+        mergeLockedPlacements(locked, generated),
+        primaryLodging?.id,
+        enumerateDates(trip.startDate, trip.endDate),
+      );
       const result = await this.itineraries.replace(tripId, placements, ItinerarySource.Ai);
       await this.entitlements.recordSuccessfulAiGeneration();
       return {
@@ -77,6 +82,35 @@ export class AiPlanningService {
       };
     }
   }
+}
+
+export function addLodgingEndpoints(
+  placements: Array<{ savedPlaceId: string; date: string; position: number; locked?: boolean }>,
+  lodgingId: string | undefined,
+  dates: string[],
+) {
+  if (!lodgingId) return placements;
+  return dates.flatMap((date) => {
+    const day = placements
+      .filter((item) => item.date === date && item.savedPlaceId !== lodgingId)
+      .sort((left, right) => left.position - right.position);
+    return [
+      { savedPlaceId: lodgingId, date, position: 0, locked: false },
+      ...day.map((item, index) => ({ ...item, position: index + 1 })),
+      { savedPlaceId: lodgingId, date, position: day.length + 1, locked: false },
+    ];
+  });
+}
+
+function enumerateDates(startDate: string, endDate: string): string[] {
+  const dates: string[] = [];
+  const current = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  while (current <= end) {
+    dates.push(current.toISOString().slice(0, 10));
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+  return dates;
 }
 
 function mergeLockedPlacements(

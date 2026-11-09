@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ArrayMaxSize, IsArray, IsDateString, IsOptional, IsUUID, Matches, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsDateString, Matches, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class TripDaySettingInputDto {
@@ -14,16 +14,6 @@ export class TripDaySettingInputDto {
   @ApiProperty({ example: '21:00', pattern: '^([01]\\d|2[0-3]):[0-5]\\d$', type: String })
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
   endTime!: string;
-
-  @ApiProperty({ format: 'uuid', nullable: true, required: false, type: String })
-  @IsOptional()
-  @IsUUID()
-  startPlaceId?: string | null;
-
-  @ApiProperty({ format: 'uuid', nullable: true, required: false, type: String })
-  @IsOptional()
-  @IsUUID()
-  endPlaceId?: string | null;
 }
 
 export class ReplaceTripDaySettingsDto {
@@ -35,10 +25,4 @@ export class ReplaceTripDaySettingsDto {
   settings!: TripDaySettingInputDto[];
 }
 
-export class TripDaySettingResponseDto extends TripDaySettingInputDto {
-  @ApiProperty({ nullable: true, type: String })
-  startPlaceName!: string | null;
-
-  @ApiProperty({ nullable: true, type: String })
-  endPlaceName!: string | null;
-}
+export class TripDaySettingResponseDto extends TripDaySettingInputDto {}

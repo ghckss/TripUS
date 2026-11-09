@@ -25,8 +25,6 @@ export interface AiPlannerInput {
     date: string;
     startTime: string;
     endTime: string;
-    startPlaceName: string | null;
-    endPlaceName: string | null;
   }>;
   lockedPlacements: AiPlannerPlacement[];
 }

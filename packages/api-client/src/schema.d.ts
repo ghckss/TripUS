@@ -482,12 +482,6 @@ export interface components {
             startTime: string;
             /** @example 21:00 */
             endTime: string;
-            /** Format: uuid */
-            startPlaceId?: string | null;
-            /** Format: uuid */
-            endPlaceId?: string | null;
-            startPlaceName: string | null;
-            endPlaceName: string | null;
         };
         TripDaySettingInputDto: {
             /** Format: date */
@@ -496,10 +490,6 @@ export interface components {
             startTime: string;
             /** @example 21:00 */
             endTime: string;
-            /** Format: uuid */
-            startPlaceId?: string | null;
-            /** Format: uuid */
-            endPlaceId?: string | null;
         };
         ReplaceTripDaySettingsDto: {
             settings: components["schemas"]["TripDaySettingInputDto"][];

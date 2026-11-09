@@ -3,8 +3,9 @@ import { useFocusEffect } from "expo-router";
 
 import { apiErrorMessage } from "@/shared/api/trip-us-api";
 import { getTrip } from "@/domains/trips";
-import { listTravelPlaces, type SavedPlace } from "@/domains/places/api/places.api";
+import { listPlaces, type SavedPlace } from "@/domains/places/api/places.api";
 import { getItinerary, getTransitRoute, replaceItinerary, undoAiPlan, type Itinerary, type TransitRoute } from "../../api/itineraries.api";
+import { ensureLodgingEndpoints } from "./itinerary-lodging-endpoints";
 
 function enumerateDates(startDate: string, endDate: string): string[] {
   const dates: string[] = [];
@@ -44,23 +45,25 @@ export function useItineraryEdit(tripId: string) {
   const reload = useCallback(async () => {
     setError(undefined);
     try {
-      const [nextItinerary, trip, nextPlaces] = await Promise.all([getItinerary(tripId), getTrip(tripId), listTravelPlaces(tripId)]);
-      setItinerary(nextItinerary);
-      setDates(enumerateDates(trip.startDate, trip.endDate));
+      const [nextItinerary, trip, nextPlaces] = await Promise.all([getItinerary(tripId), getTrip(tripId), listPlaces(tripId)]);
+      const nextDates = enumerateDates(trip.startDate, trip.endDate);
+      setItinerary(ensureLodgingEndpoints(nextItinerary, nextDates, nextPlaces));
+      setDates(nextDates);
       setPlaces(nextPlaces);
     } catch (caught) { setError(apiErrorMessage(caught)); }
   }, [tripId]);
 
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
 
-  const setPlacesForDate = (date: string, selectedPlaceIds: string[]) => {
+  const setPlacesForDate = (date: string, selectedPlaceIds: string[], availablePlaces = places) => {
     if (!itinerary) return;
     const selected = new Set(selectedPlaceIds);
     const currentItems = itinerary.items.filter((item) => item.date === date);
     const currentIds = new Set(currentItems.map((item) => item.savedPlaceId));
+    const primaryLodgingId = availablePlaces.find((place) => place.isPrimaryLodging)?.id;
 
-    const retainedItems = itinerary.items.filter((item) => item.date !== date || selected.has(item.savedPlaceId));
-    const additions = places.filter((place) => selected.has(place.id) && !currentIds.has(place.id)).map((place, index) => ({
+    const retainedItems = itinerary.items.filter((item) => item.date !== date || item.savedPlaceId === primaryLodgingId || selected.has(item.savedPlaceId));
+    const additions = availablePlaces.filter((place) => selected.has(place.id) && !currentIds.has(place.id)).map((place, index) => ({
       id: `local:${date}:${place.id}`,
       savedPlaceId: place.id,
       placeName: place.name,
@@ -76,7 +79,11 @@ export function useItineraryEdit(tripId: string) {
 
     const nextItems = [...retainedItems, ...additions];
     const placedIds = new Set(nextItems.map((item) => item.savedPlaceId));
-    setItinerary(normalizePositions({ items: nextItems, unplaced: places.filter((place) => !placedIds.has(place.id)).map((place) => ({ savedPlaceId: place.id, placeName: place.name })) }));
+    setPlaces(availablePlaces);
+    setItinerary(ensureLodgingEndpoints({
+      items: nextItems,
+      unplaced: availablePlaces.filter((place) => !place.isPrimaryLodging && !placedIds.has(place.id)).map((place) => ({ savedPlaceId: place.id, placeName: place.name })),
+    }, dates, availablePlaces));
   };
 
   const reorderWithinDay = (itemId: string, targetIndex: number) => {
@@ -140,7 +147,8 @@ export function useItineraryEdit(tripId: string) {
     if (!itinerary) return false;
     setSaving(true); setError(undefined);
     try {
-      setItinerary(await replaceItinerary(tripId, itinerary.items.map((item) => ({
+      const prepared = ensureLodgingEndpoints(itinerary, dates, places);
+      setItinerary(await replaceItinerary(tripId, prepared.items.map((item) => ({
         savedPlaceId: item.savedPlaceId, date: item.date!, position: item.position!, locked: false,
       }))));
       return true;

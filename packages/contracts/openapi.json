@@ -1509,32 +1509,12 @@
             "type": "string",
             "example": "21:00",
             "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
-          },
-          "startPlaceId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "endPlaceId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "startPlaceName": {
-            "type": "string",
-            "nullable": true
-          },
-          "endPlaceName": {
-            "type": "string",
-            "nullable": true
           }
         },
         "required": [
           "date",
           "startTime",
-          "endTime",
-          "startPlaceName",
-          "endPlaceName"
+          "endTime"
         ]
       },
       "TripDaySettingInputDto": {
@@ -1553,16 +1533,6 @@
             "type": "string",
             "example": "21:00",
             "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
-          },
-          "startPlaceId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "endPlaceId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
           }
         },
         "required": [
