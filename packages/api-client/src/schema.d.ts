@@ -519,6 +519,7 @@ export interface components {
             tag: components["schemas"]["PlaceTag"];
             preference: components["schemas"]["PlacePreference"];
             note?: string | null;
+            isPrimaryLodging: boolean;
         };
         PlaceSearchCandidateDto: {
             googlePlaceId: string;
@@ -536,6 +537,8 @@ export interface components {
             tag: components["schemas"]["PlaceTag"];
             preference: components["schemas"]["PlacePreference"];
             note?: string | null;
+            /** @default false */
+            isPrimaryLodging: boolean;
         };
         /** @enum {string} */
         SavePlaceStatus: "created" | "already_exists";
@@ -550,6 +553,7 @@ export interface components {
             tag?: components["schemas"]["PlaceTag"];
             preference?: components["schemas"]["PlacePreference"];
             note?: string | null;
+            isPrimaryLodging?: boolean;
         };
         /** @enum {string} */
         TripListStatus: "current" | "completed" | "all";

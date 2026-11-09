@@ -27,6 +27,9 @@ export class SavedPlaceResponseDto {
   @ApiPropertyOptional({ type: String, nullable: true })
   note!: string | null;
 
+  @ApiProperty({ type: Boolean })
+  isPrimaryLodging!: boolean;
+
   static fromEntity(entity: SavedPlaceEntity): SavedPlaceResponseDto {
     return {
       id: entity.id,
@@ -37,6 +40,7 @@ export class SavedPlaceResponseDto {
       tag: entity.tag,
       preference: entity.preference,
       note: entity.note,
+      isPrimaryLodging: entity.isPrimaryLodging,
     };
   }
 }

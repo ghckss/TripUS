@@ -3,7 +3,7 @@ import { useFocusEffect } from "expo-router";
 
 import { getTrip, type Trip } from "@/domains/trips/api/trips.api";
 import { getItinerary } from "@/domains/itineraries";
-import { listPlaces } from "@/domains/places/api/places.api";
+import { listTravelPlaces } from "@/domains/places/api/places.api";
 import { replaceTripReminders } from "@/domains/trips/notifications/trip-reminders";
 
 export function useTripDetail(tripId: string) {
@@ -17,7 +17,7 @@ export function useTripDetail(tripId: string) {
   const reload = useCallback(async () => {
     setError(undefined);
     try {
-      const [nextTrip, places, itinerary] = await Promise.all([getTrip(tripId), listPlaces(tripId), getItinerary(tripId)]);
+      const [nextTrip, places, itinerary] = await Promise.all([getTrip(tripId), listTravelPlaces(tripId), getItinerary(tripId)]);
       setTrip(nextTrip);
       setPlaceCount(places.length);
       setScheduledCount(itinerary.items.length);

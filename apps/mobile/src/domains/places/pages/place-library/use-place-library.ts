@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 
-import { deletePlace, listPlaces, updatePlace, type SavedPlace, type UpdateSavedPlaceInput } from "@/domains/places/api/places.api";
+import { deletePlace, listTravelPlaces, updatePlace, type SavedPlace, type UpdateSavedPlaceInput } from "@/domains/places/api/places.api";
 
 export function usePlaceLibrary(tripId: string) {
   const [places, setPlaces] = useState<SavedPlace[]>([]);
@@ -12,7 +12,7 @@ export function usePlaceLibrary(tripId: string) {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      setPlaces(await listPlaces(tripId));
+      setPlaces(await listTravelPlaces(tripId));
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "장소를 불러오지 못했어요.");
     } finally {

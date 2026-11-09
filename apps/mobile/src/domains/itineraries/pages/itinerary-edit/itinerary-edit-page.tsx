@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
+import { useState } from "react";
 import { Linking, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
@@ -8,12 +9,14 @@ import { Screen } from "@/shared/ui/screen";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { useItineraryEdit } from "./use-itinerary-edit";
 import { useItineraryDaySettings } from "./use-itinerary-day-settings";
+import { DayPlacePicker } from "./day-place-picker";
 import type { ItineraryItem } from "../../api/itineraries.api";
 
 export default function ItineraryScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { addUnplaced, dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, moveWithinDay, reload, removeFromItinerary, routes, save, saving, toggleLocked, undoAiChange, undoing } = useItineraryEdit(tripId);
+  const { dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, moveWithinDay, places, reload, removeFromItinerary, routes, save, saving, setPlacesForDate, toggleLocked, undoAiChange, undoing } = useItineraryEdit(tripId);
   const daySettings = useItineraryDaySettings(tripId);
+  const [placePickerDay, setPlacePickerDay] = useState<{ date: string; index: number }>();
   const grouped = (itinerary?.items ?? []).reduce<Record<string, ItineraryItem[]>>((groups, item) => {
     const date = item.date ?? "미배치";
     (groups[date] ??= []).push(item);
@@ -21,7 +24,7 @@ export default function ItineraryScreen() {
   }, {});
   return (
     <Screen>
-      <AppText variant="title">일정을 다듬어 보세요</AppText><AppText color={colors.muted}>미배치와 일정 포함 여부는 이 화면에서 관리합니다.</AppText>
+      <AppText variant="title">일정을 다듬어 보세요</AppText><AppText color={colors.muted}>날짜별로 방문할 장소와 숙소를 설정하세요.</AppText>
       {error && <Card><AppText color={colors.danger}>{error}</AppText><Button label="다시 시도" variant="ghost" onPress={() => void reload()} /></Card>}
       {!itinerary && !error && <Card><AppText color={colors.muted}>일정을 불러오는 중이에요…</AppText></Card>}
       {dates.map((date, dayIndex) => {
@@ -69,6 +72,7 @@ export default function ItineraryScreen() {
             </View>}
           </View>;
           })}
+          <Button label="＋ 여행 장소 추가" variant="ghost" testID={`itinerary-add-places-${date}`} onPress={() => setPlacePickerDay({ date, index: dayIndex })} />
         </Card>;
       })}
       {!daySettings.loading && daySettings.lodgings.length === 0 && <Card>
@@ -78,9 +82,16 @@ export default function ItineraryScreen() {
       </Card>}
       {daySettings.message && <AppText color={colors.secondary}>{daySettings.message}</AppText>}
       <Button label={daySettings.saving ? "숙소 저장 중…" : "날짜별 숙소·시간 저장"} disabled={daySettings.loading || daySettings.saving || daySettings.settings.length === 0} variant="secondary" testID="itinerary-day-settings-save" onPress={() => void daySettings.save()} />
-      {itinerary && <Card style={styles.unplaced}><View style={styles.row}><AppText variant="heading">미배치 장소</AppText><Pill label={`${itinerary.unplaced.length}곳`} selected /></View>{itinerary.unplaced.length === 0 ? <AppText color={colors.muted}>모든 장소가 일정에 포함됐어요.</AppText> : itinerary.unplaced.map((place) => <View key={place.savedPlaceId}><AppText>{place.placeName}</AppText><Button label="첫째 날에 추가" variant="ghost" onPress={() => addUnplaced(place.savedPlaceId)} /></View>)}</Card>}
       <Button label={saving ? "저장 중…" : "일정 저장"} disabled={!itinerary || saving} testID="itinerary-save" onPress={() => void save().then((saved) => { if (saved) router.back(); })} />
       <Button label={undoing ? "되돌리는 중…" : "최근 AI 변경 한 번 되돌리기"} disabled={undoing} variant="ghost" onPress={() => void undoAiChange()} />
+      {placePickerDay && <DayPlacePicker
+        date={placePickerDay.date}
+        dayIndex={placePickerDay.index}
+        items={itinerary?.items ?? []}
+        places={places}
+        onApply={setPlacesForDate}
+        onClose={() => setPlacePickerDay(undefined)}
+      />}
     </Screen>
   );
 }
@@ -96,5 +107,4 @@ const styles = StyleSheet.create({
   pills: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
   action: { minHeight: 40, width: 52, paddingHorizontal: spacing.xs },
   dayAction: { minHeight: 40, paddingHorizontal: spacing.sm },
-  unplaced: { borderStyle: "dashed", borderColor: colors.secondary },
 });

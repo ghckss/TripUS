@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { PlacePreference, PlaceTag } from '../../domain/entities/saved-place.entity';
 
@@ -34,4 +34,9 @@ export class CreateSavedPlaceDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  @ApiPropertyOptional({ type: Boolean, default: false })
+  @IsOptional()
+  @IsBoolean()
+  isPrimaryLodging?: boolean;
 }

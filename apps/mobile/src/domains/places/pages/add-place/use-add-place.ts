@@ -52,6 +52,7 @@ export function useAddPlace(tripId: string, initialQuery = "") {
         address: candidate.address ?? undefined,
         tag: inferTag(candidate.primaryType ?? null),
         preference: "want_to_visit",
+        isPrimaryLodging: false,
       });
       setSavedIds((current) => new Set(current).add(candidate.googlePlaceId));
       setMessage(result.status === "created" ? `${candidate.name}을(를) 추가했어요.` : "이미 추가한 장소예요.");

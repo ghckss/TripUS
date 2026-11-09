@@ -32,17 +32,19 @@ describe("savePrimaryLodging", () => {
       name: "서울 호텔",
       preference: "want_to_visit",
       tag: "lodging",
+      isPrimaryLodging: true,
     });
   });
 
   it("updates or removes the existing primary lodging", async () => {
-    mockListPlaces.mockResolvedValue([{ id: "lodging-1", name: "기존 호텔", tag: "lodging" }] as never);
+    mockListPlaces.mockResolvedValue([{ id: "lodging-1", name: "기존 호텔", tag: "lodging", isPrimaryLodging: true }] as never);
 
     await savePrimaryLodging("trip-1", { name: "새 호텔", address: "새 주소" });
     expect(mockUpdatePlace).toHaveBeenCalledWith("trip-1", "lodging-1", {
       address: "새 주소",
       name: "새 호텔",
       tag: "lodging",
+      isPrimaryLodging: true,
     });
 
     await savePrimaryLodging("trip-1", { name: "", address: "" });

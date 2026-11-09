@@ -13,8 +13,7 @@ export type LodgingDraft = {
 };
 
 export async function getPrimaryLodging(tripId: string): Promise<SavedPlace | undefined> {
-  const lodgings = (await listPlaces(tripId)).filter((place) => place.tag === "lodging");
-  return lodgings.at(-1);
+  return (await listPlaces(tripId)).find((place) => place.isPrimaryLodging || (place.isPrimaryLodging == null && place.tag === "lodging"));
 }
 
 export async function savePrimaryLodging(
@@ -36,6 +35,7 @@ export async function savePrimaryLodging(
       name,
       address,
       tag: "lodging",
+      isPrimaryLodging: true,
     });
   }
 
@@ -45,6 +45,8 @@ export async function savePrimaryLodging(
     address: address || undefined,
     tag: "lodging",
     preference: "want_to_visit",
+    isPrimaryLodging: true,
   });
-  return result.place;
+  if (result.place.isPrimaryLodging) return result.place;
+  return updatePlace(tripId, result.place.id, { tag: "lodging", isPrimaryLodging: true });
 }

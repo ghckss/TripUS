@@ -40,6 +40,7 @@ describe("AddPlacePage", () => {
     await waitFor(() => expect(mockSavePlace).toHaveBeenCalledWith("trip-1", {
       address: "서울특별시 성동구 뚝섬로 273",
       googlePlaceId: "google-seoul-forest",
+      isPrimaryLodging: false,
       name: "서울숲",
       preference: "want_to_visit",
       tag: "activity",

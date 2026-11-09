@@ -54,6 +54,7 @@ export class PlacesService {
       tag: input.tag,
       preference: input.preference,
       note: input.note ?? null,
+      isPrimaryLodging: input.isPrimaryLodging ?? false,
     });
 
     try {

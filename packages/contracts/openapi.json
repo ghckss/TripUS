@@ -1646,6 +1646,9 @@
           "note": {
             "type": "string",
             "nullable": true
+          },
+          "isPrimaryLodging": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -1653,7 +1656,8 @@
           "tripId",
           "name",
           "tag",
-          "preference"
+          "preference",
+          "isPrimaryLodging"
         ]
       },
       "PlaceSearchCandidateDto": {
@@ -1722,6 +1726,10 @@
           "note": {
             "type": "string",
             "nullable": true
+          },
+          "isPrimaryLodging": {
+            "type": "boolean",
+            "default": false
           }
         },
         "required": [
@@ -1790,6 +1798,9 @@
           "note": {
             "type": "string",
             "nullable": true
+          },
+          "isPrimaryLodging": {
+            "type": "boolean"
           }
         }
       },

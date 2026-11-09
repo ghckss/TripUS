@@ -53,12 +53,14 @@ export class ItinerariesService {
   private async read(tripId: string): Promise<ItineraryResponseDto> {
     const [items, places] = await Promise.all([
       this.items.find({ where: { tripId }, relations: { savedPlace: true }, order: { date: 'ASC', position: 'ASC' } }),
-      this.places.find({ where: { tripId }, order: { createdAt: 'ASC' } }),
+      this.places.find({ where: { tripId, isPrimaryLodging: false }, order: { createdAt: 'ASC' } }),
     ]);
     const placedIds = new Set(items.map((item) => item.savedPlaceId));
     return {
       items: items.map(ItineraryResponseDtoItem),
-      unplaced: places.filter((place) => !placedIds.has(place.id)).map((place) => ({ savedPlaceId: place.id, placeName: place.name })),
+      unplaced: places
+        .filter((place) => !place.isPrimaryLodging && !placedIds.has(place.id))
+        .map((place) => ({ savedPlaceId: place.id, placeName: place.name })),
     };
   }
 
@@ -74,7 +76,7 @@ export class ItinerariesService {
     const ids = [...new Set(input.map((item) => item.savedPlaceId))];
     if (ids.length !== input.length) conflicts.push('DUPLICATE_PLACE');
     if (ids.length > 0) {
-      const owned = await this.places.countBy({ id: In(ids), tripId: trip.id });
+      const owned = await this.places.countBy({ id: In(ids), tripId: trip.id, isPrimaryLodging: false });
       if (owned !== ids.length) conflicts.push('PLACE_NOT_IN_TRIP');
     }
     return conflicts;

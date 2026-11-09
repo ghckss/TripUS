@@ -67,6 +67,9 @@ export class SavedPlaceEntity {
   @Column({ type: 'text', nullable: true })
   note!: string | null;
 
+  @Column({ name: 'is_primary_lodging', type: 'boolean', default: false })
+  isPrimaryLodging!: boolean;
+
   @OneToMany(() => ItineraryItemEntity, (item) => item.savedPlace)
   itineraryItems!: ItineraryItemEntity[];
 

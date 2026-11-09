@@ -3,6 +3,7 @@ import { useFocusEffect } from "expo-router";
 
 import { apiErrorMessage } from "@/shared/api/trip-us-api";
 import { getTrip } from "@/domains/trips";
+import { listTravelPlaces, type SavedPlace } from "@/domains/places/api/places.api";
 import { getItinerary, getTransitRoute, replaceItinerary, undoAiPlan, type Itinerary, type TransitRoute } from "../../api/itineraries.api";
 
 function enumerateDates(startDate: string, endDate: string): string[] {
@@ -36,31 +37,52 @@ export function useItineraryEdit(tripId: string) {
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [dates, setDates] = useState<string[]>([]);
+  const [places, setPlaces] = useState<SavedPlace[]>([]);
   const [routes, setRoutes] = useState<Record<string, TransitRoute | "loading">>({});
   const [undoing, setUndoing] = useState(false);
 
   const reload = useCallback(async () => {
     setError(undefined);
     try {
-      const [nextItinerary, trip] = await Promise.all([getItinerary(tripId), getTrip(tripId)]);
+      const [nextItinerary, trip, nextPlaces] = await Promise.all([getItinerary(tripId), getTrip(tripId), listTravelPlaces(tripId)]);
       setItinerary(nextItinerary);
       setDates(enumerateDates(trip.startDate, trip.endDate));
+      setPlaces(nextPlaces);
     } catch (caught) { setError(apiErrorMessage(caught)); }
   }, [tripId]);
 
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
 
-  const addUnplaced = (savedPlaceId: string) => {
+  const setPlacesForDate = (date: string, selectedPlaceIds: string[]) => {
     if (!itinerary) return;
-    const firstDate = dates[0];
-    if (!firstDate) return;
+    const selected = new Set(selectedPlaceIds);
+    const existingIds = new Set(itinerary.items.map((item) => item.savedPlaceId));
+    const currentItems = itinerary.items.filter((item) => item.date === date);
+    const unplaced = new Map(itinerary.unplaced.map((place) => [place.savedPlaceId, place]));
+
+    currentItems.filter((item) => !selected.has(item.savedPlaceId)).forEach((item) => {
+      unplaced.set(item.savedPlaceId, { savedPlaceId: item.savedPlaceId, placeName: item.placeName });
+    });
+    selected.forEach((savedPlaceId) => unplaced.delete(savedPlaceId));
+
+    const retainedItems = itinerary.items.filter((item) => item.date !== date || selected.has(item.savedPlaceId));
+    const additions = places.filter((place) => selected.has(place.id) && !existingIds.has(place.id)).map((place, index) => ({
+      id: `local:${place.id}`,
+      savedPlaceId: place.id,
+      placeName: place.name,
+      address: place.address,
+      date,
+      position: currentItems.length + index,
+      locked: false,
+      source: "manual" as const,
+      visitStatus: null,
+      rating: null,
+      review: null,
+    }));
+
     setItinerary(normalizePositions({
-      items: [...itinerary.items, {
-        id: `local:${savedPlaceId}`, savedPlaceId, placeName: itinerary.unplaced.find((place) => place.savedPlaceId === savedPlaceId)?.placeName ?? "장소",
-        address: null, date: firstDate, position: itinerary.items.filter((item) => item.date === firstDate).length,
-        locked: false, source: "manual", visitStatus: null, rating: null, review: null,
-      }],
-      unplaced: itinerary.unplaced.filter((place) => place.savedPlaceId !== savedPlaceId),
+      items: [...retainedItems, ...additions],
+      unplaced: [...unplaced.values()],
     }));
   };
 
@@ -146,5 +168,5 @@ export function useItineraryEdit(tripId: string) {
     finally { setUndoing(false); }
   };
 
-  return { addUnplaced, dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, moveWithinDay, reload, removeFromItinerary, routes, save, saving, toggleLocked, undoAiChange, undoing };
+  return { dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, moveWithinDay, places, reload, removeFromItinerary, routes, save, saving, setPlacesForDate, toggleLocked, undoAiChange, undoing };
 }

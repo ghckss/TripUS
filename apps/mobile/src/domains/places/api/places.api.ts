@@ -10,6 +10,10 @@ export type SavePlaceResult = components["schemas"]["SavePlaceResultDto"];
 export type PlaceSearchCandidate = components["schemas"]["PlaceSearchCandidateDto"];
 export type UpdateSavedPlaceInput = components["schemas"]["UpdateSavedPlaceDto"];
 
+export function filterTravelPlaces(places: SavedPlace[]): SavedPlace[] {
+  return places.filter((place) => place.isPrimaryLodging === false || (place.isPrimaryLodging == null && place.tag !== "lodging"));
+}
+
 export async function listPlaces(tripId: string): Promise<SavedPlace[]> {
   return cachedRequest(cacheKeys.places(tripId), async () => {
     const { data, error } = await tripUsApi.GET("/v1/trips/{tripId}/places", {
@@ -18,6 +22,10 @@ export async function listPlaces(tripId: string): Promise<SavedPlace[]> {
     if (error) throw new Error(apiErrorMessage(error));
     return data;
   });
+}
+
+export async function listTravelPlaces(tripId: string): Promise<SavedPlace[]> {
+  return filterTravelPlaces(await listPlaces(tripId));
 }
 
 export async function savePlace(
