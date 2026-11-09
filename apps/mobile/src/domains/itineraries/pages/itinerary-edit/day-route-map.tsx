@@ -23,7 +23,12 @@ const coordinateKey = ({ latitude, longitude }: LatLng) => `${latitude.toFixed(6
 const markerGroupId = (entries: LocatedItem[]) => entries.map(({ item }) => item.id).join("-");
 const markerOrderLabel = (entries: LocatedItem[]) => entries.map(({ order }) => order).join(" · ");
 
-export function DayRouteMap({ items }: { items: ItineraryItem[] }) {
+type MapFocusTarget = {
+  itemId: string;
+  request: number;
+};
+
+export function DayRouteMap({ focusTarget, items }: { focusTarget?: MapFocusTarget; items: ItineraryItem[] }) {
   const locatedItems = useMemo<LocatedItem[]>(() => items.flatMap((item, index) =>
     item.latitude == null || item.longitude == null
       ? []
@@ -45,7 +50,17 @@ export function DayRouteMap({ items }: { items: ItineraryItem[] }) {
   const [mapReady, setMapReady] = useState(false);
   const [movingCoordinate, setMovingCoordinate] = useState<LatLng>(firstCoordinate);
   const [selectedMarkerId, setSelectedMarkerId] = useState<string>();
-  const selectedMarkerGroup = markerGroups.find(({ entries }) => markerGroupId(entries) === selectedMarkerId);
+  const [dismissedFocusRequest, setDismissedFocusRequest] = useState<number>();
+  const focusedEntry = locatedItems.find(({ item }) => item.id === focusTarget?.itemId);
+  const focusedGroupEntries = focusedEntry
+    ? markerGroups.find(({ coordinate }) => coordinateKey(coordinate) === coordinateKey(focusedEntry.coordinate))?.entries
+    : undefined;
+  const focusRequest = focusTarget?.request;
+  const focusLatitude = focusedEntry?.coordinate.latitude;
+  const focusLongitude = focusedEntry?.coordinate.longitude;
+  const focusGroupId = focusedGroupEntries ? markerGroupId(focusedGroupEntries) : undefined;
+  const visibleMarkerId = focusGroupId && focusRequest !== dismissedFocusRequest ? focusGroupId : selectedMarkerId;
+  const selectedMarkerGroup = markerGroups.find(({ entries }) => markerGroupId(entries) === visibleMarkerId);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -59,6 +74,16 @@ export function DayRouteMap({ items }: { items: ItineraryItem[] }) {
       edgePadding: { top: 44, right: 44, bottom: 44, left: 44 },
     });
   }, [coordinates, mapReady, signature]);
+
+  useEffect(() => {
+    if (!mapReady || focusRequest == null || focusLatitude == null || focusLongitude == null) return;
+    mapRef.current?.animateToRegion({
+      latitude: focusLatitude,
+      longitude: focusLongitude,
+      latitudeDelta: 0.006,
+      longitudeDelta: 0.006,
+    }, 450);
+  }, [focusLatitude, focusLongitude, focusRequest, mapReady]);
 
   useEffect(() => {
     if (coordinates.length === 0) return;
@@ -97,6 +122,7 @@ export function DayRouteMap({ items }: { items: ItineraryItem[] }) {
       showsMyLocationButton={false}
       style={StyleSheet.absoluteFill}
       toolbarEnabled={false}
+      testID="day-route-map"
     >
       {coordinates.length > 1 && <Polyline coordinates={coordinates} geodesic strokeColor={colors.primary} strokeWidth={4} />}
       {markerGroups.map(({ coordinate, entries }) => {
@@ -107,7 +133,10 @@ export function DayRouteMap({ items }: { items: ItineraryItem[] }) {
           coordinate={coordinate}
           identifier={markerId}
           key={markerId}
-          onPress={() => setSelectedMarkerId(markerId)}
+          onPress={() => {
+            setSelectedMarkerId(markerId);
+            if (focusRequest != null) setDismissedFocusRequest(focusRequest);
+          }}
           testID={`route-marker-${entries.map(({ order }) => order).join("-")}`}
           zIndex={Math.max(...entries.map(({ order }) => order))}
         >
@@ -119,7 +148,10 @@ export function DayRouteMap({ items }: { items: ItineraryItem[] }) {
       {coordinates.length > 1 && <Marker coordinate={movingCoordinate} pinColor={colors.secondary} zIndex={0} />}
     </MapView>
     {selectedMarkerGroup && <View accessibilityLabel={`${markerOrderLabel(selectedMarkerGroup.entries)}번 일정 상세`} style={styles.markerDetails}>
-      <Pressable accessibilityLabel="일정 상세 닫기" hitSlop={8} onPress={() => setSelectedMarkerId(undefined)} style={styles.detailsClose}>
+      <Pressable accessibilityLabel="일정 상세 닫기" hitSlop={8} onPress={() => {
+        setSelectedMarkerId(undefined);
+        if (focusRequest != null) setDismissedFocusRequest(focusRequest);
+      }} style={styles.detailsClose}>
         <AppText color={colors.muted}>×</AppText>
       </Pressable>
       {selectedMarkerGroup.entries.map(({ item, order }) => <View key={item.id} style={styles.detailsRow}>

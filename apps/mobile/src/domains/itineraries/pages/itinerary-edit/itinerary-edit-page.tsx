@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { useRef, useState } from "react";
+import { Linking, Pressable, ScrollView, StyleSheet, TextInput, View, type ScrollViewInstance } from "react-native";
 
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
@@ -29,7 +29,9 @@ export default function ItineraryScreen() {
     undoAiChange, undoing,
   } = useItineraryEdit(tripId);
   const daySettings = useItineraryDaySettings(tripId);
+  const screenRef = useRef<ScrollViewInstance>(null);
   const [activeDate, setActiveDate] = useState<string>();
+  const [mapFocusTarget, setMapFocusTarget] = useState<{ itemId: string; request: number }>();
   const [placePickerDay, setPlacePickerDay] = useState<{ date: string; index: number }>();
   const selectedDate = activeDate && dates.includes(activeDate) ? activeDate : dates[0];
   const dayIndex = Math.max(0, dates.indexOf(selectedDate));
@@ -42,7 +44,12 @@ export default function ItineraryScreen() {
   const setting = daySettings.settings.find((candidate) => candidate.date === selectedDate);
   const primaryLodgingId = places.find((place) => place.isPrimaryLodging)?.id;
 
-  return <Screen>
+  const focusPlaceOnMap = (itemId: string) => {
+    setMapFocusTarget((current) => ({ itemId, request: (current?.request ?? 0) + 1 }));
+    screenRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
+  return <Screen ref={screenRef}>
     <AppText variant="title">일정을 다듬어 보세요</AppText>
     <AppText color={colors.muted}>날짜를 고르고 지도 동선과 장소 순서를 편집하세요.</AppText>
     {error && <Card><AppText color={colors.danger}>{error}</AppText><Button label="다시 시도" variant="ghost" onPress={() => void reload()} /></Card>}
@@ -61,7 +68,7 @@ export default function ItineraryScreen() {
 
     {selectedDate && <Card>
       <View style={styles.row}><AppText variant="heading">Day {dayIndex + 1}</AppText><Pill label={selectedDate} /></View>
-      <DayRouteMap items={items} />
+      <DayRouteMap focusTarget={mapFocusTarget} items={items} />
 
       {setting && <View style={styles.daySettings}>
         <AppText variant="label">활동 시간</AppText>
@@ -96,6 +103,7 @@ export default function ItineraryScreen() {
               moveToAdjacentDay(item.id, direction);
               if (targetDate) setActiveDate(targetDate);
             }}
+            onPress={() => focusPlaceOnMap(item.id)}
             onRemove={() => removeFromItinerary(item.id)}
             onReorder={(targetIndex) => reorderWithinDay(item.id, targetIndex)}
             placeName={item.placeName}

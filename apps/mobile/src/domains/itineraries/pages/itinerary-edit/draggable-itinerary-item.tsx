@@ -15,6 +15,7 @@ type Props = PropsWithChildren<{
   canMoveToPreviousDay: boolean;
   canMoveToNextDay: boolean;
   onMoveToDay: (direction: -1 | 1) => void;
+  onPress: () => void;
   onRemove: () => void;
   onReorder: (targetIndex: number) => void;
 }>;
@@ -27,6 +28,7 @@ export function DraggableItineraryItem({
   index,
   itemCount,
   onMoveToDay,
+  onPress,
   onRemove,
   onReorder,
   placeName,
@@ -85,8 +87,10 @@ export function DraggableItineraryItem({
       >
         <AppText variant="heading" color={colors.primary}>⠇</AppText>
       </View>}
-      <View style={styles.order}><AppText variant="caption" color={colors.white}>{index + 1}</AppText></View>
-      <AppText variant="label" style={styles.name}>{placeName}</AppText>
+      <Pressable accessibilityLabel={`${placeName} 지도에서 보기`} accessibilityRole="button" onPress={onPress} style={styles.placeSummary}>
+        <View style={styles.order}><AppText variant="caption" color={colors.white}>{index + 1}</AppText></View>
+        <AppText variant="label" style={styles.name}>{placeName}</AppText>
+      </Pressable>
       {!fixedLabel && <Pressable accessibilityLabel={`${placeName} 일정에서 제외`} hitSlop={8} onPress={onRemove} style={styles.remove}>
         <AppText variant="heading" color={colors.muted}>×</AppText>
       </Pressable>}
@@ -100,6 +104,7 @@ const styles = StyleSheet.create({
   header: { minHeight: 36, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingRight: spacing.lg },
   dragHandle: { width: 32, minHeight: 40, alignItems: "center", justifyContent: "center" },
   fixedEndpoint: { minHeight: 32, justifyContent: "center", borderRadius: radius.pill, backgroundColor: colors.secondarySoft, paddingHorizontal: spacing.sm },
+  placeSummary: { flex: 1, minHeight: 40, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   order: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary },
   name: { flex: 1 },
   remove: { position: "absolute", right: -4, top: -5, width: 40, height: 40, alignItems: "center", justifyContent: "center" },

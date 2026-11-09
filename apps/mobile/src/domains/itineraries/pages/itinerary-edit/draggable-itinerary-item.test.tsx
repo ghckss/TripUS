@@ -12,6 +12,7 @@ describe("DraggableItineraryItem", () => {
         index={1}
         itemCount={3}
         onMoveToDay={jest.fn()}
+        onPress={jest.fn()}
         onRemove={jest.fn()}
         onReorder={reorder}
         placeName="감천문화마을"
@@ -25,5 +26,26 @@ describe("DraggableItineraryItem", () => {
     expect(reorder).toHaveBeenCalledWith(0);
     expect(screen.queryByText("↑")).not.toBeOnTheScreen();
     expect(screen.queryByText("↓")).not.toBeOnTheScreen();
+  });
+
+  it("opens the place on the map when its summary is pressed", async () => {
+    const openOnMap = jest.fn();
+    const screen = await render(
+      <DraggableItineraryItem
+        canMoveToNextDay={false}
+        canMoveToPreviousDay={false}
+        index={0}
+        itemCount={1}
+        onMoveToDay={jest.fn()}
+        onPress={openOnMap}
+        onRemove={jest.fn()}
+        onReorder={jest.fn()}
+        placeName="감천문화마을"
+      />,
+    );
+
+    await fireEvent.press(screen.getByLabelText("감천문화마을 지도에서 보기"));
+
+    expect(openOnMap).toHaveBeenCalledTimes(1);
   });
 });

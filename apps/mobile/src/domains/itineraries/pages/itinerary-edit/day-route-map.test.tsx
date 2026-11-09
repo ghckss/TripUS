@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react-native";
+import { fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import type { ItineraryItem } from "../../api/itineraries.api";
 import { DayRouteMap } from "./day-route-map";
@@ -60,5 +60,14 @@ describe("DayRouteMap", () => {
 
     expect(screen.getByLabelText("1 · 3번 일정 상세")).toBeOnTheScreen();
     expect(screen.getAllByText("부산 호텔")).toHaveLength(2);
+  });
+
+  it("zooms to a visit selected from the itinerary and opens its marker details", async () => {
+    const selected = itineraryItem();
+    const screen = await render(<DayRouteMap focusTarget={{ itemId: selected.id, request: 1 }} items={[selected]} />);
+
+    await fireEvent(screen.getByTestId("day-route-map"), "mapReady");
+
+    await waitFor(() => expect(screen.getByLabelText("1번 일정 상세")).toBeOnTheScreen());
   });
 });
