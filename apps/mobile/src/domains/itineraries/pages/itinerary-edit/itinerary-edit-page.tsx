@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, TextInput, View, type ScrollViewInstance } from "react-native";
+import { Pressable, ScrollView, StyleSheet, TextInput, View, type ScrollViewInstance } from "react-native";
 
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
@@ -24,8 +24,8 @@ function dayLabel(date: string, index: number) {
 export default function ItineraryScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const {
-    dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, places, reload,
-    removeFromItinerary, reorderWithinDay, routes, save, saving, setPlacesForDate,
+    dates, error, itinerary, moveToAdjacentDay, places, reload,
+    removeFromItinerary, reorderWithinDay, save, saving, setPlacesForDate,
     undoAiChange, undoing,
   } = useItineraryEdit(tripId);
   const daySettings = useItineraryDaySettings(tripId);
@@ -86,8 +86,6 @@ export default function ItineraryScreen() {
       {items.length === 0 && <AppText color={colors.muted}>아직 배치된 장소가 없어요.</AppText>}
       <View style={styles.placeList}>
         {items.map((item, placeIndex) => {
-          const nextItem = items[placeIndex + 1];
-          const route = nextItem ? routes[`${item.savedPlaceId}:${nextItem.savedPlaceId}`] : undefined;
           const fixedLodgingLabel = item.savedPlaceId === primaryLodgingId
             ? placeIndex === 0 ? "하루 시작 숙소" : placeIndex === items.length - 1 ? "하루 종료 숙소" : undefined
             : undefined;
@@ -107,14 +105,7 @@ export default function ItineraryScreen() {
             onRemove={() => removeFromItinerary(item.id)}
             onReorder={(targetIndex) => reorderWithinDay(item.id, targetIndex)}
             placeName={item.placeName}
-          >
-            {nextItem && <View style={styles.route}>
-              {route && route !== "loading" && route.status === "available" && <AppText variant="caption" color={colors.secondary}>대중교통 약 {route.durationMinutes}분{route.distanceMeters ? ` · ${(route.distanceMeters / 1000).toFixed(1)}km` : ""}</AppText>}
-              {route && route !== "loading" && route.status === "available" && <Button label="Google Maps에서 길 찾기" variant="ghost" onPress={() => void Linking.openURL(`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(item.address ?? item.placeName)}&destination=${encodeURIComponent(nextItem.address ?? nextItem.placeName)}&travelmode=transit`)} />}
-              {route && route !== "loading" && route.status === "unavailable" && <Pressable onPress={() => router.push(`/trips/${tripId}/exceptions/route-failure`)}><AppText variant="caption" color={colors.danger}>경로를 찾지 못했어요 · 자세히 보기</AppText></Pressable>}
-              {!route || route === "loading" ? <Button label={route === "loading" ? "경로 확인 중…" : "다음 장소까지 대중교통"} disabled={route === "loading"} variant="ghost" onPress={() => void loadTransitRoute(item.savedPlaceId, nextItem.savedPlaceId)} /> : null}
-            </View>}
-          </DraggableItineraryItem>;
+          />;
         })}
       </View>
       <AppText variant="caption" color={colors.muted}>위·아래로 끌면 순서가, 좌·우로 끌면 날짜가 바뀌어요.</AppText>
@@ -140,5 +131,4 @@ const styles = StyleSheet.create({
   timeInput: { flex: 1, minHeight: 44, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, paddingHorizontal: spacing.md, color: colors.ink },
   scheduleHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: spacing.sm },
   placeList: { gap: spacing.sm },
-  route: { gap: spacing.xs, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.line },
 });

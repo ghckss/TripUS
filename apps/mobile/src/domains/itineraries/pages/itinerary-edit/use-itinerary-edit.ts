@@ -4,7 +4,7 @@ import { useFocusEffect } from "expo-router";
 import { apiErrorMessage } from "@/shared/api/trip-us-api";
 import { getTrip } from "@/domains/trips";
 import { listPlaces, type SavedPlace } from "@/domains/places/api/places.api";
-import { getItinerary, getTransitRoute, replaceItinerary, undoAiPlan, type Itinerary, type TransitRoute } from "../../api/itineraries.api";
+import { getItinerary, replaceItinerary, undoAiPlan, type Itinerary } from "../../api/itineraries.api";
 import { ensureLodgingEndpoints } from "./itinerary-lodging-endpoints";
 
 function enumerateDates(startDate: string, endDate: string): string[] {
@@ -49,7 +49,6 @@ export function useItineraryEdit(tripId: string) {
   const [saving, setSaving] = useState(false);
   const [dates, setDates] = useState<string[]>([]);
   const [places, setPlaces] = useState<SavedPlace[]>([]);
-  const [routes, setRoutes] = useState<Record<string, TransitRoute | "loading">>({});
   const [undoing, setUndoing] = useState(false);
 
   const reload = useCallback(async () => {
@@ -143,18 +142,6 @@ export function useItineraryEdit(tripId: string) {
     setItinerary(normalizePositions({ items: nextItems, unplaced: stillPlaced ? itinerary.unplaced : [...itinerary.unplaced, { savedPlaceId: item.savedPlaceId, placeName: item.placeName }] }));
   };
 
-  const loadTransitRoute = async (originSavedPlaceId: string, destinationSavedPlaceId: string) => {
-    const key = `${originSavedPlaceId}:${destinationSavedPlaceId}`;
-    setRoutes((current) => ({ ...current, [key]: "loading" }));
-    try {
-      const route = await getTransitRoute(tripId, originSavedPlaceId, destinationSavedPlaceId);
-      setRoutes((current) => ({ ...current, [key]: route }));
-    } catch (caught) {
-      setError(apiErrorMessage(caught));
-      setRoutes((current) => { const next = { ...current }; delete next[key]; return next; });
-    }
-  };
-
   const save = async () => {
     if (!itinerary) return false;
     setSaving(true); setError(undefined);
@@ -177,5 +164,5 @@ export function useItineraryEdit(tripId: string) {
     finally { setUndoing(false); }
   };
 
-  return { dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, places, reload, removeFromItinerary, reorderWithinDay, routes, save, saving, setPlacesForDate, undoAiChange, undoing };
+  return { dates, error, itinerary, moveToAdjacentDay, places, reload, removeFromItinerary, reorderWithinDay, save, saving, setPlacesForDate, undoAiChange, undoing };
 }

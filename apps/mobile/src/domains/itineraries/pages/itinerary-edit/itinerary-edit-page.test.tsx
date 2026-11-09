@@ -26,13 +26,11 @@ jest.mock("./use-itinerary-edit", () => ({
     dates: mockDates,
     error: undefined,
     itinerary: mockItinerary,
-    loadTransitRoute: jest.fn(),
     moveToAdjacentDay: jest.fn(),
     places: mockPlaces,
     reload: jest.fn(),
     removeFromItinerary: mockRemoveFromItinerary,
     reorderWithinDay: jest.fn(),
-    routes: {},
     save: jest.fn(),
     saving: false,
     setPlacesForDate: mockSetPlacesForDate,
@@ -164,5 +162,20 @@ describe("ItineraryScreen day editing", () => {
     await fireEvent.press(screen.getByTestId("itinerary-date-tab-2026-11-09"));
     expect(screen.queryByText("감천문화마을")).not.toBeOnTheScreen();
     expect(screen.getByText("흰여울문화마을")).toBeOnTheScreen();
+  });
+
+  it("does not show transit or external directions actions between visits", async () => {
+    mockItinerary = {
+      items: [
+        { id: "item-1", savedPlaceId: "place-1", placeName: "감천문화마을", date: "2026-11-08", position: 0 },
+        { id: "item-2", savedPlaceId: "place-2", placeName: "흰여울문화마을", date: "2026-11-08", position: 1 },
+      ],
+      unplaced: [],
+    };
+
+    const screen = await render(<ItineraryScreen />);
+
+    expect(screen.queryByText("다음 장소까지 대중교통")).not.toBeOnTheScreen();
+    expect(screen.queryByText("Google Maps에서 길 찾기")).not.toBeOnTheScreen();
   });
 });
