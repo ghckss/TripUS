@@ -5,6 +5,8 @@ import ItineraryScreen from "./itinerary-edit-page";
 const mockUpdateDaySetting = jest.fn();
 const mockSaveDaySettings = jest.fn();
 const mockSetPlacesForDate = jest.fn();
+let mockItinerary = { items: [] as Record<string, unknown>[], unplaced: [] as Record<string, unknown>[] };
+let mockPlaces = [{ id: "place-1", name: "감천문화마을", address: "부산 사하구", tag: "attraction" }];
 
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), push: jest.fn() },
@@ -15,11 +17,11 @@ jest.mock("./use-itinerary-edit", () => ({
   useItineraryEdit: () => ({
     dates: ["2026-11-08"],
     error: undefined,
-    itinerary: { items: [], unplaced: [] },
+    itinerary: mockItinerary,
     loadTransitRoute: jest.fn(),
     moveToAdjacentDay: jest.fn(),
     moveWithinDay: jest.fn(),
-    places: [{ id: "place-1", name: "감천문화마을", address: "부산 사하구", tag: "attraction" }],
+    places: mockPlaces,
     reload: jest.fn(),
     removeFromItinerary: jest.fn(),
     routes: {},
@@ -55,6 +57,8 @@ jest.mock("./use-itinerary-day-settings", () => ({
 describe("ItineraryScreen day lodging settings", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockItinerary = { items: [], unplaced: [] };
+    mockPlaces = [{ id: "place-1", name: "감천문화마을", address: "부산 사하구", tag: "attraction" }];
   });
 
   it("changes and saves a lodging for an individual date", async () => {
@@ -76,6 +80,28 @@ describe("ItineraryScreen day lodging settings", () => {
     await fireEvent.press(screen.getByTestId("itinerary-add-places-2026-11-08"));
     expect(screen.getByText("Day 1 장소")).toBeOnTheScreen();
 
+    await fireEvent.press(screen.getByTestId("itinerary-place-option-place-1"));
+    await fireEvent.press(screen.getByTestId("itinerary-place-picker-apply"));
+
+    expect(mockSetPlacesForDate).toHaveBeenCalledWith("2026-11-08", ["place-1"]);
+  });
+
+  it("shows unplaced places by default and allows a place from another day in the all tab", async () => {
+    mockItinerary = {
+      items: [{ id: "item-1", savedPlaceId: "place-1", placeName: "감천문화마을", date: "2026-11-09", position: 0 }],
+      unplaced: [{ savedPlaceId: "place-2", placeName: "흰여울문화마을" }],
+    };
+    mockPlaces = [
+      { id: "place-1", name: "감천문화마을", address: "부산 사하구", tag: "attraction" },
+      { id: "place-2", name: "흰여울문화마을", address: "부산 영도구", tag: "attraction" },
+    ];
+    const screen = await render(<ItineraryScreen />);
+
+    await fireEvent.press(screen.getByTestId("itinerary-add-places-2026-11-08"));
+    expect(screen.queryByTestId("itinerary-place-option-place-1")).not.toBeOnTheScreen();
+    expect(screen.getByTestId("itinerary-place-option-place-2")).toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByTestId("itinerary-place-tab-all"));
     await fireEvent.press(screen.getByTestId("itinerary-place-option-place-1"));
     await fireEvent.press(screen.getByTestId("itinerary-place-picker-apply"));
 

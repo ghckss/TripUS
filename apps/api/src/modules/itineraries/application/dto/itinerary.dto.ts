@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayUnique, IsArray, IsBoolean, IsDateString, IsInt, IsOptional, IsUUID, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsInt, IsOptional, IsUUID, Min, ValidateNested } from 'class-validator';
 
 import { ItineraryItemEntity, ItinerarySource, VisitStatus } from '../../domain/entities/itinerary-item.entity';
 
@@ -94,7 +94,6 @@ export class ReplaceItineraryItemDto {
 export class ReplaceItineraryDto {
   @ApiProperty({ type: ReplaceItineraryItemDto, isArray: true })
   @IsArray()
-  @ArrayUnique((item: ReplaceItineraryItemDto) => item.savedPlaceId)
   @ValidateNested({ each: true })
   @Type(() => ReplaceItineraryItemDto)
   items!: ReplaceItineraryItemDto[];

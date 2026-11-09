@@ -56,18 +56,12 @@ export function useItineraryEdit(tripId: string) {
   const setPlacesForDate = (date: string, selectedPlaceIds: string[]) => {
     if (!itinerary) return;
     const selected = new Set(selectedPlaceIds);
-    const existingIds = new Set(itinerary.items.map((item) => item.savedPlaceId));
     const currentItems = itinerary.items.filter((item) => item.date === date);
-    const unplaced = new Map(itinerary.unplaced.map((place) => [place.savedPlaceId, place]));
-
-    currentItems.filter((item) => !selected.has(item.savedPlaceId)).forEach((item) => {
-      unplaced.set(item.savedPlaceId, { savedPlaceId: item.savedPlaceId, placeName: item.placeName });
-    });
-    selected.forEach((savedPlaceId) => unplaced.delete(savedPlaceId));
+    const currentIds = new Set(currentItems.map((item) => item.savedPlaceId));
 
     const retainedItems = itinerary.items.filter((item) => item.date !== date || selected.has(item.savedPlaceId));
-    const additions = places.filter((place) => selected.has(place.id) && !existingIds.has(place.id)).map((place, index) => ({
-      id: `local:${place.id}`,
+    const additions = places.filter((place) => selected.has(place.id) && !currentIds.has(place.id)).map((place, index) => ({
+      id: `local:${date}:${place.id}`,
       savedPlaceId: place.id,
       placeName: place.name,
       address: place.address,
@@ -80,10 +74,9 @@ export function useItineraryEdit(tripId: string) {
       review: null,
     }));
 
-    setItinerary(normalizePositions({
-      items: [...retainedItems, ...additions],
-      unplaced: [...unplaced.values()],
-    }));
+    const nextItems = [...retainedItems, ...additions];
+    const placedIds = new Set(nextItems.map((item) => item.savedPlaceId));
+    setItinerary(normalizePositions({ items: nextItems, unplaced: places.filter((place) => !placedIds.has(place.id)).map((place) => ({ savedPlaceId: place.id, placeName: place.name })) }));
   };
 
   const moveWithinDay = (itemId: string, direction: -1 | 1) => {
@@ -124,10 +117,9 @@ export function useItineraryEdit(tripId: string) {
     if (!itinerary) return;
     const item = itinerary.items.find((candidate) => candidate.id === itemId);
     if (!item) return;
-    setItinerary(normalizePositions({
-      items: itinerary.items.filter((candidate) => candidate.id !== itemId),
-      unplaced: [...itinerary.unplaced, { savedPlaceId: item.savedPlaceId, placeName: item.placeName }],
-    }));
+    const nextItems = itinerary.items.filter((candidate) => candidate.id !== itemId);
+    const stillPlaced = nextItems.some((candidate) => candidate.savedPlaceId === item.savedPlaceId);
+    setItinerary(normalizePositions({ items: nextItems, unplaced: stillPlaced ? itinerary.unplaced : [...itinerary.unplaced, { savedPlaceId: item.savedPlaceId, placeName: item.placeName }] }));
   };
 
   const toggleLocked = (itemId: string) => {
