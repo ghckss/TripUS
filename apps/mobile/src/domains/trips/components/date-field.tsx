@@ -1,10 +1,9 @@
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useState } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { Modal, Platform, Pressable, StyleSheet, View } from "react-native";
 
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
-import { Button } from "@/shared/ui/button";
 
 type DateFieldProps = {
   label: string;
@@ -35,9 +34,22 @@ function displayValue(value: string): string {
 export function DateField({ label, value, onChange, minimumDate, testID }: DateFieldProps) {
   const [open, setOpen] = useState(false);
   const handleChange = (event: DateTimePickerEvent, date?: Date) => {
-    if (Platform.OS !== "ios") setOpen(false);
-    if (event.type === "set" && date) onChange(formatValue(date));
+    if (event.type === "set" && date) {
+      onChange(formatValue(date));
+    }
+    setOpen(false);
   };
+
+  const picker = <DateTimePicker
+    display={Platform.OS === "ios" ? "inline" : "default"}
+    locale="ko-KR"
+    minimumDate={minimumDate ? parseDate(minimumDate) : undefined}
+    mode="date"
+    onChange={handleChange}
+    style={Platform.OS === "ios" ? styles.picker : undefined}
+    testID={testID ? `${testID}-picker` : undefined}
+    value={parseDate(value)}
+  />;
 
   return <View style={styles.container}>
     <AppText variant="label">{label}</AppText>
@@ -46,18 +58,20 @@ export function DateField({ label, value, onChange, minimumDate, testID }: DateF
       <AppText variant="label" style={styles.value}>{displayValue(value)}</AppText>
       <AppText color={colors.muted}>선택</AppText>
     </Pressable>
-    {open && <View style={styles.pickerPanel}>
-      <DateTimePicker
-        display={Platform.OS === "ios" ? "inline" : "default"}
-        locale="ko-KR"
-        minimumDate={minimumDate ? parseDate(minimumDate) : undefined}
-        mode="date"
-        onChange={handleChange}
-        testID={testID ? `${testID}-picker` : undefined}
-        value={parseDate(value)}
-      />
-      {Platform.OS === "ios" && <Button label="날짜 선택 완료" variant="ghost" onPress={() => setOpen(false)} />}
-    </View>}
+    {open && Platform.OS !== "ios" && picker}
+    {Platform.OS === "ios" && <Modal
+      animationType="fade"
+      onRequestClose={() => setOpen(false)}
+      transparent
+      visible={open}
+    >
+      <Pressable accessibilityRole="button" accessibilityLabel="달력 닫기" onPress={() => setOpen(false)} style={styles.backdrop}>
+        <Pressable accessibilityRole="none" onPress={(event) => event.stopPropagation()} style={styles.pickerPanel}>
+          <AppText variant="heading">{label} 선택</AppText>
+          {picker}
+        </Pressable>
+      </Pressable>
+    </Modal>}
   </View>;
 }
 
@@ -65,5 +79,7 @@ const styles = StyleSheet.create({
   container: { gap: spacing.sm },
   field: { minHeight: 54, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.canvas, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   value: { flex: 1 },
-  pickerPanel: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: spacing.sm },
+  backdrop: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(15, 23, 42, 0.45)", padding: spacing.md },
+  pickerPanel: { width: "100%", maxWidth: 380, overflow: "hidden", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
+  picker: { width: "100%", alignSelf: "center" },
 });

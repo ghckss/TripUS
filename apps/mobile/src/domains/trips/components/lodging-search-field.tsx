@@ -47,10 +47,7 @@ export function LodgingSearchField({ destination, value, onChange }: LodgingSear
     <AppText variant="heading">기본 숙소</AppText>
     <AppText color={colors.muted}>지도 검색 결과에서 선택하세요. 날짜별 숙소는 일정 편집에서 변경할 수 있어요.</AppText>
     {value && <Card style={styles.selected}>
-      <View style={styles.selectedHeader}>
-        <AppText variant="label">선택한 숙소</AppText>
-        <Button label="선택 해제" variant="ghost" onPress={() => onChange(undefined)} />
-      </View>
+      <AppText variant="label">선택한 숙소</AppText>
       <AppText variant="heading">{value.name}</AppText>
       {value.address && <AppText color={colors.muted}>{value.address}</AppText>}
     </Card>}
@@ -88,7 +85,6 @@ export function LodgingSearchField({ destination, value, onChange }: LodgingSear
 const styles = StyleSheet.create({
   container: { gap: spacing.sm, marginTop: spacing.md },
   selected: { backgroundColor: colors.primarySoft },
-  selectedHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   searchRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   input: { flex: 1, minHeight: 52, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.canvas, paddingHorizontal: spacing.md, fontSize: 16, color: colors.ink },
   result: { minHeight: 68, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, padding: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.sm },
