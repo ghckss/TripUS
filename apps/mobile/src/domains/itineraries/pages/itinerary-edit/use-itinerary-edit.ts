@@ -33,6 +33,16 @@ function normalizePositions(itinerary: Itinerary): Itinerary {
   };
 }
 
+function applySavedPlaceCoordinates(itinerary: Itinerary, places: SavedPlace[]): Itinerary {
+  const coordinates = new Map(places.flatMap((place) => place.latitude != null && place.longitude != null
+    ? [[place.id, { latitude: place.latitude, longitude: place.longitude }] as const]
+    : []));
+  return {
+    ...itinerary,
+    items: itinerary.items.map((item) => ({ ...item, ...coordinates.get(item.savedPlaceId) })),
+  };
+}
+
 export function useItineraryEdit(tripId: string) {
   const [itinerary, setItinerary] = useState<Itinerary>();
   const [error, setError] = useState<string>();
@@ -47,7 +57,7 @@ export function useItineraryEdit(tripId: string) {
     try {
       const [nextItinerary, trip, nextPlaces] = await Promise.all([getItinerary(tripId), getTrip(tripId), listPlaces(tripId)]);
       const nextDates = enumerateDates(trip.startDate, trip.endDate);
-      setItinerary(ensureLodgingEndpoints(nextItinerary, nextDates, nextPlaces));
+      setItinerary(ensureLodgingEndpoints(applySavedPlaceCoordinates(nextItinerary, nextPlaces), nextDates, nextPlaces));
       setDates(nextDates);
       setPlaces(nextPlaces);
     } catch (caught) { setError(apiErrorMessage(caught)); }
@@ -68,6 +78,8 @@ export function useItineraryEdit(tripId: string) {
       savedPlaceId: place.id,
       placeName: place.name,
       address: place.address,
+      latitude: place.latitude,
+      longitude: place.longitude,
       date,
       position: currentItems.length + index,
       locked: false,

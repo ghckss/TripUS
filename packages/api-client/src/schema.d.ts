@@ -418,6 +418,8 @@ export interface components {
             savedPlaceId: string;
             placeName: string;
             address?: string | null;
+            latitude?: number | null;
+            longitude?: number | null;
             /** Format: date */
             date?: string | null;
             position?: number | null;
@@ -506,6 +508,8 @@ export interface components {
             googlePlaceId?: string | null;
             name: string;
             address?: string | null;
+            latitude?: number | null;
+            longitude?: number | null;
             tag: components["schemas"]["PlaceTag"];
             preference: components["schemas"]["PlacePreference"];
             note?: string | null;
@@ -524,6 +528,8 @@ export interface components {
             /** @example 국립현대미술관 서울 */
             name: string;
             address?: string | null;
+            latitude?: number | null;
+            longitude?: number | null;
             tag: components["schemas"]["PlaceTag"];
             preference: components["schemas"]["PlacePreference"];
             note?: string | null;
@@ -540,6 +546,8 @@ export interface components {
             googlePlaceId?: string | null;
             name?: string;
             address?: string | null;
+            latitude?: number | null;
+            longitude?: number | null;
             tag?: components["schemas"]["PlaceTag"];
             preference?: components["schemas"]["PlacePreference"];
             note?: string | null;

@@ -17,6 +17,12 @@ export class ItineraryItemResponseDto {
   @ApiPropertyOptional({ type: String, nullable: true })
   address!: string | null;
 
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  latitude!: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  longitude!: number | null;
+
   @ApiPropertyOptional({ type: String, format: 'date', nullable: true })
   date!: string | null;
 
@@ -44,6 +50,8 @@ export class ItineraryItemResponseDto {
       savedPlaceId: entity.savedPlaceId,
       placeName: entity.savedPlace.name,
       address: entity.savedPlace.address,
+      latitude: entity.savedPlace.latitude,
+      longitude: entity.savedPlace.longitude,
       date: entity.date,
       position: entity.position,
       locked: entity.locked,

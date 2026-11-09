@@ -11,6 +11,8 @@ export type SelectedLodging = {
   googlePlaceId?: string;
   name: string;
   address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 type LodgingSearchFieldProps = {

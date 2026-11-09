@@ -10,6 +10,8 @@ export type LodgingDraft = {
   googlePlaceId?: string;
   name: string;
   address: string;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export async function getPrimaryLodging(tripId: string): Promise<SavedPlace | undefined> {
@@ -34,6 +36,7 @@ export async function savePrimaryLodging(
       ...(draft.googlePlaceId ? { googlePlaceId: draft.googlePlaceId } : {}),
       name,
       address,
+      ...(draft.latitude != null && draft.longitude != null ? { latitude: draft.latitude, longitude: draft.longitude } : {}),
       tag: "lodging",
       isPrimaryLodging: true,
     });
@@ -43,6 +46,7 @@ export async function savePrimaryLodging(
     ...(draft.googlePlaceId ? { googlePlaceId: draft.googlePlaceId } : {}),
     name,
     address: address || undefined,
+    ...(draft.latitude != null && draft.longitude != null ? { latitude: draft.latitude, longitude: draft.longitude } : {}),
     tag: "lodging",
     preference: "want_to_visit",
     isPrimaryLodging: true,

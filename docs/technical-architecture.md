@@ -223,7 +223,9 @@ POST /v1/trips/:tripId/photos/:photoId/confirm
 - `PhotoStoragePort`: 원본·최적화본 업로드와 다운로드 URL 발급
 - `SocialIdentityPort`: Google·Apple ID 토큰 검증
 
-Google 지도 연동은 `MAPS_PROVIDER=mock|google`로 전환한다. `google` 모드에서는 서버에만 `GOOGLE_MAPS_API_KEY`를 주입하고 Places API(New) Text Search와 Routes API Compute Routes를 호출한다. 응답 필드는 비용과 지연을 줄이도록 필요한 field mask만 요청한다. 경로를 찾지 못하거나 공급자 호출이 실패하면 500 오류 대신 `unavailable` 도메인 결과를 반환한다.
+Google 장소·경로 연동은 `MAPS_PROVIDER=mock|google`로 전환한다. `google` 모드에서는 서버에만 `GOOGLE_MAPS_API_KEY`를 주입하고 Places API(New) Text Search와 Routes API Compute Routes를 호출한다. 응답 필드는 비용과 지연을 줄이도록 필요한 field mask만 요청한다. 경로를 찾지 못하거나 공급자 호출이 실패하면 500 오류 대신 `unavailable` 도메인 결과를 반환한다.
+
+앱 내부 지도는 `react-native-maps`의 Google provider를 사용한다. 장소 검색 결과의 실제 위·경도를 저장 장소에 함께 영속화하고 일정 응답으로 전달해 날짜별 순서 마커, 연결선과 이동 마커를 그린다. 예전에 저장한 Google Place ID의 좌표가 없으면 장소 목록 조회 시 Place Details로 한 번 보강한다. 네이티브 SDK 키는 서버 키와 분리해 CNG 빌드 시 `GOOGLE_MAPS_IOS_API_KEY`, `GOOGLE_MAPS_ANDROID_API_KEY`로 주입한다.
 
 ### OpenAI 일정 생성
 
@@ -300,7 +302,7 @@ NestJS API는 컨테이너 상시 서버가 아니라 Lambda Web Function으로 
 - 비동기 AI 일정 작업을 위한 SQS/Event Function
 - CloudFront/WAF 및 사용자 지정 API 도메인
 - OpenAI 모델과 요청별 비용·품질 기준
-- Google 지도 네이티브 지도 화면과 클라이언트 SDK 범위
+- Google 지도 사용량·과금 알림과 운영 키 회전 정책
 - 모노레포를 향후 별도 저장소로 분리할 시점
 
 이 선택은 현재 기반 구현을 막지 않으며 각 포트 뒤에 둔다.

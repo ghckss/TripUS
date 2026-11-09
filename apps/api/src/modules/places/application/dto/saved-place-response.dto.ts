@@ -18,6 +18,12 @@ export class SavedPlaceResponseDto {
   @ApiPropertyOptional({ type: String, nullable: true })
   address!: string | null;
 
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  latitude!: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  longitude!: number | null;
+
   @ApiProperty({ enum: PlaceTag, enumName: 'PlaceTag' })
   tag!: PlaceTag;
 
@@ -37,6 +43,8 @@ export class SavedPlaceResponseDto {
       googlePlaceId: entity.googlePlaceId,
       name: entity.name,
       address: entity.address,
+      latitude: entity.latitude,
+      longitude: entity.longitude,
       tag: entity.tag,
       preference: entity.preference,
       note: entity.note,

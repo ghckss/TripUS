@@ -63,6 +63,9 @@ export default function NewTripScreen() {
             googlePlaceId: lodging.googlePlaceId,
             name: lodging.name,
             address: lodging.address ?? "",
+            ...(lodging.latitude !== undefined && lodging.longitude !== undefined
+              ? { latitude: lodging.latitude, longitude: lodging.longitude }
+              : {}),
           });
         } catch {
           Alert.alert("숙소 저장 실패", "여행은 생성됐지만 숙소를 저장하지 못했어요. 여행 정보에서 다시 선택해 주세요.");

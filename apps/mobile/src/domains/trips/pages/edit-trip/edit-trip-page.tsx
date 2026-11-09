@@ -35,6 +35,8 @@ export default function EditTripScreen() {
         googlePlaceId: currentLodging.googlePlaceId ?? undefined,
         name: currentLodging.name,
         address: currentLodging.address,
+        latitude: currentLodging.latitude,
+        longitude: currentLodging.longitude,
       } : undefined);
     }).catch((caught) => setError(caught instanceof Error ? caught.message : "여행 정보를 불러오지 못했어요."))
       .finally(() => setLoading(false));
@@ -65,6 +67,9 @@ export default function EditTripScreen() {
         googlePlaceId: lodging?.googlePlaceId,
         name: lodging?.name ?? "",
         address: lodging?.address ?? "",
+        ...(lodging?.latitude !== undefined && lodging.longitude !== undefined
+          ? { latitude: lodging.latitude, longitude: lodging.longitude }
+          : {}),
       });
       router.back();
     } catch (caught) {

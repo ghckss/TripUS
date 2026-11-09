@@ -75,7 +75,13 @@ EXPO_PUBLIC_AUTH_MODE=development
 EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=
 EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=
 EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=
+
+# Google Maps 네이티브 SDK용 CNG 빌드 변수
+GOOGLE_MAPS_IOS_API_KEY=<iOS 앱 제한 키>
+GOOGLE_MAPS_ANDROID_API_KEY=<Android 앱 제한 키>
 ```
+
+`GOOGLE_MAPS_IOS_API_KEY`와 `GOOGLE_MAPS_ANDROID_API_KEY`는 JavaScript 번들에서 읽는 런타임 값이 아니라 CNG가 네이티브 프로젝트를 생성할 때 사용하는 빌드 값이다. 키를 바꾼 뒤에는 Metro 재시작만으로 반영되지 않으므로 Development Build를 다시 생성한다. iOS 키는 Bundle ID `com.tripus.app`, Android 키는 package name `com.tripus.app`과 배포 인증서 SHA-1로 제한하고 각 키에는 해당 플랫폼의 Maps SDK만 허용한다.
 
 3000 포트를 다른 프로그램이 사용하면 API의 `PORT`와 `API_PUBLIC_URL`, 모바일의 `EXPO_PUBLIC_API_URL`을 같은 포트로 함께 바꾼다. 예를 들어 API는 `3001`, iOS Simulator는 `http://127.0.0.1:3001`, Android Emulator는 `http://10.0.2.2:3001`을 사용한다.
 
@@ -89,12 +95,14 @@ OPENAI_API_KEY=<OpenAI 프로젝트 API 키>
 OPENAI_MODEL=<사용할 Responses API 지원 모델 ID>
 ```
 
-Google 장소·경로 어댑터를 켤 때도 키는 API에만 둔다.
+Google 장소·경로 어댑터를 켤 때 서버용 키는 API에만 둔다.
 
 ```dotenv
 MAPS_PROVIDER=google
 GOOGLE_MAPS_API_KEY=<서버용 Google Maps Platform API 키>
 ```
+
+앱 내부 Google 지도는 서버 어댑터와 별개다. 모바일 CNG 빌드에는 플랫폼별 Maps SDK 키가 필요하고, 서버의 Places/Routes 키를 재사용하지 않는다.
 
 소셜 로그인을 켤 때 모바일에는 플랫폼별 공개 OAuth Client ID를, API에는 허용할 Client ID 전체를 쉼표로 구분해 둔다.
 
@@ -124,6 +132,8 @@ EXPO_PUBLIC_AUTH_MODE=production
 EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=<iOS OAuth Client ID>
 EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=<Android OAuth Client ID>
 EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=<Web OAuth Client ID>
+GOOGLE_MAPS_IOS_API_KEY=<iOS 앱 제한 Maps SDK 키>
+GOOGLE_MAPS_ANDROID_API_KEY=<Android 앱 제한 Maps SDK 키>
 ```
 
 운영 `ACCESS_TOKEN_SECRET`은 `openssl rand -base64 48` 같은 방식으로 새로 생성하고 로컬 기본값을 재사용하지 않는다. 자세한 secret 등록과 Lambda 배포 순서는 [AWS 배포 가이드](./aws-deployment.md)를 따른다.

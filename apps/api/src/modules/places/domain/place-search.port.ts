@@ -11,4 +11,5 @@ export interface PlaceSearchCandidate {
 
 export interface PlaceSearchPort {
   search(query: string, destination: string): Promise<PlaceSearchCandidate[]>;
+  getCoordinates(googlePlaceId: string): Promise<{ latitude: number; longitude: number } | null>;
 }

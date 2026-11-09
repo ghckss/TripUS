@@ -6,7 +6,7 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 
 ## 마일스톤
 
-상태 기준일: 2026-11-04
+상태 기준일: 2026-11-09
 
 ### M0. 기술 결정과 계약
 
@@ -35,12 +35,13 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 
 ### M2. 디자인 시스템과 목업 도메인
 
-상태: 완료(지도는 목업)
+상태: 완료
 
 - Figma 기반 색상·타이포·간격 토큰
 - 모바일 앱 셸, 스택, 탭과 공통 컴포넌트
 - 여행·저장 장소·일정·방문 기록 스키마
 - Google Places/Routes와 OpenAI 일정 생성 목업 어댑터
+- 실제 좌표 기반 Google 네이티브 지도 컴포넌트
 - 기능별 예외 UI 기반
 
 완료 조건: iOS와 Android에서 핵심 라우트와 디자인 시스템을 확인할 수 있다.
@@ -112,6 +113,7 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 - 일정 충돌은 정상 `conflict` 결과로 반환하고, 경로 실패와 일정 충돌 전용 모바일 화면을 제공한다.
 - 완료 정리에서 별점은 `rated`, 별도 미방문은 `not_visited`, 입력 없이 보관한 방문은 `unrated`로 저장한다.
 - Google Places Text Search(New), Google Routes, OpenAI Responses API, S3 호환 사진 저장을 환경 설정으로 교체할 수 있다.
+- Google Places 검색 좌표를 저장 장소와 일정 계약에 보존하고, 일정 편집의 날짜별 지도에 실제 순서 마커·연결선·이동 마커를 표시한다. 기존 장소는 Place Details로 좌표를 점진 보강한다.
 - Android와 iOS Development Build에서 실제 PostgreSQL을 사용해 개발 로그인, AI 일정 생성, 일정 편집, 대중교통 목업 경로, 별점·미방문, 사진 업로드와 완료 기록 갤러리까지 확인했다.
 - 실제 공급자 자격 증명 통합 검증과 EAS 빌드 실행은 외부 계정 연결 단계에 남아 있다.
 - Free/Plus의 여행·AI 생성 한도를 서버에서 강제하고 프로필과 행동 맥락에서 사용량을 표시한다. AI 공급자 실패는 무료 횟수를 차감하지 않는다.

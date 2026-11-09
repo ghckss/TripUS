@@ -94,6 +94,8 @@ function ItineraryResponseDtoItem(entity: ItineraryItemEntity) {
     savedPlaceId: entity.savedPlaceId,
     placeName: entity.savedPlace.name,
     address: entity.savedPlace.address,
+    latitude: entity.savedPlace.latitude,
+    longitude: entity.savedPlace.longitude,
     date: entity.date,
     position: entity.position,
     locked: entity.locked,

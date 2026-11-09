@@ -20,8 +20,10 @@ EAS의 `development`, `preview`, `production` 환경마다 다음 변수를 설�
 | `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | 개발용 iOS OAuth Client ID | 배포용 iOS OAuth Client ID |
 | `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | 개발용 Android OAuth Client ID | 배포용 Android OAuth Client ID |
 | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | 개발용 Web OAuth Client ID | 배포용 Web OAuth Client ID |
+| `GOOGLE_MAPS_IOS_API_KEY` | 개발 iOS 앱 제한 Maps SDK 키 | 배포 iOS 앱 제한 Maps SDK 키 |
+| `GOOGLE_MAPS_ANDROID_API_KEY` | 개발 Android 앱 제한 Maps SDK 키 | 배포 Android 앱 제한 Maps SDK 키 |
 
-값은 Expo 대시보드 또는 `eas env:create`로 관리한다. OAuth client secret, OpenAI 키, AWS 키는 모바일 환경에 넣지 않고 API 런타임에서만 관리한다.
+값은 Expo 대시보드 또는 `eas env:create`로 관리한다. Maps SDK 키는 최종 앱 바이너리에 포함되는 플랫폼 자격 증명이므로 각 앱 식별자와 SDK로 제한한다. OAuth client secret, OpenAI 키, 서버용 Google Maps 키, AWS 키는 모바일 환경에 넣지 않고 API 런타임에서만 관리한다.
 
 ## 빌드 프로필
 

@@ -63,6 +63,9 @@ export function DayPlacePicker({ tripId, date, dayIndex, items, places, onApply,
         googlePlaceId: candidate.googlePlaceId,
         name: candidate.name,
         address: candidate.address ?? undefined,
+        ...(candidate.latitude !== null && candidate.longitude !== null
+          ? { latitude: candidate.latitude, longitude: candidate.longitude }
+          : {}),
         tag: inferPlaceTag(candidate.primaryType ?? null),
         preference: "want_to_visit",
         isPrimaryLodging: false,

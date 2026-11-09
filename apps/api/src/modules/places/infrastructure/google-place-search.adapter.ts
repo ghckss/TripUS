@@ -45,4 +45,18 @@ export class GooglePlaceSearchAdapter implements PlaceSearchPort {
       longitude: place.location?.longitude ?? null,
     }] : []);
   }
+
+  async getCoordinates(googlePlaceId: string): Promise<{ latitude: number; longitude: number } | null> {
+    const response = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(googlePlaceId)}?languageCode=ko`, {
+      headers: {
+        'X-Goog-Api-Key': this.apiKey,
+        'X-Goog-FieldMask': 'location',
+      },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) throw new ServiceUnavailableException(`Google Place Details request failed (${response.status})`);
+    const body = await response.json() as { location?: { latitude?: number; longitude?: number } };
+    const { latitude, longitude } = body.location ?? {};
+    return latitude === undefined || longitude === undefined ? null : { latitude, longitude };
+  }
 }

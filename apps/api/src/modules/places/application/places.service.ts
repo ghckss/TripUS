@@ -36,6 +36,7 @@ export class PlacesService {
   async list(tripId: string): Promise<SavedPlaceResponseDto[]> {
     await this.assertOwnedActiveTrip(tripId);
     const entities = await this.places.find({ where: { tripId }, order: { createdAt: 'DESC' } });
+    await Promise.all(entities.map((entity) => this.hydrateMissingCoordinates(entity)));
     return entities.map((entity) => SavedPlaceResponseDto.fromEntity(entity));
   }
 
@@ -43,6 +44,11 @@ export class PlacesService {
     await this.assertOwnedActiveTrip(tripId);
     const existing = await this.findByGooglePlaceId(tripId, input.googlePlaceId);
     if (existing) {
+      if (existing.latitude === null && input.latitude !== undefined && input.longitude !== undefined) {
+        existing.latitude = input.latitude;
+        existing.longitude = input.longitude;
+        await this.places.save(existing);
+      }
       return this.result(SavePlaceStatus.AlreadyExists, existing);
     }
 
@@ -51,6 +57,8 @@ export class PlacesService {
       googlePlaceId: input.googlePlaceId ?? null,
       name: input.name,
       address: input.address ?? null,
+      latitude: input.latitude ?? null,
+      longitude: input.longitude ?? null,
       tag: input.tag,
       preference: input.preference,
       note: input.note ?? null,
@@ -99,6 +107,19 @@ export class PlacesService {
     return googlePlaceId
       ? this.places.findOneBy({ tripId, googlePlaceId })
       : Promise.resolve(null);
+  }
+
+  private async hydrateMissingCoordinates(entity: SavedPlaceEntity): Promise<void> {
+    if (!entity.googlePlaceId || entity.latitude !== null || entity.longitude !== null) return;
+    try {
+      const coordinates = await this.placeSearch.getCoordinates(entity.googlePlaceId);
+      if (!coordinates) return;
+      entity.latitude = coordinates.latitude;
+      entity.longitude = coordinates.longitude;
+      await this.places.save(entity);
+    } catch {
+      // Coordinate backfill must not make the saved-place list unavailable.
+    }
   }
 
   private async findSavedPlace(tripId: string, placeId: string): Promise<SavedPlaceEntity> {

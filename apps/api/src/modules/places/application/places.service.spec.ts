@@ -27,10 +27,12 @@ function createService() {
   const trips = { findOneBy: vi.fn() };
   const identity: IdentityPort = { getCurrentUserId: () => userId };
   const placeSearchSearch = vi.fn<PlaceSearchPort['search']>();
-  const placeSearch: PlaceSearchPort = { search: placeSearchSearch };
+  const placeSearchGetCoordinates = vi.fn<PlaceSearchPort['getCoordinates']>();
+  const placeSearch: PlaceSearchPort = { search: placeSearchSearch, getCoordinates: placeSearchGetCoordinates };
   return {
     places,
     placeSearchSearch,
+    placeSearchGetCoordinates,
     trips,
     service: new PlacesService(
       places as unknown as Repository<SavedPlaceEntity>,
@@ -82,6 +84,25 @@ describe('PlacesService', () => {
     await expect(service.list(tripId)).rejects.toBeInstanceOf(NotFoundException);
     expect(trips.findOneBy).toHaveBeenCalledWith({ id: tripId, ownerId: userId, active: true });
     expect(places.find).not.toHaveBeenCalled();
+  });
+
+  it('backfills coordinates for an existing Google place', async () => {
+    const { placeSearchGetCoordinates, places, service, trips } = createService();
+    const place = {
+      id: '20000000-0000-4000-8000-000000000001', tripId, googlePlaceId: 'google-place-1',
+      name: '서촌 골목', address: '서울', latitude: null, longitude: null,
+      tag: PlaceTag.Attraction, preference: PlacePreference.MustVisit, note: null, isPrimaryLodging: false,
+    } as SavedPlaceEntity;
+    trips.findOneBy.mockResolvedValue({ id: tripId });
+    places.find.mockResolvedValue([place]);
+    places.save.mockResolvedValue(place);
+    placeSearchGetCoordinates.mockResolvedValue({ latitude: 37.5796, longitude: 126.9718 });
+
+    const result = await service.list(tripId);
+
+    expect(placeSearchGetCoordinates).toHaveBeenCalledWith('google-place-1');
+    expect(places.save).toHaveBeenCalledWith(expect.objectContaining({ latitude: 37.5796, longitude: 126.9718 }));
+    expect(result[0]).toMatchObject({ latitude: 37.5796, longitude: 126.9718 });
   });
 
   it('deletes a saved place only after checking trip ownership', async () => {

@@ -1,5 +1,6 @@
 import {
   Column,
+  Check,
   CreateDateColumn,
   Entity,
   Index,
@@ -35,6 +36,9 @@ export enum PlacePreference {
 @Index('uq_saved_places_trip_google_place', ['tripId', 'googlePlaceId'], {
   unique: true,
 })
+@Check('chk_saved_places_coordinates_pair', '("latitude" IS NULL AND "longitude" IS NULL) OR ("latitude" IS NOT NULL AND "longitude" IS NOT NULL)')
+@Check('chk_saved_places_latitude', '"latitude" IS NULL OR "latitude" BETWEEN -90 AND 90')
+@Check('chk_saved_places_longitude', '"longitude" IS NULL OR "longitude" BETWEEN -180 AND 180')
 export class SavedPlaceEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -57,6 +61,12 @@ export class SavedPlaceEntity {
 
   @Column({ type: 'varchar', length: 300, nullable: true })
   address!: string | null;
+
+  @Column({ type: 'double precision', nullable: true })
+  latitude!: number | null;
+
+  @Column({ type: 'double precision', nullable: true })
+  longitude!: number | null;
 
   @Column({ type: 'enum', enum: PlaceTag, enumName: 'place_tag' })
   tag!: PlaceTag;

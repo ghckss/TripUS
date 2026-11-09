@@ -7,6 +7,8 @@ function lodgingEndpoint(place: SavedPlace, date: string, edge: "start" | "end")
     savedPlaceId: place.id,
     placeName: place.name,
     address: place.address,
+    latitude: place.latitude,
+    longitude: place.longitude,
     date,
     position: 0,
     locked: false,

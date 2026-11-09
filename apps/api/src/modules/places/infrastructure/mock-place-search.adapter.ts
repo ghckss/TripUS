@@ -4,6 +4,10 @@ import { PlaceSearchCandidate, PlaceSearchPort } from '../domain/place-search.po
 
 @Injectable()
 export class MockPlaceSearchAdapter implements PlaceSearchPort {
+  getCoordinates(): Promise<null> {
+    return Promise.resolve(null);
+  }
+
   search(query: string, destination: string): Promise<PlaceSearchCandidate[]> {
     const normalized = query.trim();
     return Promise.resolve([
