@@ -16,8 +16,9 @@ jest.mock("./use-complete-trip", () => ({
     error: undefined,
     itinerary: {
       items: [
-        { id: "item-1", placeName: "서울숲" },
-        { id: "item-2", placeName: "한강공원" },
+        { id: "item-1", savedPlaceId: "place-1", placeName: "서울숲" },
+        { id: "item-2", savedPlaceId: "place-2", placeName: "한강공원" },
+        { id: "item-3", savedPlaceId: "place-1", placeName: "서울숲" },
       ],
     },
     photos: [],
@@ -36,12 +37,14 @@ describe("CompleteTripScreen", () => {
   it("submits rated and not-visited places without status tabs", async () => {
     const screen = await render(<CompleteTripScreen />);
 
+    expect(screen.getAllByText("서울숲")).toHaveLength(1);
     await fireEvent.press(screen.getAllByLabelText("5점")[0]);
     await fireEvent.press(screen.getAllByText("미방문으로 설정")[1]);
     await fireEvent.press(screen.getByTestId("complete-trip-submit"));
 
     await waitFor(() => expect(mockComplete).toHaveBeenCalledWith([
       { itineraryItemId: "item-1", notVisited: false, rating: 5, review: undefined },
+      { itineraryItemId: "item-3", notVisited: false, rating: 5, review: undefined },
       { itineraryItemId: "item-2", notVisited: true, rating: undefined, review: undefined },
     ]));
     expect(router.replace).toHaveBeenCalledWith("/trips/trip-1/summary");
