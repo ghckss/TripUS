@@ -48,4 +48,27 @@ describe("DraggableItineraryItem", () => {
 
     expect(openOnMap).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps a lodging endpoint fixed without showing endpoint labels", async () => {
+    const screen = await render(
+      <DraggableItineraryItem
+        canMoveToNextDay={false}
+        canMoveToPreviousDay={false}
+        fixed
+        index={0}
+        itemCount={1}
+        onMoveToDay={jest.fn()}
+        onPress={jest.fn()}
+        onRemove={jest.fn()}
+        onReorder={jest.fn()}
+        placeName="부산 호텔"
+      />,
+    );
+
+    expect(screen.queryByText("하루 시작 숙소")).not.toBeOnTheScreen();
+    expect(screen.queryByText("하루 종료 숙소")).not.toBeOnTheScreen();
+    expect(screen.queryByLabelText("부산 호텔 순서 이동")).not.toBeOnTheScreen();
+    expect(screen.queryByLabelText("부산 호텔 일정에서 제외")).not.toBeOnTheScreen();
+    expect(screen.getByLabelText("부산 호텔 지도에서 보기")).toBeOnTheScreen();
+  });
 });

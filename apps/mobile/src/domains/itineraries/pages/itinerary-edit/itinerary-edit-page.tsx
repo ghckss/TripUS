@@ -86,16 +86,14 @@ export default function ItineraryScreen() {
       {items.length === 0 && <AppText color={colors.muted}>아직 배치된 장소가 없어요.</AppText>}
       <View style={styles.placeList}>
         {items.map((item, placeIndex) => {
-          const fixedLodgingLabel = item.savedPlaceId === primaryLodgingId
-            ? placeIndex === 0 ? "하루 시작 숙소" : placeIndex === items.length - 1 ? "하루 종료 숙소" : undefined
-            : undefined;
+          const fixedLodging = item.savedPlaceId === primaryLodgingId && (placeIndex === 0 || placeIndex === items.length - 1);
           return <DraggableItineraryItem
             canMoveToNextDay={dayIndex < dates.length - 1}
             canMoveToPreviousDay={dayIndex > 0}
             index={placeIndex}
             itemCount={items.length}
             key={item.id}
-            fixedLabel={fixedLodgingLabel}
+            fixed={fixedLodging}
             onMoveToDay={(direction) => {
               const targetDate = dates[dayIndex + direction];
               moveToAdjacentDay(item.id, direction);
