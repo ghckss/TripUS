@@ -79,7 +79,7 @@ export function useItineraryEdit(tripId: string) {
     setItinerary(normalizePositions({ items: nextItems, unplaced: places.filter((place) => !placedIds.has(place.id)).map((place) => ({ savedPlaceId: place.id, placeName: place.name })) }));
   };
 
-  const moveWithinDay = (itemId: string, direction: -1 | 1) => {
+  const reorderWithinDay = (itemId: string, targetIndex: number) => {
     if (!itinerary) return;
     const item = itinerary.items.find((candidate) => candidate.id === itemId);
     if (!item) return;
@@ -87,15 +87,17 @@ export function useItineraryEdit(tripId: string) {
       .filter((candidate) => candidate.date === item.date)
       .sort((left, right) => (left.position ?? 0) - (right.position ?? 0));
     const index = sameDay.findIndex((candidate) => candidate.id === itemId);
-    const target = sameDay[index + direction];
-    if (!target) return;
+    const boundedTargetIndex = Math.max(0, Math.min(targetIndex, sameDay.length - 1));
+    if (index < 0 || index === boundedTargetIndex) return;
+    const reordered = [...sameDay];
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(boundedTargetIndex, 0, moved);
+    const nextPositions = new Map(reordered.map((candidate, position) => [candidate.id, position]));
     setItinerary(normalizePositions({
       ...itinerary,
-      items: itinerary.items.map((candidate) => {
-        if (candidate.id === item.id) return { ...candidate, position: target.position };
-        if (candidate.id === target.id) return { ...candidate, position: item.position };
-        return candidate;
-      }),
+      items: itinerary.items.map((candidate) => nextPositions.has(candidate.id)
+        ? { ...candidate, position: nextPositions.get(candidate.id)! }
+        : candidate),
     }));
   };
 
@@ -122,11 +124,6 @@ export function useItineraryEdit(tripId: string) {
     setItinerary(normalizePositions({ items: nextItems, unplaced: stillPlaced ? itinerary.unplaced : [...itinerary.unplaced, { savedPlaceId: item.savedPlaceId, placeName: item.placeName }] }));
   };
 
-  const toggleLocked = (itemId: string) => {
-    if (!itinerary) return;
-    setItinerary({ ...itinerary, items: itinerary.items.map((item) => item.id === itemId ? { ...item, locked: !item.locked } : item) });
-  };
-
   const loadTransitRoute = async (originSavedPlaceId: string, destinationSavedPlaceId: string) => {
     const key = `${originSavedPlaceId}:${destinationSavedPlaceId}`;
     setRoutes((current) => ({ ...current, [key]: "loading" }));
@@ -144,7 +141,7 @@ export function useItineraryEdit(tripId: string) {
     setSaving(true); setError(undefined);
     try {
       setItinerary(await replaceItinerary(tripId, itinerary.items.map((item) => ({
-        savedPlaceId: item.savedPlaceId, date: item.date!, position: item.position!, locked: item.locked,
+        savedPlaceId: item.savedPlaceId, date: item.date!, position: item.position!, locked: false,
       }))));
       return true;
     } catch (caught) { setError(apiErrorMessage(caught)); return false; } finally { setSaving(false); }
@@ -160,5 +157,5 @@ export function useItineraryEdit(tripId: string) {
     finally { setUndoing(false); }
   };
 
-  return { dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, moveWithinDay, places, reload, removeFromItinerary, routes, save, saving, setPlacesForDate, toggleLocked, undoAiChange, undoing };
+  return { dates, error, itinerary, loadTransitRoute, moveToAdjacentDay, places, reload, removeFromItinerary, reorderWithinDay, routes, save, saving, setPlacesForDate, undoAiChange, undoing };
 }

@@ -12,7 +12,7 @@ import { clearTripReminders } from "@/domains/trips/notifications/trip-reminders
 
 export default function TripHomeScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { enableReminders, trip, error, placeCount, reload, reminderMessage, scheduledCount, settingReminder } = useTripDetail(tripId);
+  const { trip, error, placeCount, reload, scheduledCount } = useTripDetail(tripId);
   const path = `/trips/${tripId}` as const;
   return (
     <Screen>
@@ -20,8 +20,6 @@ export default function TripHomeScreen() {
       {!trip && !error && <Card><AppText color={colors.muted}>여행을 불러오는 중이에요…</AppText></Card>}
       {trip && <><View style={styles.row}><Pill label="여행 예정" selected /><AppText variant="caption" color={colors.muted}>{trip.timezone}</AppText></View><AppText variant="title">{trip.title}</AppText><AppText color={colors.muted}>{trip.startDate} – {trip.endDate} · {trip.destination}</AppText></>}
       {trip && <Button label="여행 정보 수정" variant="ghost" onPress={() => router.push(`${path}/edit`)} />}
-      {trip && <Button label={settingReminder ? "알림 설정 중…" : "여행 알림 설정"} disabled={settingReminder} variant="ghost" onPress={() => void enableReminders()} />}
-      {reminderMessage && <AppText color={colors.secondary}>{reminderMessage}</AppText>}
       <Card style={styles.progress}><AppText variant="heading">준비가 한창이에요</AppText><AppText color={colors.muted}>장소 {placeCount}곳 저장 · 일정 {scheduledCount}곳 배치</AppText></Card>
       <Button label="＋ 장소 추가" testID="trip-add-place" onPress={() => router.push(`${path}/places/new`)} />
       <Pressable testID="trip-open-places" onPress={() => router.push(`${path}/places`)}><Card><AppText variant="heading">📍 장소 보관함</AppText><AppText color={colors.muted}>저장한 모든 장소를 한 목록에서 확인해요.</AppText></Card></Pressable>

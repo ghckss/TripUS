@@ -5,6 +5,8 @@ import ItineraryScreen from "./itinerary-edit-page";
 const mockUpdateDaySetting = jest.fn();
 const mockSaveDaySettings = jest.fn();
 const mockSetPlacesForDate = jest.fn();
+const mockRemoveFromItinerary = jest.fn();
+let mockDates = ["2026-11-08"];
 let mockItinerary = { items: [] as Record<string, unknown>[], unplaced: [] as Record<string, unknown>[] };
 let mockPlaces = [{ id: "place-1", name: "감천문화마을", address: "부산 사하구", tag: "attraction" }];
 
@@ -15,20 +17,19 @@ jest.mock("expo-router", () => ({
 }));
 jest.mock("./use-itinerary-edit", () => ({
   useItineraryEdit: () => ({
-    dates: ["2026-11-08"],
+    dates: mockDates,
     error: undefined,
     itinerary: mockItinerary,
     loadTransitRoute: jest.fn(),
     moveToAdjacentDay: jest.fn(),
-    moveWithinDay: jest.fn(),
     places: mockPlaces,
     reload: jest.fn(),
-    removeFromItinerary: jest.fn(),
+    removeFromItinerary: mockRemoveFromItinerary,
+    reorderWithinDay: jest.fn(),
     routes: {},
     save: jest.fn(),
     saving: false,
     setPlacesForDate: mockSetPlacesForDate,
-    toggleLocked: jest.fn(),
     undoAiChange: jest.fn(),
     undoing: false,
   }),
@@ -57,6 +58,7 @@ jest.mock("./use-itinerary-day-settings", () => ({
 describe("ItineraryScreen day lodging settings", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockDates = ["2026-11-08"];
     mockItinerary = { items: [], unplaced: [] };
     mockPlaces = [{ id: "place-1", name: "감천문화마을", address: "부산 사하구", tag: "attraction" }];
   });
@@ -106,5 +108,29 @@ describe("ItineraryScreen day lodging settings", () => {
     await fireEvent.press(screen.getByTestId("itinerary-place-picker-apply"));
 
     expect(mockSetPlacesForDate).toHaveBeenCalledWith("2026-11-08", ["place-1"]);
+  });
+
+  it("shows one date at a time and removes a place with the simple X action", async () => {
+    mockDates = ["2026-11-08", "2026-11-09"];
+    mockItinerary = {
+      items: [
+        { id: "item-1", savedPlaceId: "place-1", placeName: "감천문화마을", date: "2026-11-08", position: 0 },
+        { id: "item-2", savedPlaceId: "place-2", placeName: "흰여울문화마을", date: "2026-11-09", position: 0 },
+      ],
+      unplaced: [],
+    };
+    const screen = await render(<ItineraryScreen />);
+
+    expect(screen.getByText("감천문화마을")).toBeOnTheScreen();
+    expect(screen.queryByText("흰여울문화마을")).not.toBeOnTheScreen();
+    expect(screen.queryByText("일정 잠금")).not.toBeOnTheScreen();
+    expect(screen.queryByText("제외")).not.toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByLabelText("감천문화마을 일정에서 제외"));
+    expect(mockRemoveFromItinerary).toHaveBeenCalledWith("item-1");
+
+    await fireEvent.press(screen.getByTestId("itinerary-date-tab-2026-11-09"));
+    expect(screen.queryByText("감천문화마을")).not.toBeOnTheScreen();
+    expect(screen.getByText("흰여울문화마을")).toBeOnTheScreen();
   });
 });
