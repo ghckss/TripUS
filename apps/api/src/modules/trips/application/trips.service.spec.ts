@@ -54,6 +54,46 @@ describe('TripsService', () => {
     });
   });
 
+  it('normalizes and stores multiple trip regions', async () => {
+    const { repository, service } = createService();
+    repository.save.mockImplementation((trip: unknown) => Promise.resolve(trip as TripEntity));
+
+    const result = await service.create({
+      title: '서울과 인제 여행',
+      destination: '한국',
+      regions: [
+        { googlePlaceId: 'seoul', name: ' 서울 ', address: ' 대한민국 서울 ', latitude: 37.5665, longitude: 126.978 },
+        { googlePlaceId: 'inje', name: '인제군', address: '강원특별자치도 인제군', latitude: 38.0695, longitude: 128.1707 },
+      ],
+      timezone: 'Asia/Seoul',
+      startDate: '2026-11-10',
+      endDate: '2026-11-12',
+    });
+
+    expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({
+      regions: [
+        { googlePlaceId: 'seoul', name: '서울', address: '대한민국 서울', latitude: 37.5665, longitude: 126.978 },
+        { googlePlaceId: 'inje', name: '인제군', address: '강원특별자치도 인제군', latitude: 38.0695, longitude: 128.1707 },
+      ],
+    }));
+    expect(result.regions).toHaveLength(2);
+  });
+
+  it('rejects duplicate trip regions', async () => {
+    const { service } = createService();
+    await expect(service.create({
+      title: '중복 지역 여행',
+      destination: '한국',
+      regions: [
+        { googlePlaceId: 'seoul', name: '서울', address: null, latitude: null, longitude: null },
+        { googlePlaceId: 'seoul', name: '서울특별시', address: null, latitude: null, longitude: null },
+      ],
+      timezone: 'Asia/Seoul',
+      startDate: '2026-11-10',
+      endDate: '2026-11-12',
+    })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('validates the effective date range when updating a trip', async () => {
     const { repository, service } = createService();
     repository.findOneBy.mockResolvedValue({

@@ -6,13 +6,61 @@ import { z } from 'zod';
 
 import { AiPlannerError, AiPlannerInput, AiPlannerOutput, AiPlannerPort } from '../domain/ai-planner.port';
 
+export const AI_PLANNER_SYSTEM_PROMPT = [
+  'You are a professional local travel guide with more than ten years of experience in the supplied destination and a practical itinerary planner.',
+  'Create a detailed, realistic itinerary from the supplied trip, traveler context, day, lodging, and saved-place data. Write every user-facing activity, reason, and Plan B in Korean.',
+  'Use only IDs from places in placements, include each place at most once, and keep every placement within the supplied trip dates and daily time windows.',
+  'Treat startLodging and endLodging as route anchors only; never return lodging IDs in placements.',
+  'Use addresses and coordinates to group nearby places, minimize unnecessary travel, and avoid putting geographically impractical places on the same day.',
+  'The supplied regions are hard geographic limits. Schedule and recommend places only within those regions, and never expand the itinerary into an unselected region.',
+  'Your primary objective is to place the traveler-saved places into the itinerary. Recommendations are supplementary and must not replace or deprioritize saved places.',
+  'After placing saved places, use recommendations within the selected regions when needed so every day forms a useful route matching the travel-style density. Decide the appropriate number from the dates, daily time windows, traveler context, and route practicality.',
+  'A recommendation must be a concrete visitable place such as an attraction, restaurant, cafe, market, shop, park, museum, or cultural venue. Never recommend stations, airports, lodging, neighborhoods, cities, or administrative areas as activities.',
+  'Cluster nearby places and normally keep consecutive travel legs within 30 minutes. For every visit, include the travel method and estimated minutes from the preceding lodging or visit, then set realistic startTime and durationMinutes values in chronological order within each daily time window.',
+  'Include a meal or cafe naturally when it improves a long day, and return one indoor Plan B for every trip day.',
+  'Do not claim that opening hours are verified. Activity text should remind the traveler to confirm time-sensitive reservations or operating hours when relevant.',
+  'Never invent IDs for new places in placements.',
+  'Follow the supplied travel-style guidance, prioritize must_visit places, and plan around lockedPlacements without returning them.',
+  'When a place cannot be scheduled realistically, return it in unplaced with a concise reason instead of forcing it into the itinerary.',
+  'Do not invent place IDs, locations, dates, or opening hours.',
+].join(' ');
+
+const PlacementSchema = z.object({
+  savedPlaceId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  position: z.number().int().min(0),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  durationMinutes: z.number().int().min(15).max(360),
+  activity: z.string().min(1).max(500),
+  travelMethod: z.string().min(1).max(120),
+  travelDurationMinutes: z.number().int().min(0).max(180),
+});
+
+const RecommendationSchema = z.object({
+  placeName: z.string().min(1),
+  regionName: z.string().min(1),
+  suggestedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  position: z.number().int().min(0),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  durationMinutes: z.number().int().min(15).max(360),
+  activity: z.string().min(1).max(500),
+  travelMethod: z.string().min(1).max(120),
+  travelDurationMinutes: z.number().int().min(0).max(180),
+  reason: z.string().min(1),
+});
+
+const PlanBSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  placeName: z.string().min(1),
+  regionName: z.string().min(1),
+  reason: z.string().min(1).max(500),
+});
+
 const AiPlanSchema = z.object({
-  placements: z.array(z.object({
-    savedPlaceId: z.string().uuid(),
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    position: z.number().int().min(0),
-  })),
+  placements: z.array(PlacementSchema),
   unplaced: z.array(z.object({ savedPlaceId: z.string().uuid(), reason: z.string() })),
+  recommendations: z.array(RecommendationSchema),
+  planBs: z.array(PlanBSchema),
 });
 
 @Injectable()
@@ -37,7 +85,7 @@ export class OpenAiPlannerAdapter implements AiPlannerPort {
         model: this.model,
         max_output_tokens: this.maxOutputTokens,
         input: [
-          { role: 'system', content: 'You create practical travel itineraries. Use only supplied savedPlaceId values, include each at most once, keep every placement within the supplied trip dates and available time window, and plan around lockedPlacements without returning them.' },
+          { role: 'system', content: AI_PLANNER_SYSTEM_PROMPT },
           { role: 'user', content: JSON.stringify(input) },
         ],
         text: { format: zodTextFormat(AiPlanSchema, 'trip_itinerary') },

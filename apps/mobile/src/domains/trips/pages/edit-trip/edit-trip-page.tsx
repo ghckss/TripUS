@@ -8,6 +8,7 @@ import { CountrySelect } from "@/domains/trips/components/country-select";
 import { defaultTravelCountry, resolveTravelCountry, type TravelCountry } from "@/domains/trips/components/country-options";
 import { DateField } from "@/domains/trips/components/date-field";
 import { LodgingSearchField, type SelectedLodging } from "@/domains/trips/components/lodging-search-field";
+import { RegionMultiSelect, type SelectedRegion } from "@/domains/trips/components/region-multi-select";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
@@ -18,6 +19,7 @@ export default function EditTripScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const [title, setTitle] = useState("");
   const [country, setCountry] = useState<TravelCountry>(defaultTravelCountry);
+  const [regions, setRegions] = useState<SelectedRegion[]>([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [lodging, setLodging] = useState<SelectedLodging>();
@@ -29,6 +31,7 @@ export default function EditTripScreen() {
     void Promise.all([getTrip(tripId), getPrimaryLodging(tripId)]).then(([trip, currentLodging]) => {
       setTitle(trip.title);
       setCountry(resolveTravelCountry(trip.destination, trip.timezone));
+      setRegions(trip.regions ?? []);
       setStartDate(trip.startDate);
       setEndDate(trip.endDate);
       setLodging(currentLodging ? {
@@ -44,6 +47,7 @@ export default function EditTripScreen() {
 
   const changeCountry = (next: TravelCountry) => {
     setCountry(next);
+    setRegions([]);
     setLodging(undefined);
   };
 
@@ -59,6 +63,7 @@ export default function EditTripScreen() {
       await updateTrip(tripId, {
         title: title.trim(),
         destination: country.name,
+        regions,
         timezone: country.timezone,
         startDate,
         endDate,
@@ -81,19 +86,20 @@ export default function EditTripScreen() {
 
   return <Screen>
     <AppText variant="title">여행 기본 정보</AppText>
-    <AppText color={colors.muted}>국가, 일정과 지도에서 찾은 기본 숙소를 변경할 수 있어요.</AppText>
+    <AppText color={colors.muted}>국가, 도시·지역, 일정과 기본 숙소를 변경할 수 있어요.</AppText>
     <Card>
       <AppText variant="label">여행 이름</AppText>
       <TextInput value={title} onChangeText={setTitle} style={styles.input} />
       <AppText variant="label">여행 국가</AppText>
       <CountrySelect value={country} onChange={changeCountry} />
       <AppText variant="caption" color={colors.muted}>시간대 · {country.timezone} (자동 설정)</AppText>
+      <RegionMultiSelect country={country} value={regions} onChange={setRegions} />
       {startDate && <DateField label="출발일" value={startDate} onChange={changeStartDate} />}
       {endDate && <DateField label="종료일" value={endDate} minimumDate={startDate} onChange={setEndDate} />}
-      <LodgingSearchField destination={country.name} value={lodging} onChange={setLodging} />
+      <LodgingSearchField destination={[...regions.map((region) => region.name), country.name].join(", ")} value={lodging} onChange={setLodging} />
     </Card>
     {error && <AppText color={colors.danger}>{error}</AppText>}
-    <Button label={saving ? "저장 중…" : "변경사항 저장"} disabled={loading || saving || !title.trim() || !startDate || !endDate} onPress={() => void submit()} />
+    <Button label={saving ? "저장 중…" : "변경사항 저장"} disabled={loading || saving || !title.trim() || !startDate || !endDate || regions.length === 0} onPress={() => void submit()} />
   </Screen>;
 }
 

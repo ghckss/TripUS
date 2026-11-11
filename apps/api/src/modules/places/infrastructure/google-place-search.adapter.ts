@@ -22,6 +22,10 @@ export class GooglePlaceSearchAdapter implements PlaceSearchPort {
   }
 
   async search(query: string, destination: string): Promise<PlaceSearchCandidate[]> {
+    return this.textSearch({ textQuery: `${query} ${destination}`, languageCode: 'ko', pageSize: 10 });
+  }
+
+  private async textSearch(requestBody: Record<string, unknown>): Promise<PlaceSearchCandidate[]> {
     const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
       method: 'POST',
       headers: {
@@ -29,14 +33,14 @@ export class GooglePlaceSearchAdapter implements PlaceSearchPort {
         'X-Goog-Api-Key': this.apiKey,
         'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.primaryType,places.location',
       },
-      body: JSON.stringify({ textQuery: `${query} ${destination}`, languageCode: 'ko', pageSize: 10 }),
+      body: JSON.stringify(requestBody),
       signal: AbortSignal.timeout(8_000),
     });
     if (!response.ok) {
       throw new ServiceUnavailableException(`Google Places request failed (${response.status})`);
     }
-    const body = await response.json() as GoogleTextSearchResponse;
-    return (body.places ?? []).flatMap((place) => place.id && place.displayName?.text ? [{
+    const responseBody = await response.json() as GoogleTextSearchResponse;
+    return (responseBody.places ?? []).flatMap((place) => place.id && place.displayName?.text ? [{
       googlePlaceId: place.id,
       name: place.displayName.text,
       address: place.formattedAddress ?? null,

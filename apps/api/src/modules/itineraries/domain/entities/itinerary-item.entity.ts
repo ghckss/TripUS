@@ -65,6 +65,21 @@ export class ItineraryItemEntity {
   @Column({ type: 'integer', nullable: true })
   position!: number | null;
 
+  @Column({ name: 'scheduled_time', type: 'time', nullable: true })
+  scheduledTime!: string | null;
+
+  @Column({ name: 'duration_minutes', type: 'integer', nullable: true })
+  durationMinutes!: number | null;
+
+  @Column({ name: 'activity_summary', type: 'varchar', length: 500, nullable: true })
+  activitySummary!: string | null;
+
+  @Column({ name: 'travel_method', type: 'varchar', length: 120, nullable: true })
+  travelMethod!: string | null;
+
+  @Column({ name: 'travel_duration_minutes', type: 'integer', nullable: true })
+  travelDurationMinutes!: number | null;
+
   @Column({ type: 'boolean', default: false })
   locked!: boolean;
 

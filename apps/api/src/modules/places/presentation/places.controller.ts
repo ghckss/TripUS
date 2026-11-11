@@ -4,7 +4,7 @@ import { ApiBody, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiPa
 import { CreateSavedPlaceDto } from '../application/dto/create-saved-place.dto';
 import { SavedPlaceResponseDto, SavePlaceResultDto } from '../application/dto/saved-place-response.dto';
 import { PlacesService } from '../application/places.service';
-import { PlaceSearchCandidateDto, SearchPlacesByDestinationQueryDto, SearchPlacesQueryDto } from '../application/dto/search-places.dto';
+import { PlaceSearchCandidateDto, SearchCitiesQueryDto, SearchPlacesByDestinationQueryDto, SearchPlacesQueryDto } from '../application/dto/search-places.dto';
 import { UpdateSavedPlaceDto } from '../application/dto/update-saved-place.dto';
 
 @ApiTags('places')
@@ -78,5 +78,14 @@ export class PlaceDiscoveryController {
   @ApiOkResponse({ type: PlaceSearchCandidateDto, isArray: true })
   search(@Query() input: SearchPlacesByDestinationQueryDto): Promise<PlaceSearchCandidateDto[]> {
     return this.places.searchByDestination(input.query, input.destination);
+  }
+
+  @Get('cities')
+  @ApiQuery({ name: 'query', type: String, minLength: 1 })
+  @ApiQuery({ name: 'country', type: String, minLength: 1, maxLength: 120 })
+  @ApiQuery({ name: 'countryCode', type: String, pattern: '^[A-Z]{2}$' })
+  @ApiOkResponse({ type: PlaceSearchCandidateDto, isArray: true })
+  cities(@Query() input: SearchCitiesQueryDto): Promise<PlaceSearchCandidateDto[]> {
+    return this.places.searchCities(input.query, input.country, input.countryCode);
   }
 }

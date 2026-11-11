@@ -25,7 +25,7 @@ export default function TripsScreen() {
           <Card style={styles.tripCard}>
             <View style={styles.row}><Pill label="여행 예정" selected /><AppText variant="caption" color={colors.muted}>{trip.timezone}</AppText></View>
             <AppText variant="title">{trip.title}</AppText>
-            <AppText color={colors.muted}>{trip.startDate} – {trip.endDate} · {trip.destination}</AppText>
+            <AppText color={colors.muted}>{trip.startDate} – {trip.endDate} · {trip.regions?.length ? trip.regions.map((region) => region.name).join(" · ") : trip.destination}</AppText>
             <AppText variant="label" color={colors.primary}>여행 준비 이어가기 →</AppText>
           </Card>
         </Pressable>

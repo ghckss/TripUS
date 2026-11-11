@@ -38,7 +38,14 @@ export function useItineraryDaySettings(tripId: string) {
     setSaving(true);
     setMessage(undefined);
     try {
-      const input = settings.map(({ date, startTime, endTime }) => ({ date, startTime, endTime }));
+      const input = settings.map(({ date, startTime, endTime, planBPlaceName, planBAddress, planBReason }) => ({
+        date,
+        startTime,
+        endTime,
+        planBPlaceName,
+        planBAddress,
+        planBReason,
+      }));
       setSettings(await replaceTripDaySettings(tripId, input));
       setMessage("날짜별 활동 시간을 저장했어요.");
     } catch (caught) {

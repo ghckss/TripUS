@@ -29,4 +29,5 @@ export class MockPlaceSearchAdapter implements PlaceSearchPort {
       },
     ]);
   }
+
 }

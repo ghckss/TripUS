@@ -6,6 +6,7 @@ import NewTripScreen from "./new-trip-page";
 const mockCreateTrip = jest.fn();
 const mockSavePrimaryLodging = jest.fn();
 const mockSearchPlacesByDestination = jest.fn();
+const mockSearchCities = jest.fn();
 
 jest.mock("expo-router", () => ({
   router: { replace: jest.fn() },
@@ -22,6 +23,10 @@ jest.mock("@/domains/places/api/lodgings.api", () => ({
 }));
 jest.mock("@/domains/places/api/places.api", () => ({
   searchPlacesByDestination: (...args: unknown[]) => mockSearchPlacesByDestination(...args),
+  searchCities: (country: string, countryCode: string, query: string) => {
+    mockSearchCities(country, countryCode, query);
+    return mockSearchPlacesByDestination(country, query);
+  },
 }));
 
 function localDate(offset: number): string {
@@ -40,17 +45,28 @@ describe("NewTripScreen", () => {
 
   it("searches a country and applies its timezone when creating a trip", async () => {
     mockCreateTrip.mockResolvedValue({ id: "trip-1" });
+    mockSearchPlacesByDestination.mockResolvedValue([{
+      googlePlaceId: "region-tokyo", name: "도쿄", address: "일본 도쿄도", latitude: 35.6762, longitude: 139.6503,
+    }]);
     const screen = await render(<NewTripScreen />);
 
     await fireEvent.changeText(screen.getByTestId("new-trip-title"), "일본 단풍 여행");
     await fireEvent.press(screen.getByTestId("new-trip-destination"));
     await fireEvent.changeText(screen.getByTestId("country-search-input"), "Japan");
     await fireEvent.press(screen.getByTestId("country-option-JP"));
+    await fireEvent.press(screen.getByTestId("region-dropdown-open"));
+    await fireEvent.changeText(screen.getByTestId("region-search-input"), "도쿄");
+    await fireEvent.press(screen.getByTestId("region-search-button"));
+    await fireEvent.press(await screen.findByTestId("region-result-region-tokyo"));
     await fireEvent.press(screen.getByTestId("new-trip-submit"));
 
+    expect(mockSearchCities).toHaveBeenCalledWith("일본", "JP", expect.any(String));
     await waitFor(() => expect(mockCreateTrip).toHaveBeenCalledWith({
       destination: "일본",
       endDate: localDate(2),
+      regions: [{
+        googlePlaceId: "region-tokyo", name: "도쿄", address: "일본 도쿄도", latitude: 35.6762, longitude: 139.6503,
+      }],
       startDate: localDate(0),
       timezone: "Asia/Tokyo",
       title: "일본 단풍 여행",
@@ -58,19 +74,63 @@ describe("NewTripScreen", () => {
     expect(router.replace).toHaveBeenCalledWith("/trips/trip-1");
   });
 
+  it("adds multiple cities and regions to a trip", async () => {
+    mockCreateTrip.mockResolvedValue({ id: "trip-1" });
+    mockSearchPlacesByDestination.mockImplementation((_destination: string, query: string) => Promise.resolve(query === "서울" ? [{
+      googlePlaceId: "region-seoul",
+      name: "서울",
+      address: "대한민국 서울특별시",
+      latitude: 37.5665,
+      longitude: 126.978,
+    }] : [{
+      googlePlaceId: "region-inje",
+      name: "인제군",
+      address: "대한민국 강원특별자치도 인제군",
+      latitude: 38.0695,
+      longitude: 128.1707,
+    }]));
+    const screen = await render(<NewTripScreen />);
+
+    await fireEvent.changeText(screen.getByTestId("new-trip-title"), "서울과 인제 여행");
+    await fireEvent.press(screen.getByTestId("region-dropdown-open"));
+    await fireEvent.changeText(screen.getByTestId("region-search-input"), "서울");
+    await fireEvent.press(screen.getByTestId("region-search-button"));
+    await fireEvent.press(await screen.findByTestId("region-result-region-seoul"));
+    await fireEvent.press(screen.getByTestId("region-dropdown-open"));
+    await fireEvent.changeText(screen.getByTestId("region-search-input"), "인제");
+    await fireEvent.press(screen.getByTestId("region-search-button"));
+    await fireEvent.press(await screen.findByTestId("region-result-region-inje"));
+    await fireEvent.press(screen.getByTestId("new-trip-submit"));
+
+    await waitFor(() => expect(mockCreateTrip).toHaveBeenCalledWith(expect.objectContaining({
+      regions: [
+        {
+          googlePlaceId: "region-seoul", name: "서울", address: "대한민국 서울특별시",
+          latitude: 37.5665, longitude: 126.978,
+        },
+        {
+          googlePlaceId: "region-inje", name: "인제군", address: "대한민국 강원특별자치도 인제군",
+          latitude: 38.0695, longitude: 128.1707,
+        },
+      ],
+    })));
+  });
+
   it("saves a lodging selected from map search results", async () => {
     mockCreateTrip.mockResolvedValue({ id: "trip-1" });
     mockSavePrimaryLodging.mockResolvedValue({ id: "lodging-1" });
-    mockSearchPlacesByDestination.mockResolvedValue([{
-      googlePlaceId: "google-hotel-1",
-      name: "서울 지도 호텔",
-      address: "서울특별시 중구",
-    }]);
+    mockSearchPlacesByDestination.mockImplementation((_destination: string, query: string) => Promise.resolve(query === "서울" ? [{
+      googlePlaceId: "region-seoul", name: "서울", address: "대한민국 서울특별시", latitude: 37.5665, longitude: 126.978,
+    }] : [{ googlePlaceId: "google-hotel-1", name: "서울 지도 호텔", address: "서울특별시 중구" }]));
     const screen = await render(<NewTripScreen />);
 
     await fireEvent.changeText(screen.getByTestId("new-trip-title"), "서울 여행");
+    await fireEvent.press(screen.getByTestId("region-dropdown-open"));
+    await fireEvent.changeText(screen.getByTestId("region-search-input"), "서울");
+    await fireEvent.press(screen.getByTestId("region-search-button"));
+    await fireEvent.press(await screen.findByTestId("region-result-region-seoul"));
     await fireEvent.changeText(screen.getByTestId("lodging-search-input"), "지도 호텔");
-    await fireEvent.press(screen.getByText("검색"));
+    await fireEvent.press(screen.getByTestId("lodging-search-button"));
     await fireEvent.press(await screen.findByLabelText("서울 지도 호텔 숙소 선택"));
     await fireEvent.press(screen.getByTestId("new-trip-submit"));
 
@@ -84,9 +144,16 @@ describe("NewTripScreen", () => {
 
   it("keeps the form visible when creation fails", async () => {
     mockCreateTrip.mockRejectedValue(new Error("서버에 연결하지 못했어요."));
+    mockSearchPlacesByDestination.mockResolvedValue([{
+      googlePlaceId: "region-seoul", name: "서울", address: "대한민국 서울특별시", latitude: 37.5665, longitude: 126.978,
+    }]);
     const screen = await render(<NewTripScreen />);
 
     await fireEvent.changeText(screen.getByTestId("new-trip-title"), "실패 테스트 여행");
+    await fireEvent.press(screen.getByTestId("region-dropdown-open"));
+    await fireEvent.changeText(screen.getByTestId("region-search-input"), "서울");
+    await fireEvent.press(screen.getByTestId("region-search-button"));
+    await fireEvent.press(await screen.findByTestId("region-result-region-seoul"));
     await fireEvent.press(screen.getByTestId("new-trip-submit"));
 
     expect(await screen.findByText("서버에 연결하지 못했어요.")).toBeOnTheScreen();

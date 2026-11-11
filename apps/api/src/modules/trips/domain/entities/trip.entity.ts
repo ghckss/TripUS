@@ -15,6 +15,14 @@ import { ItineraryItemEntity } from '../../../itineraries/domain/entities/itiner
 import { SavedPlaceEntity } from '../../../places/domain/entities/saved-place.entity';
 import { UserEntity } from '../../../users/domain/entities/user.entity';
 
+export interface TripRegion {
+  googlePlaceId: string | null;
+  name: string;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
 @Entity({ name: 'trips' })
 @Index('idx_trips_owner_active', ['ownerId', 'active'])
 @Check('chk_trips_date_range', '"end_date" >= "start_date"')
@@ -34,6 +42,9 @@ export class TripEntity {
 
   @Column({ type: 'varchar', length: 120 })
   destination!: string;
+
+  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+  regions!: TripRegion[];
 
   @Column({ type: 'varchar', length: 64 })
   timezone!: string;

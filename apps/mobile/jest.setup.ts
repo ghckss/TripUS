@@ -1,3 +1,65 @@
+import "react-native-gesture-handler/jestSetup";
+
+jest.mock("react-native-reanimated", () => {
+  const { View } = require("react-native");
+  const transition = {
+    damping: () => transition,
+    springify: () => transition,
+    stiffness: () => transition,
+  };
+
+  return {
+    __esModule: true,
+    default: { View, createAnimatedComponent: (component: unknown) => component },
+    isSharedValue: (value: unknown) => Boolean(value && typeof value === "object" && "get" in value && "set" in value),
+    LinearTransition: transition,
+    runOnJS: (callback: (...args: unknown[]) => unknown) => callback,
+    useAnimatedStyle: (factory: () => unknown) => factory(),
+    useComposedEventHandler: () => undefined,
+    useEvent: () => jest.fn(),
+    useHandler: () => ({ context: {}, doDependenciesDiffer: false, useWeb: false }),
+    useSharedValue: (initial: unknown) => ({
+      value: initial,
+      get() { return this.value; },
+      set(next: unknown) { this.value = next; },
+    }),
+    withSpring: (value: unknown) => value,
+    withTiming: (value: unknown) => value,
+  };
+});
+
+jest.mock("react-native-reanimated-dnd", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+  const Sortable = ({ data, renderItem }: Record<string, any>) => React.createElement(
+    View,
+    null,
+    data.map((item: Record<string, unknown>, index: number) => renderItem({
+      item,
+      index,
+      id: item.id,
+      itemsCount: data.length,
+    })),
+  );
+  const SortableItem = ({ children, id, onDragStart, onDrop }: Record<string, any>) => React.createElement(
+    View,
+    { testID: `sortable-item-${id}`, onDragStart, onDrop },
+    children,
+  );
+  SortableItem.Handle = ({ children }: { children: React.ReactNode }) => children;
+
+  return { __esModule: true, Sortable, SortableItem };
+});
+
+jest.mock("react-native-gesture-handler", () => {
+  const React = require("react");
+  const actual = jest.requireActual("react-native-gesture-handler");
+  return {
+    ...actual,
+    GestureDetector: ({ children, gesture }: { children: React.ReactElement; gesture: unknown }) => React.cloneElement(children, { testGesture: gesture }),
+  };
+});
+
 jest.mock(
   "@react-native-community/netinfo",
   () => require("@react-native-community/netinfo/jest/netinfo-mock.js"),

@@ -7,7 +7,7 @@ type UploadTarget = components["schemas"]["PhotoUploadTargetDto"];
 
 export async function createPhotoUpload(
   tripId: string,
-  input: { itineraryItemId: string; mimeType: string; byteSize: number; filename: string },
+  input: { itineraryItemId?: string; mimeType: string; byteSize: number; filename: string },
 ): Promise<UploadTarget> {
   const { data, error } = await tripUsApi.POST("/v1/trips/{tripId}/photos", { params: { path: { tripId } }, body: input });
   if (error) throw new Error(apiErrorMessage(error));

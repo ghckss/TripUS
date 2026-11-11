@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import { TripEntity } from '../../domain/entities/trip.entity';
+import { TripRegionDto } from './trip-region.dto';
 
 export class TripResponseDto {
   @ApiProperty({ type: String, format: 'uuid' })
@@ -11,6 +12,9 @@ export class TripResponseDto {
 
   @ApiProperty({ type: String })
   destination!: string;
+
+  @ApiProperty({ type: TripRegionDto, isArray: true })
+  regions!: TripRegionDto[];
 
   @ApiProperty({ type: String, example: 'Asia/Seoul' })
   timezone!: string;
@@ -32,6 +36,7 @@ export class TripResponseDto {
       id: entity.id,
       title: entity.title,
       destination: entity.destination,
+      regions: entity.regions ?? [],
       timezone: entity.timezone,
       startDate: entity.startDate,
       endDate: entity.endDate,

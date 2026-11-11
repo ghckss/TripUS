@@ -1,5 +1,8 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { ArrayMaxSize, IsArray, IsDateString, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+
+import { TripRegionDto } from './trip-region.dto';
 
 export class CreateTripDto {
   @ApiProperty({ type: String, example: '서울 가을 여행', maxLength: 120 })
@@ -13,6 +16,14 @@ export class CreateTripDto {
   @IsNotEmpty()
   @MaxLength(120)
   destination!: string;
+
+  @ApiPropertyOptional({ type: TripRegionDto, isArray: true, maxItems: 10, default: [] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => TripRegionDto)
+  regions?: TripRegionDto[];
 
   @ApiProperty({ type: String, example: 'Asia/Seoul', maxLength: 64 })
   @IsString()

@@ -19,4 +19,13 @@ export class TripDaySettingEntity {
 
   @Column({ name: 'end_time', type: 'time' })
   endTime!: string;
+
+  @Column({ name: 'plan_b_place_name', type: 'varchar', length: 180, nullable: true })
+  planBPlaceName!: string | null;
+
+  @Column({ name: 'plan_b_address', type: 'varchar', length: 300, nullable: true })
+  planBAddress!: string | null;
+
+  @Column({ name: 'plan_b_reason', type: 'varchar', length: 500, nullable: true })
+  planBReason!: string | null;
 }

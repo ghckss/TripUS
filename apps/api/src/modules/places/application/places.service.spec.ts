@@ -52,6 +52,47 @@ describe('PlacesService', () => {
     expect(placeSearchSearch).toHaveBeenCalledWith('도쿄 호텔', '일본');
   });
 
+  it('loads city choices for a selected country', async () => {
+    const { service } = createService();
+
+    const cities = await service.searchCities('Tokyo', '일본', 'JP');
+    expect(cities).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: '도쿄', address: '일본', primaryType: 'locality' }),
+    ]));
+  });
+
+  it('limits the default dropdown to 20 population-ranked localized cities', async () => {
+    const { placeSearchSearch, service } = createService();
+
+    const cities = await service.searchCities('주요 도시', '일본', 'JP');
+
+    expect(cities).toHaveLength(20);
+    expect(cities.slice(0, 5).map((city) => city.name)).toEqual(['도쿄', '요코하마', '오사카', '나고야', '삿포로']);
+    expect(placeSearchSearch).not.toHaveBeenCalled();
+  });
+
+  it('searches the catalog with a localized city query', async () => {
+    const { placeSearchSearch, service } = createService();
+
+    await expect(service.searchCities('도쿄', '일본', 'JP')).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ googlePlaceId: 'catalog:geonames:1850147', name: '도쿄' }),
+    ]));
+    expect(placeSearchSearch).not.toHaveBeenCalled();
+  });
+
+  it('falls back to place discovery when a city is missing from the compact catalog', async () => {
+    const { placeSearchSearch, service } = createService();
+    placeSearchSearch.mockResolvedValue([{
+      googlePlaceId: 'city-google', name: '작은 도시', address: '일본', primaryType: 'locality',
+      latitude: 35.67, longitude: 139.65,
+    }]);
+
+    await expect(service.searchCities('작은 도시', '일본', 'JP')).resolves.toEqual([
+      expect.objectContaining({ googlePlaceId: 'city-google', name: '작은 도시' }),
+    ]);
+    expect(placeSearchSearch).toHaveBeenCalledWith('작은 도시', '일본');
+  });
+
   it('returns the existing place for a duplicate Google Place ID', async () => {
     const { places, service, trips } = createService();
     trips.findOneBy.mockResolvedValue({ id: tripId });

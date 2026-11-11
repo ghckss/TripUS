@@ -600,6 +600,104 @@
         ]
       }
     },
+    "/v1/places/cities": {
+      "get": {
+        "operationId": "PlaceDiscoveryController_cities",
+        "parameters": [
+          {
+            "name": "query",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "example": "도쿄",
+              "type": "string"
+            }
+          },
+          {
+            "name": "country",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 120,
+              "example": "일본",
+              "type": "string"
+            }
+          },
+          {
+            "name": "countryCode",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "pattern": "^[A-Z]{2}$",
+              "example": "JP",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlaceSearchCandidateDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "places"
+        ]
+      }
+    },
+    "/v1/trips/{tripId}/routes/transit": {
+      "post": {
+        "operationId": "RoutesController_transit",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitRouteRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransitRouteResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "routes"
+        ]
+      }
+    },
     "/v1/trips": {
       "get": {
         "operationId": "TripsController_list",
@@ -797,47 +895,6 @@
         },
         "tags": [
           "trip-records"
-        ]
-      }
-    },
-    "/v1/trips/{tripId}/routes/transit": {
-      "post": {
-        "operationId": "RoutesController_transit",
-        "parameters": [
-          {
-            "name": "tripId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TransitRouteRequestDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TransitRouteResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "routes"
         ]
       }
     },
@@ -1201,6 +1258,23 @@
           "relaxed"
         ]
       },
+      "AiTransportMode": {
+        "type": "string",
+        "enum": [
+          "public_transit",
+          "walking",
+          "car",
+          "mixed"
+        ]
+      },
+      "AiBudgetLevel": {
+        "type": "string",
+        "enum": [
+          "budget",
+          "standard",
+          "premium"
+        ]
+      },
       "GenerateAiPlanDto": {
         "type": "object",
         "properties": {
@@ -1210,6 +1284,35 @@
                 "$ref": "#/components/schemas/TravelStyle"
               }
             ]
+          },
+          "companions": {
+            "type": "string",
+            "maxLength": 120,
+            "example": "친구 2명"
+          },
+          "transportMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AiTransportMode"
+              }
+            ]
+          },
+          "budgetLevel": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AiBudgetLevel"
+              }
+            ]
+          },
+          "preferences": {
+            "type": "string",
+            "maxLength": 500,
+            "example": "현지 맛집과 전시를 좋아함"
+          },
+          "avoidances": {
+            "type": "string",
+            "maxLength": 500,
+            "example": "긴 대기와 하루 1만 보 이상 걷기"
           }
         },
         "required": [
@@ -1271,6 +1374,27 @@
             "nullable": true
           },
           "position": {
+            "type": "number",
+            "nullable": true
+          },
+          "scheduledTime": {
+            "type": "string",
+            "example": "10:30",
+            "nullable": true
+          },
+          "durationMinutes": {
+            "type": "number",
+            "nullable": true
+          },
+          "activitySummary": {
+            "type": "string",
+            "nullable": true
+          },
+          "travelMethod": {
+            "type": "string",
+            "nullable": true
+          },
+          "travelDurationMinutes": {
             "type": "number",
             "nullable": true
           },
@@ -1402,6 +1526,28 @@
           "locked": {
             "type": "boolean",
             "default": false
+          },
+          "scheduledTime": {
+            "type": "string",
+            "example": "10:30"
+          },
+          "durationMinutes": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 720
+          },
+          "activitySummary": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "travelMethod": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "travelDurationMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 720
           }
         },
         "required": [
@@ -1517,6 +1663,21 @@
             "type": "string",
             "example": "21:00",
             "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "planBPlaceName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 180
+          },
+          "planBAddress": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          },
+          "planBReason": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
           }
         },
         "required": [
@@ -1541,6 +1702,21 @@
             "type": "string",
             "example": "21:00",
             "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "planBPlaceName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 180
+          },
+          "planBAddress": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          },
+          "planBReason": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
           }
         },
         "required": [
@@ -1814,12 +1990,102 @@
           }
         }
       },
+      "TransitRouteRequestDto": {
+        "type": "object",
+        "properties": {
+          "originSavedPlaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "destinationSavedPlaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "departureTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "originSavedPlaceId",
+          "destinationSavedPlaceId"
+        ]
+      },
+      "TransitRouteStatus": {
+        "type": "string",
+        "enum": [
+          "available",
+          "unavailable"
+        ]
+      },
+      "TransitRouteResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransitRouteStatus"
+              }
+            ]
+          },
+          "durationMinutes": {
+            "type": "number",
+            "nullable": true
+          },
+          "distanceMeters": {
+            "type": "number",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
       "TripListStatus": {
         "type": "string",
         "enum": [
           "current",
           "completed",
           "all"
+        ]
+      },
+      "TripRegionDto": {
+        "type": "object",
+        "properties": {
+          "googlePlaceId": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "example": "서울"
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 300,
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "googlePlaceId",
+          "name",
+          "address",
+          "latitude",
+          "longitude"
         ]
       },
       "TripResponseDto": {
@@ -1834,6 +2100,12 @@
           },
           "destination": {
             "type": "string"
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripRegionDto"
+            }
           },
           "timezone": {
             "type": "string",
@@ -1860,6 +2132,7 @@
           "id",
           "title",
           "destination",
+          "regions",
           "timezone",
           "startDate",
           "endDate",
@@ -1878,6 +2151,14 @@
             "type": "string",
             "example": "서울",
             "maxLength": 120
+          },
+          "regions": {
+            "maxItems": 10,
+            "default": [],
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripRegionDto"
+            }
           },
           "timezone": {
             "type": "string",
@@ -1913,6 +2194,13 @@
           "destination": {
             "type": "string",
             "maxLength": 120
+          },
+          "regions": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripRegionDto"
+            }
           },
           "timezone": {
             "type": "string",
@@ -1980,61 +2268,6 @@
         "required": [
           "trip",
           "itinerary"
-        ]
-      },
-      "TransitRouteRequestDto": {
-        "type": "object",
-        "properties": {
-          "originSavedPlaceId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "destinationSavedPlaceId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "departureTime": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "originSavedPlaceId",
-          "destinationSavedPlaceId"
-        ]
-      },
-      "TransitRouteStatus": {
-        "type": "string",
-        "enum": [
-          "available",
-          "unavailable"
-        ]
-      },
-      "TransitRouteResponseDto": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/TransitRouteStatus"
-              }
-            ]
-          },
-          "durationMinutes": {
-            "type": "number",
-            "nullable": true
-          },
-          "distanceMeters": {
-            "type": "number",
-            "nullable": true
-          },
-          "reason": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "status"
         ]
       },
       "CreatePhotoUploadDto": {

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class SearchPlacesQueryDto {
   @ApiProperty({ type: String, minLength: 2 })
@@ -14,6 +14,25 @@ export class SearchPlacesByDestinationQueryDto extends SearchPlacesQueryDto {
   @MinLength(1)
   @MaxLength(120)
   destination!: string;
+}
+
+export class SearchCitiesQueryDto {
+  @ApiProperty({ type: String, minLength: 1, maxLength: 120, example: '도쿄' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  query!: string;
+
+  @ApiProperty({ type: String, minLength: 1, maxLength: 120, example: '일본' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  country!: string;
+
+  @ApiProperty({ type: String, pattern: '^[A-Z]{2}$', example: 'JP' })
+  @IsString()
+  @Matches(/^[A-Z]{2}$/)
+  countryCode!: string;
 }
 
 export class PlaceSearchCandidateDto {

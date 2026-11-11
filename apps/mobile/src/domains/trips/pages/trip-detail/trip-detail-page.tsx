@@ -18,7 +18,7 @@ export default function TripHomeScreen() {
     <Screen>
       {error && <Card><AppText variant="heading">여행을 불러오지 못했어요</AppText><AppText color={colors.muted}>{error}</AppText><Button label="다시 시도" variant="ghost" onPress={() => void reload()} /></Card>}
       {!trip && !error && <Card><AppText color={colors.muted}>여행을 불러오는 중이에요…</AppText></Card>}
-      {trip && <><View style={styles.row}><Pill label="여행 예정" selected /><AppText variant="caption" color={colors.muted}>{trip.timezone}</AppText></View><AppText variant="title">{trip.title}</AppText><AppText color={colors.muted}>{trip.startDate} – {trip.endDate} · {trip.destination}</AppText></>}
+      {trip && <><View style={styles.row}><Pill label="여행 예정" selected /><AppText variant="caption" color={colors.muted}>{trip.timezone}</AppText></View><AppText variant="title">{trip.title}</AppText><AppText color={colors.muted}>{trip.startDate} – {trip.endDate} · {trip.regions?.length ? trip.regions.map((region) => region.name).join(" · ") : trip.destination}</AppText></>}
       {trip && <Button label="여행 정보 수정" variant="ghost" onPress={() => router.push(`${path}/edit`)} />}
       <Card style={styles.progress}><AppText variant="heading">준비가 한창이에요</AppText><AppText color={colors.muted}>장소 {placeCount}곳 저장 · 일정 {scheduledCount}곳 배치</AppText></Card>
       <Button label="＋ 장소 추가" testID="trip-add-place" onPress={() => router.push(`${path}/places/new`)} />

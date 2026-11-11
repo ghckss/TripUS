@@ -7,6 +7,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "cities:generate": "node scripts/generate-city-catalog.mjs",
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "lint": "eslint .",

@@ -61,6 +61,14 @@ export async function searchPlacesByDestination(destination: string, query: stri
   return data;
 }
 
+export async function searchCities(country: string, countryCode: string, query: string): Promise<PlaceSearchCandidate[]> {
+  const { data, error } = await tripUsApi.GET("/v1/places/cities", {
+    params: { query: { country, countryCode, query } },
+  });
+  if (error) throw new Error(apiErrorMessage(error));
+  return data;
+}
+
 export async function updatePlace(
   tripId: string,
   placeId: string,

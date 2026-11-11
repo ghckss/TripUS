@@ -27,5 +27,6 @@ import { RoutesController } from './presentation/routes.controller';
           : mock,
     },
   ],
+  exports: [ROUTES_PORT],
 })
 export class RoutesModule {}

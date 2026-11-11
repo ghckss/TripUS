@@ -26,7 +26,31 @@ export class TripDaySettingsService {
         date,
         startTime: setting?.startTime.slice(0, 5) ?? '09:00',
         endTime: setting?.endTime.slice(0, 5) ?? '21:00',
+        planBPlaceName: setting?.planBPlaceName ?? null,
+        planBAddress: setting?.planBAddress ?? null,
+        planBReason: setting?.planBReason ?? null,
       };
+    });
+  }
+
+  async applyAiPlanBs(
+    tripId: string,
+    planBs: Array<{ date: string; placeName: string; address: string | null; reason: string }>,
+  ): Promise<TripDaySettingResponseDto[]> {
+    const current = await this.get(tripId);
+    const byDate = new Map(planBs.map((planB) => [planB.date, planB]));
+    return this.replace(tripId, {
+      settings: current.map((setting) => {
+        const planB = byDate.get(setting.date);
+        return {
+          date: setting.date,
+          startTime: setting.startTime,
+          endTime: setting.endTime,
+          planBPlaceName: planB?.placeName ?? null,
+          planBAddress: planB?.address ?? null,
+          planBReason: planB?.reason ?? null,
+        };
+      }),
     });
   }
 

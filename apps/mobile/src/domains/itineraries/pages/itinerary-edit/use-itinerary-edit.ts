@@ -5,7 +5,7 @@ import { apiErrorMessage } from "@/shared/api/trip-us-api";
 import { getTrip } from "@/domains/trips";
 import { listPlaces, type SavedPlace } from "@/domains/places/api/places.api";
 import { getItinerary, replaceItinerary, undoAiPlan, type Itinerary } from "../../api/itineraries.api";
-import { ensureLodgingEndpoints } from "./itinerary-lodging-endpoints";
+import { ensureLodgingEndpoints, isLodgingPlace, replaceLodgingBoundary, type LodgingEdge } from "./itinerary-lodging-endpoints";
 
 function enumerateDates(startDate: string, endDate: string): string[] {
   const dates: string[] = [];
@@ -67,12 +67,18 @@ export function useItineraryEdit(tripId: string) {
   const setPlacesForDate = (date: string, selectedPlaceIds: string[], availablePlaces = places) => {
     if (!itinerary) return;
     const selected = new Set(selectedPlaceIds);
-    const currentItems = itinerary.items.filter((item) => item.date === date);
-    const currentIds = new Set(currentItems.map((item) => item.savedPlaceId));
-    const primaryLodgingId = availablePlaces.find((place) => place.isPrimaryLodging)?.id;
+    const placesById = new Map(availablePlaces.map((place) => [place.id, place]));
+    const currentItems = itinerary.items
+      .filter((item) => item.date === date)
+      .sort((left, right) => (left.position ?? 0) - (right.position ?? 0));
+    const endpointItemIds = new Set([
+      ...(isLodgingPlace(currentItems[0]?.savedPlaceId ? placesById.get(currentItems[0].savedPlaceId) : undefined) ? [currentItems[0].id] : []),
+      ...(currentItems.length > 1 && isLodgingPlace(currentItems.at(-1)?.savedPlaceId ? placesById.get(currentItems.at(-1)!.savedPlaceId) : undefined) ? [currentItems.at(-1)!.id] : []),
+    ]);
+    const currentVisitIds = new Set(currentItems.filter((item) => !endpointItemIds.has(item.id)).map((item) => item.savedPlaceId));
 
-    const retainedItems = itinerary.items.filter((item) => item.date !== date || item.savedPlaceId === primaryLodgingId || selected.has(item.savedPlaceId));
-    const additions = availablePlaces.filter((place) => selected.has(place.id) && !currentIds.has(place.id)).map((place, index) => ({
+    const retainedItems = itinerary.items.filter((item) => item.date !== date || endpointItemIds.has(item.id) || selected.has(item.savedPlaceId));
+    const additions = availablePlaces.filter((place) => selected.has(place.id) && !currentVisitIds.has(place.id)).map((place, index) => ({
       id: `local:${date}:${place.id}`,
       savedPlaceId: place.id,
       placeName: place.name,
@@ -93,44 +99,62 @@ export function useItineraryEdit(tripId: string) {
     setPlaces(availablePlaces);
     setItinerary(ensureLodgingEndpoints({
       items: nextItems,
-      unplaced: availablePlaces.filter((place) => !place.isPrimaryLodging && !placedIds.has(place.id)).map((place) => ({ savedPlaceId: place.id, placeName: place.name })),
+      unplaced: availablePlaces.filter((place) => !isLodgingPlace(place) && !placedIds.has(place.id)).map((place) => ({ savedPlaceId: place.id, placeName: place.name })),
     }, dates, availablePlaces));
   };
 
+  const replaceDayLodging = (date: string, edge: LodgingEdge, place: SavedPlace, availablePlaces = places) => {
+    const nextPlaces = availablePlaces.some((candidate) => candidate.id === place.id)
+      ? availablePlaces
+      : [place, ...availablePlaces];
+    setPlaces(nextPlaces);
+    setItinerary((current) => current ? replaceLodgingBoundary(current, dates, date, edge, place) : current);
+  };
+
   const reorderWithinDay = (itemId: string, targetIndex: number) => {
-    if (!itinerary) return;
-    const item = itinerary.items.find((candidate) => candidate.id === itemId);
-    if (!item) return;
-    const sameDay = itinerary.items
-      .filter((candidate) => candidate.date === item.date)
-      .sort((left, right) => (left.position ?? 0) - (right.position ?? 0));
-    const index = sameDay.findIndex((candidate) => candidate.id === itemId);
-    const boundedTargetIndex = Math.max(0, Math.min(targetIndex, sameDay.length - 1));
-    if (index < 0 || index === boundedTargetIndex) return;
-    const reordered = [...sameDay];
-    const [moved] = reordered.splice(index, 1);
-    reordered.splice(boundedTargetIndex, 0, moved);
-    const nextPositions = new Map(reordered.map((candidate, position) => [candidate.id, position]));
-    setItinerary(normalizePositions({
-      ...itinerary,
-      items: itinerary.items.map((candidate) => nextPositions.has(candidate.id)
-        ? { ...candidate, position: nextPositions.get(candidate.id)! }
-        : candidate),
-    }));
+    setItinerary((current) => {
+      if (!current) return current;
+      const item = current.items.find((candidate) => candidate.id === itemId);
+      if (!item) return current;
+      const sameDay = current.items
+        .filter((candidate) => candidate.date === item.date)
+        .sort((left, right) => (left.position ?? 0) - (right.position ?? 0));
+      const index = sameDay.findIndex((candidate) => candidate.id === itemId);
+      const boundedTargetIndex = Math.max(0, Math.min(targetIndex, sameDay.length - 1));
+      if (index < 0 || index === boundedTargetIndex) return current;
+      const reordered = [...sameDay];
+      const [moved] = reordered.splice(index, 1);
+      reordered.splice(boundedTargetIndex, 0, moved);
+      const nextPositions = new Map(reordered.map((candidate, position) => [candidate.id, position]));
+      return normalizePositions({
+        ...current,
+        items: current.items.map((candidate) => nextPositions.has(candidate.id)
+          ? {
+            ...candidate,
+            position: nextPositions.get(candidate.id)!,
+            scheduledTime: null,
+            travelMethod: null,
+            travelDurationMinutes: null,
+          }
+          : candidate),
+      });
+    });
   };
 
   const moveToAdjacentDay = (itemId: string, direction: -1 | 1) => {
-    if (!itinerary) return;
-    const item = itinerary.items.find((candidate) => candidate.id === itemId);
-    const currentIndex = item?.date ? dates.indexOf(item.date) : -1;
-    const nextDate = dates[currentIndex + direction];
-    if (!item || !nextDate) return;
-    setItinerary(normalizePositions({
-      ...itinerary,
-      items: itinerary.items.map((candidate) => candidate.id === itemId
-        ? { ...candidate, date: nextDate, position: itinerary.items.filter((other) => other.date === nextDate).length }
-        : candidate),
-    }));
+    setItinerary((current) => {
+      if (!current) return current;
+      const item = current.items.find((candidate) => candidate.id === itemId);
+      const currentIndex = item?.date ? dates.indexOf(item.date) : -1;
+      const nextDate = dates[currentIndex + direction];
+      if (!item || !nextDate) return current;
+      return normalizePositions({
+        ...current,
+        items: current.items.map((candidate) => candidate.id === itemId
+          ? { ...candidate, date: nextDate, position: current.items.filter((other) => other.date === nextDate).length }
+          : candidate),
+      });
+    });
   };
 
   const removeFromItinerary = (itemId: string) => {
@@ -149,6 +173,11 @@ export function useItineraryEdit(tripId: string) {
       const prepared = ensureLodgingEndpoints(itinerary, dates, places);
       setItinerary(await replaceItinerary(tripId, prepared.items.map((item) => ({
         savedPlaceId: item.savedPlaceId, date: item.date!, position: item.position!, locked: false,
+        ...(item.scheduledTime ? { scheduledTime: item.scheduledTime } : {}),
+        ...(item.durationMinutes ? { durationMinutes: item.durationMinutes } : {}),
+        ...(item.activitySummary ? { activitySummary: item.activitySummary } : {}),
+        ...(item.travelMethod ? { travelMethod: item.travelMethod } : {}),
+        ...(item.travelDurationMinutes != null ? { travelDurationMinutes: item.travelDurationMinutes } : {}),
       }))));
       return true;
     } catch (caught) { setError(apiErrorMessage(caught)); return false; } finally { setSaving(false); }
@@ -164,5 +193,5 @@ export function useItineraryEdit(tripId: string) {
     finally { setUndoing(false); }
   };
 
-  return { dates, error, itinerary, moveToAdjacentDay, places, reload, removeFromItinerary, reorderWithinDay, save, saving, setPlacesForDate, undoAiChange, undoing };
+  return { dates, error, itinerary, moveToAdjacentDay, places, reload, removeFromItinerary, reorderWithinDay, replaceDayLodging, save, saving, setPlacesForDate, undoAiChange, undoing };
 }

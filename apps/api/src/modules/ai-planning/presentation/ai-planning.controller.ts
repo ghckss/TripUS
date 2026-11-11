@@ -14,6 +14,6 @@ export class AiPlanningController {
   @ApiBody({ type: GenerateAiPlanDto })
   @ApiOkResponse({ type: GenerateAiPlanResponseDto })
   generate(@Param('tripId', new ParseUUIDPipe()) tripId: string, @Body() input: GenerateAiPlanDto): Promise<GenerateAiPlanResponseDto> {
-    return this.planning.generate(tripId, input.style);
+    return this.planning.generate(tripId, input);
   }
 }

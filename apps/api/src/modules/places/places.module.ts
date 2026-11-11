@@ -27,5 +27,6 @@ import { MockPlaceSearchAdapter } from './infrastructure/mock-place-search.adapt
           : mock,
     },
   ],
+  exports: [PLACE_SEARCH_PORT],
 })
 export class PlacesModule {}

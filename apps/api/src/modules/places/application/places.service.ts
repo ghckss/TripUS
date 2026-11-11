@@ -10,6 +10,7 @@ import { CreateSavedPlaceDto } from './dto/create-saved-place.dto';
 import { SavedPlaceResponseDto, SavePlaceResultDto, SavePlaceStatus } from './dto/saved-place-response.dto';
 import { PlaceSearchCandidateDto } from './dto/search-places.dto';
 import { UpdateSavedPlaceDto } from './dto/update-saved-place.dto';
+import { listCountryCities } from '../infrastructure/city-catalog';
 
 @Injectable()
 export class PlacesService {
@@ -31,6 +32,14 @@ export class PlacesService {
 
   searchByDestination(query: string, destination: string): Promise<PlaceSearchCandidateDto[]> {
     return this.placeSearch.search(query, destination);
+  }
+
+  async searchCities(query: string, country: string, countryCode: string): Promise<PlaceSearchCandidateDto[]> {
+    const catalogCities = listCountryCities(countryCode, query).map((city) => ({ ...city, address: country }));
+    if (catalogCities.length > 0) return catalogCities;
+    const discovered = await this.placeSearch.search(query, country);
+    const cityTypes = new Set(['locality', 'administrative_area_level_1', 'administrative_area_level_2']);
+    return discovered.filter((candidate) => !candidate.primaryType || cityTypes.has(candidate.primaryType));
   }
 
   async list(tripId: string): Promise<SavedPlaceResponseDto[]> {

@@ -9,6 +9,7 @@ import { TripEntity } from '../domain/entities/trip.entity';
 import { TripListStatus } from './dto/list-trips-query.dto';
 import { UpdateTripDto } from './dto/update-trip.dto';
 import { EntitlementsService } from '../../entitlements/application/entitlements.service';
+import { TripRegionDto } from './dto/trip-region.dto';
 
 @Injectable()
 export class TripsService {
@@ -41,6 +42,7 @@ export class TripsService {
     await this.entitlements.assertCanCreateTrip();
     const entity = this.trips.create({
       ...input,
+      regions: normalizeRegions(input.regions ?? []),
       ownerId: this.identity.getCurrentUserId(),
       active: true,
       archivedAt: null,
@@ -59,7 +61,10 @@ export class TripsService {
     if (endDate < startDate) {
       throw new BadRequestException('endDate must be on or after startDate');
     }
-    Object.assign(entity, input);
+    Object.assign(entity, {
+      ...input,
+      ...(input.regions ? { regions: normalizeRegions(input.regions) } : {}),
+    });
     return TripResponseDto.fromEntity(await this.trips.save(entity));
   }
 
@@ -80,4 +85,27 @@ export class TripsService {
     }
     return entity;
   }
+}
+
+function normalizeRegions(regions: TripRegionDto[]) {
+  const seen = new Set<string>();
+  return regions.map((region) => {
+    const googlePlaceId = region.googlePlaceId?.trim() || null;
+    const name = region.name.trim();
+    const address = region.address?.trim() || null;
+    const hasLatitude = region.latitude !== null && region.latitude !== undefined;
+    const hasLongitude = region.longitude !== null && region.longitude !== undefined;
+    if (!name) throw new BadRequestException('Region name must not be empty');
+    if (hasLatitude !== hasLongitude) throw new BadRequestException('Region coordinates must include both latitude and longitude');
+    const key = googlePlaceId ?? `${name.toLocaleLowerCase()}|${address?.toLocaleLowerCase() ?? ''}`;
+    if (seen.has(key)) throw new BadRequestException('Duplicate trip region');
+    seen.add(key);
+    return {
+      googlePlaceId,
+      name,
+      address,
+      latitude: region.latitude ?? null,
+      longitude: region.longitude ?? null,
+    };
+  });
 }

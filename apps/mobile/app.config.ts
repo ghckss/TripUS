@@ -18,6 +18,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ...(androidGoogleMapsApiKey ? { androidGoogleMapsApiKey } : {}),
     },
   ]);
+  plugins.push("expo-sharing");
+  plugins.push([
+    "expo-media-library",
+    {
+      photosPermission: "TripUS가 여행 사진을 캐러셀에 배치할 수 있도록 사진 접근을 허용해 주세요.",
+      savePhotosPermission: "TripUS가 완성한 여행 캐러셀을 사진 앱에 저장하도록 허용해 주세요.",
+      isAccessMediaLocationEnabled: false,
+    },
+  ]);
 
   return {
     ...config,

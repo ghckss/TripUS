@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsDateString, IsInt, IsOptional, IsUUID, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 import { ItineraryItemEntity, ItinerarySource, VisitStatus } from '../../domain/entities/itinerary-item.entity';
 
@@ -29,6 +29,21 @@ export class ItineraryItemResponseDto {
   @ApiPropertyOptional({ type: Number, nullable: true })
   position!: number | null;
 
+  @ApiPropertyOptional({ type: String, example: '10:30', nullable: true })
+  scheduledTime!: string | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  durationMinutes!: number | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  activitySummary!: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  travelMethod!: string | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  travelDurationMinutes!: number | null;
+
   @ApiProperty({ type: Boolean })
   locked!: boolean;
 
@@ -54,6 +69,11 @@ export class ItineraryItemResponseDto {
       longitude: entity.savedPlace.longitude,
       date: entity.date,
       position: entity.position,
+      scheduledTime: entity.scheduledTime?.slice(0, 5) ?? null,
+      durationMinutes: entity.durationMinutes,
+      activitySummary: entity.activitySummary,
+      travelMethod: entity.travelMethod,
+      travelDurationMinutes: entity.travelDurationMinutes,
       locked: entity.locked,
       source: entity.source,
       visitStatus: entity.visitStatus,
@@ -97,6 +117,37 @@ export class ReplaceItineraryItemDto {
   @IsOptional()
   @IsBoolean()
   locked?: boolean;
+
+  @ApiPropertyOptional({ type: String, example: '10:30' })
+  @IsOptional()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  scheduledTime?: string;
+
+  @ApiPropertyOptional({ type: Number, minimum: 15, maximum: 720 })
+  @IsOptional()
+  @IsInt()
+  @Min(15)
+  @Max(720)
+  durationMinutes?: number;
+
+  @ApiPropertyOptional({ type: String, maxLength: 500 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  activitySummary?: string;
+
+  @ApiPropertyOptional({ type: String, maxLength: 120 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  travelMethod?: string;
+
+  @ApiPropertyOptional({ type: Number, minimum: 0, maximum: 720 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(720)
+  travelDurationMinutes?: number;
 }
 
 export class ReplaceItineraryDto {

@@ -64,7 +64,7 @@ export function LodgingSearchField({ destination, value, onChange }: LodgingSear
         testID="lodging-search-input"
         value={query}
       />
-      <Button label={searching ? "검색 중…" : "검색"} disabled={searching} onPress={() => void search()} />
+      <Button label={searching ? "검색 중…" : "검색"} disabled={searching} onPress={() => void search()} testID="lodging-search-button" />
     </View>
     {message && <AppText color={colors.muted}>{message}</AppText>}
     {results.map((candidate) => <Pressable

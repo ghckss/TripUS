@@ -9,6 +9,7 @@ import { CountrySelect } from "@/domains/trips/components/country-select";
 import { defaultTravelCountry, type TravelCountry } from "@/domains/trips/components/country-options";
 import { DateField } from "@/domains/trips/components/date-field";
 import { LodgingSearchField, type SelectedLodging } from "@/domains/trips/components/lodging-search-field";
+import { RegionMultiSelect, type SelectedRegion } from "@/domains/trips/components/region-multi-select";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
@@ -27,6 +28,7 @@ function initialDate(offset: number): string {
 export default function NewTripScreen() {
   const [title, setTitle] = useState("");
   const [country, setCountry] = useState<TravelCountry>(defaultTravelCountry);
+  const [regions, setRegions] = useState<SelectedRegion[]>([]);
   const [startDate, setStartDate] = useState(() => initialDate(0));
   const [endDate, setEndDate] = useState(() => initialDate(2));
   const [lodging, setLodging] = useState<SelectedLodging>();
@@ -38,6 +40,7 @@ export default function NewTripScreen() {
 
   const changeCountry = (next: TravelCountry) => {
     setCountry(next);
+    setRegions([]);
     setLodging(undefined);
   };
 
@@ -53,6 +56,7 @@ export default function NewTripScreen() {
       const trip = await createTrip({
         title: title.trim(),
         destination: country.name,
+        regions,
         timezone: country.timezone,
         startDate,
         endDate,
@@ -83,16 +87,17 @@ export default function NewTripScreen() {
 
   return <Screen>
     <AppText variant="title">어디로 떠나나요?</AppText>
-    <AppText color={colors.muted}>국가와 날짜를 선택하면 시간대를 자동으로 맞춰드려요.</AppText>
+    <AppText color={colors.muted}>국가와 여러 도시·지역을 선택해 여행 범위를 정해보세요.</AppText>
     <Card>
       <AppText variant="label">여행 이름</AppText>
       <TextInput testID="new-trip-title" value={title} onChangeText={setTitle} placeholder="예: 일본 단풍 여행" style={styles.input} />
       <AppText variant="label">여행 국가</AppText>
       <CountrySelect testID="new-trip-destination" value={country} onChange={changeCountry} />
       <AppText variant="caption" color={colors.muted}>시간대 · {country.timezone} (자동 설정)</AppText>
+      <RegionMultiSelect country={country} value={regions} onChange={setRegions} />
       <DateField label="출발일" testID="new-trip-start-date" value={startDate} onChange={changeStartDate} />
       <DateField label="종료일" testID="new-trip-end-date" value={endDate} minimumDate={startDate} onChange={setEndDate} />
-      <LodgingSearchField destination={country.name} value={lodging} onChange={setLodging} />
+      <LodgingSearchField destination={[...regions.map((region) => region.name), country.name].join(", ")} value={lodging} onChange={setLodging} />
     </Card>
     {limitReached && <Card>
       <AppText variant="heading">무료 여행 한도에 도달했어요</AppText>
@@ -100,7 +105,7 @@ export default function NewTripScreen() {
       <Button label="내 여행에서 확인" variant="ghost" onPress={() => router.replace("/(tabs)/trips")} />
     </Card>}
     {error && <AppText color={colors.danger}>{error}</AppText>}
-    <Button label={saving ? "여행 만드는 중…" : "여행 만들기"} disabled={saving || limitReached || !title.trim()} testID="new-trip-submit" onPress={() => void submit()} />
+    <Button label={saving ? "여행 만드는 중…" : "여행 만들기"} disabled={saving || limitReached || !title.trim() || regions.length === 0} testID="new-trip-submit" onPress={() => void submit()} />
   </Screen>;
 }
 

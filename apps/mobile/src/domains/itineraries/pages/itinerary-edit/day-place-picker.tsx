@@ -8,6 +8,7 @@ import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import type { ItineraryItem } from "../../api/itineraries.api";
+import { isLodgingPlace } from "./itinerary-lodging-endpoints";
 
 type DayPlacePickerProps = {
   tripId: string;
@@ -21,8 +22,8 @@ type DayPlacePickerProps = {
 
 export function DayPlacePicker({ tripId, date, dayIndex, items, places, onApply, onClose }: DayPlacePickerProps) {
   const [selected, setSelected] = useState<Set<string>>(() => {
-    const primaryLodgingId = places.find((place) => place.isPrimaryLodging)?.id;
-    return new Set(items.filter((item) => item.date === date && item.savedPlaceId !== primaryLodgingId).map((item) => item.savedPlaceId));
+    const lodgingIds = new Set(places.filter(isLodgingPlace).map((place) => place.id));
+    return new Set(items.filter((item) => item.date === date && !lodgingIds.has(item.savedPlaceId)).map((item) => item.savedPlaceId));
   });
   const [tab, setTab] = useState<"unplaced" | "all">("unplaced");
   const [availablePlaces, setAvailablePlaces] = useState(places);
@@ -34,7 +35,7 @@ export function DayPlacePicker({ tripId, date, dayIndex, items, places, onApply,
   const [message, setMessage] = useState<string>();
 
   const placedIds = new Set(items.map((item) => item.savedPlaceId));
-  const selectablePlaces = availablePlaces.filter((place) => !place.isPrimaryLodging);
+  const selectablePlaces = availablePlaces.filter((place) => !isLodgingPlace(place));
   const unplacedPlaces = selectablePlaces.filter((place) => !placedIds.has(place.id));
   const displayedPlaces = tab === "unplaced" ? unplacedPlaces : selectablePlaces;
   const toggle = (placeId: string) => {
