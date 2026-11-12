@@ -99,7 +99,7 @@ export function DraggableItineraryItem({
 }
 
 const styles = StyleSheet.create({
-  card: { height: 176, gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
+  card: { gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
   header: { minHeight: 40, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   dragSurface: { flex: 1, minHeight: 44, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   dragHandle: { width: 32, minHeight: 44, alignItems: "center", justifyContent: "center" },

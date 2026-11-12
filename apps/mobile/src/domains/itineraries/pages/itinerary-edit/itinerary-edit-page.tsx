@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
 import { Sortable, SortableItem, type SortableRenderItemProps } from "react-native-reanimated-dnd";
 
@@ -24,7 +24,7 @@ function dayLabel(date: string, index: number) {
   return { day: `Day ${index + 1}`, date: shortDate };
 }
 
-const ITINERARY_ITEM_HEIGHT = 184;
+const ESTIMATED_ITINERARY_ITEM_HEIGHT = 152;
 
 export default function ItineraryScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
@@ -37,6 +37,7 @@ export default function ItineraryScreen() {
   const reorderCommitTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [activeDate, setActiveDate] = useState<string>();
   const [mapAnimationPaused, setMapAnimationPaused] = useState(false);
+  const [measuredSortable, setMeasuredSortable] = useState({ signature: "", height: 0 });
   const [mapFocusTarget, setMapFocusTarget] = useState<{ itemId: string; request: number }>();
   const [placePickerDay, setPlacePickerDay] = useState<{ date: string; index: number }>();
   const [lodgingPicker, setLodgingPicker] = useState<{ current: SavedPlace; date: string; dayIndex: number; edge: LodgingEdge }>();
@@ -61,6 +62,14 @@ export default function ItineraryScreen() {
   const movableStartIndex = hasFixedStart ? 1 : 0;
   const movableEndIndex = hasFixedEnd ? items.length - 1 : items.length;
   const movableItems = items.slice(movableStartIndex, movableEndIndex);
+  const movableSignature = movableItems.map(({ id }) => id).join("|");
+  const sortableHeight = measuredSortable.signature === movableSignature
+    ? measuredSortable.height
+    : movableItems.length * ESTIMATED_ITINERARY_ITEM_HEIGHT;
+  const handleHeightsMeasured = useCallback((heights: Record<string, number>) => {
+    const height = Object.values(heights).reduce((total, itemHeight) => total + itemHeight, 0);
+    setMeasuredSortable({ signature: movableSignature, height });
+  }, [movableSignature]);
 
   const focusPlaceOnMap = (itemId: string) => {
     setMapFocusTarget((current) => ({ itemId, request: (current?.request ?? 0) + 1 }));
@@ -144,13 +153,15 @@ export default function ItineraryScreen() {
           activitySummary={items[0].activitySummary}
         />}
         {movableItems.length > 0 && <View
-          style={[styles.sortableViewport, { height: movableItems.length * ITINERARY_ITEM_HEIGHT }]}
+          style={[styles.sortableViewport, { height: sortableHeight }]}
           testID="itinerary-sortable-list"
         >
           <Sortable
             contentContainerStyle={styles.sortableContent}
             data={movableItems}
-            itemHeight={ITINERARY_ITEM_HEIGHT}
+            enableDynamicHeights
+            estimatedItemHeight={ESTIMATED_ITINERARY_ITEM_HEIGHT}
+            onHeightsMeasured={handleHeightsMeasured}
             style={styles.sortableList}
             useFlatList
             renderItem={(props: SortableRenderItemProps<ItineraryItem>) => {
@@ -161,7 +172,6 @@ export default function ItineraryScreen() {
                 data={item}
                 id={id}
                 key={id}
-                itemHeight={ITINERARY_ITEM_HEIGHT}
                 onDragStart={startItemDrag}
                 onDrop={(_, targetIndex) => {
                   endItemDrag();
@@ -235,6 +245,6 @@ const styles = StyleSheet.create({
   sortableViewport: { zIndex: 2, elevation: 2, overflow: "visible" },
   sortableList: { flex: 1, overflow: "visible", backgroundColor: "transparent" },
   sortableContent: { overflow: "visible" },
-  sortableItem: { height: ITINERARY_ITEM_HEIGHT, paddingBottom: spacing.sm, overflow: "visible" },
+  sortableItem: { paddingBottom: spacing.sm, overflow: "visible" },
   undoMessage: { marginTop: -spacing.sm, textAlign: "center" },
 });
