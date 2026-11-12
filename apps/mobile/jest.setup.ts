@@ -31,9 +31,9 @@ jest.mock("react-native-reanimated", () => {
 jest.mock("react-native-reanimated-dnd", () => {
   const React = require("react");
   const { View } = require("react-native");
-  const Sortable = ({ data, renderItem }: Record<string, any>) => React.createElement(
+  const Sortable = ({ data, renderItem, useFlatList }: Record<string, any>) => React.createElement(
     View,
-    null,
+    { testID: "mock-sortable", testUseFlatList: useFlatList },
     data.map((item: Record<string, unknown>, index: number) => renderItem({
       item,
       index,

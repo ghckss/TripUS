@@ -24,7 +24,10 @@ function dayLabel(date: string, index: number) {
   return { day: `Day ${index + 1}`, date: shortDate };
 }
 
-const ESTIMATED_ITINERARY_ITEM_HEIGHT = 152;
+// A two-line description produces the tallest supported card. Starting from
+// that upper bound prevents items from overlapping before native measurement
+// reports their exact content height.
+const ESTIMATED_ITINERARY_ITEM_HEIGHT = 180;
 
 export default function ItineraryScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
@@ -163,7 +166,7 @@ export default function ItineraryScreen() {
             estimatedItemHeight={ESTIMATED_ITINERARY_ITEM_HEIGHT}
             onHeightsMeasured={handleHeightsMeasured}
             style={styles.sortableList}
-            useFlatList
+            useFlatList={false}
             renderItem={(props: SortableRenderItemProps<ItineraryItem>) => {
               const { id, index, item, ...sortableProps } = props;
               const placeIndex = index + movableStartIndex;

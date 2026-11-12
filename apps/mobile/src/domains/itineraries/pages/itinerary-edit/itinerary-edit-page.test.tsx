@@ -176,6 +176,7 @@ describe("ItineraryScreen day editing", () => {
     expect(screen.getByText("이동 · 방법 미정 · 시간 미정")).toBeOnTheScreen();
     expect(screen.getByText("도착 미정 · 소요 미정")).toBeOnTheScreen();
     expect(screen.getByText("상세 설명이 아직 없어요.")).toBeOnTheScreen();
+    expect(screen.getByTestId("mock-sortable").props.testUseFlatList).toBe(false);
   });
 
   it("does not show transit or external directions actions between visits", async () => {
