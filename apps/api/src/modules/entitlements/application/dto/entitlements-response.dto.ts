@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 import { SubscriptionTier } from '../../../users/domain/entities/user.entity';
+import { BillingProvider } from '../../../../config/environment';
 
 export class EntitlementsResponseDto {
   @ApiProperty({ enum: SubscriptionTier, enumName: 'SubscriptionTier' })
@@ -17,4 +18,7 @@ export class EntitlementsResponseDto {
 
   @ApiProperty({ example: 0, type: Number })
   aiGenerationsUsed!: number;
+
+  @ApiProperty({ enum: BillingProvider, enumName: 'BillingProvider' })
+  upgradeMode!: BillingProvider;
 }

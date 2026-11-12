@@ -1,4 +1,4 @@
-import { Controller, Get, Inject } from '@nestjs/common';
+import { Controller, Get, Inject, Post } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
 import { EntitlementsService } from '../application/entitlements.service';
@@ -13,5 +13,11 @@ export class EntitlementsController {
   @ApiOkResponse({ type: EntitlementsResponseDto })
   get(): Promise<EntitlementsResponseDto> {
     return this.entitlements.get();
+  }
+
+  @Post('upgrade')
+  @ApiOkResponse({ type: EntitlementsResponseDto })
+  upgrade(): Promise<EntitlementsResponseDto> {
+    return this.entitlements.upgrade();
   }
 }

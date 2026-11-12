@@ -9,3 +9,9 @@ export async function getEntitlements(): Promise<Entitlements> {
   if (error) throw new Error(apiErrorMessage(error));
   return data;
 }
+
+export async function upgradePlan(): Promise<Entitlements> {
+  const { data, error } = await tripUsApi.POST('/v1/me/entitlements/upgrade');
+  if (error) throw new Error(apiErrorMessage(error));
+  return data;
+}

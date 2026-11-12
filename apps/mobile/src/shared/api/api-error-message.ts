@@ -29,6 +29,7 @@ const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   PHOTO_TOO_LARGE: "사진 한 장은 100MB보다 작아야 해요.",
   PHOTO_VARIANT_NOT_FOUND: "요청한 사진을 찾을 수 없어요.",
   PLACE_PROVIDER_UNAVAILABLE: "장소 검색 서비스에 잠시 연결할 수 없어요.",
+  PLAN_UPGRADE_UNAVAILABLE: "현재는 Plus 업그레이드를 진행할 수 없어요.",
   RATE_LIMITED: "요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",
   REFRESH_TOKEN_INVALID: "로그인이 만료되었어요. 다시 로그인해 주세요.",
   REFRESH_TOKEN_USER_UNAVAILABLE: "사용자 정보를 확인할 수 없어요. 다시 로그인해 주세요.",

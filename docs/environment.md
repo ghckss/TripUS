@@ -52,6 +52,9 @@ PHOTO_S3_BUCKET=
 AWS_REGION=ap-northeast-2
 PHOTO_S3_ENDPOINT=
 
+# 로컬 Plus 전환 테스트 전용. 배포 환경에서는 disabled를 사용한다.
+BILLING_PROVIDER=mock
+
 AUTH_MODE=development
 ACCESS_TOKEN_SECRET=tripus-development-secret-change-me
 ACCESS_TOKEN_ISSUER=tripus-api
@@ -86,6 +89,8 @@ GOOGLE_MAPS_ANDROID_API_KEY=<Android 앱 제한 키>
 3000 포트를 다른 프로그램이 사용하면 API의 `PORT`와 `API_PUBLIC_URL`, 모바일의 `EXPO_PUBLIC_API_URL`을 같은 포트로 함께 바꾼다. 예를 들어 API는 `3001`, iOS Simulator는 `http://127.0.0.1:3001`, Android Emulator는 `http://10.0.2.2:3001`을 사용한다.
 
 ## 실제 외부 서비스 활성화
+
+`BILLING_PROVIDER=mock`은 스토어 결제 없이 Plus 권한 전환 흐름을 확인하는 로컬 테스트 전용 값이다. 기본값과 AWS 배포값은 `disabled`이며, 실제 출시 전 App Store·Google Play 영수증 검증 공급자로 교체해야 한다.
 
 OpenAI 일정 생성을 켤 때는 API에만 다음 값을 둔다. `OPENAI_API_KEY`를 모바일 환경 변수에 넣으면 안 된다.
 

@@ -1,4 +1,5 @@
-import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -6,6 +7,7 @@ import { IDENTITY_PORT, type IdentityPort } from '../../identity/domain/identity
 import { TripEntity } from '../../trips/domain/entities/trip.entity';
 import { SubscriptionTier, UserEntity } from '../../users/domain/entities/user.entity';
 import { EntitlementsResponseDto } from './dto/entitlements-response.dto';
+import { BillingProvider } from '../../../config/environment';
 
 const FREE_TRIP_LIMIT = 1;
 const FREE_AI_GENERATION_LIMIT = 1;
@@ -16,6 +18,7 @@ export class EntitlementsService {
     @InjectRepository(UserEntity) private readonly users: Repository<UserEntity>,
     @InjectRepository(TripEntity) private readonly trips: Repository<TripEntity>,
     @Inject(IDENTITY_PORT) private readonly identity: IdentityPort,
+    @Inject(ConfigService) private readonly config: ConfigService,
   ) {}
 
   async get(): Promise<EntitlementsResponseDto> {
@@ -32,7 +35,21 @@ export class EntitlementsService {
       tripCount,
       aiGenerationLimit: plus ? null : FREE_AI_GENERATION_LIMIT,
       aiGenerationsUsed: user.successfulAiGenerations,
+      upgradeMode: this.config.get<BillingProvider>('BILLING_PROVIDER', BillingProvider.Disabled),
     };
+  }
+
+  async upgrade(): Promise<EntitlementsResponseDto> {
+    if (this.config.get<BillingProvider>('BILLING_PROVIDER', BillingProvider.Disabled) !== BillingProvider.Mock) {
+      throw new ServiceUnavailableException({ code: 'PLAN_UPGRADE_UNAVAILABLE' });
+    }
+    const userId = this.identity.getCurrentUserId();
+    const user = await this.users.findOneBy({ id: userId });
+    if (!user) throw new UnauthorizedException('Authenticated user is unavailable');
+    if (user.subscriptionTier !== SubscriptionTier.Plus) {
+      await this.users.update({ id: userId }, { subscriptionTier: SubscriptionTier.Plus });
+    }
+    return this.get();
   }
 
   async assertCanCreateTrip(): Promise<void> {

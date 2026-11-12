@@ -21,6 +21,11 @@ export enum PhotoStorageProvider {
   S3 = 's3',
 }
 
+export enum BillingProvider {
+  Disabled = 'disabled',
+  Mock = 'mock',
+}
+
 export function validateEnvironment(
   environment: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -105,6 +110,13 @@ export function validateEnvironment(
       throw new Error('AWS_REGION is required when PHOTO_STORAGE_PROVIDER=s3');
     }
   }
+  const billingProvider = environment.BILLING_PROVIDER ?? BillingProvider.Disabled;
+  if (!Object.values(BillingProvider).includes(billingProvider as BillingProvider)) {
+    throw new Error('BILLING_PROVIDER must be disabled or mock');
+  }
+  if (environment.NODE_ENV === 'production' && billingProvider === BillingProvider.Mock) {
+    throw new Error('BILLING_PROVIDER=mock is not allowed in production');
+  }
 
   return {
     ...environment,
@@ -123,6 +135,7 @@ export function validateEnvironment(
     OPENAI_MAX_RETRIES: openAiMaxRetries,
     OPENAI_MAX_OUTPUT_TOKENS: openAiMaxOutputTokens,
     PHOTO_STORAGE_PROVIDER: photoStorageProvider,
+    BILLING_PROVIDER: billingProvider,
     PHOTO_LOCAL_DIRECTORY: environment.PHOTO_LOCAL_DIRECTORY ?? '.data/photos',
     API_PUBLIC_URL: environment.API_PUBLIC_URL ?? `http://localhost:${port}`,
     PORT: port,

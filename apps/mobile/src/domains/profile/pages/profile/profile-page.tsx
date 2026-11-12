@@ -24,6 +24,7 @@ export default function ProfileScreen() {
         <AppText color={colors.muted}>AI 일정 생성 {entitlements.aiGenerationsUsed}{entitlements.aiGenerationLimit === null ? "회" : `/${entitlements.aiGenerationLimit}회`}</AppText>
       </>}
       <AppText variant="caption" color={colors.muted}>원본 사진 저장 용량은 플랜과 관계없이 제한하지 않아요.</AppText>
+      {entitlements?.tier === "free" && <Button label="Plus 알아보기" variant="secondary" testID="profile-upgrade-plan" onPress={() => router.push("/profile/upgrade")} />}
     </Card>
     <Button label="로그아웃" variant="ghost" onPress={() => void logout().finally(() => router.replace("/(auth)/login"))} />
   </Screen>;

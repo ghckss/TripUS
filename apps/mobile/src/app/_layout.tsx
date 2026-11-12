@@ -37,6 +37,7 @@ export default function RootLayout() {
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="save-place" options={{ title: "장소 저장" }} />
+            <Stack.Screen name="profile/upgrade" options={{ title: "Plus 플랜" }} />
             <Stack.Screen name="trips/new" options={{ title: "새 여행" }} />
             <Stack.Screen name="trips/[tripId]/index" options={{ title: "여행" }} />
             <Stack.Screen name="trips/[tripId]/edit" options={{ title: "여행 수정" }} />

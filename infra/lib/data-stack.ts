@@ -189,6 +189,7 @@ export class DataStack extends Stack {
         secretStringTemplate: JSON.stringify({
           AI_PLANNER_PROVIDER: config.aiPlannerProvider,
           AUTH_MODE: config.authMode,
+          BILLING_PROVIDER: 'disabled',
           MAPS_PROVIDER: config.mapsProvider,
         }),
       },

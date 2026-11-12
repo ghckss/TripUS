@@ -261,9 +261,71 @@
         ]
       }
     },
+    "/v1/trips/{tripId}/routes/transit": {
+      "post": {
+        "operationId": "RoutesController_transit",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitRouteRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransitRouteResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "routes"
+        ]
+      }
+    },
     "/v1/me/entitlements": {
       "get": {
         "operationId": "EntitlementsController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntitlementsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "entitlements"
+        ]
+      }
+    },
+    "/v1/me/entitlements/upgrade": {
+      "post": {
+        "operationId": "EntitlementsController_upgrade",
         "parameters": [],
         "responses": {
           "200": {
@@ -610,47 +672,6 @@
         },
         "tags": [
           "places"
-        ]
-      }
-    },
-    "/v1/trips/{tripId}/routes/transit": {
-      "post": {
-        "operationId": "RoutesController_transit",
-        "parameters": [
-          {
-            "name": "tripId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TransitRouteRequestDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TransitRouteResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "routes"
         ]
       }
     },
@@ -1573,11 +1594,73 @@
           "itinerary"
         ]
       },
+      "TransitRouteRequestDto": {
+        "type": "object",
+        "properties": {
+          "originSavedPlaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "destinationSavedPlaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "departureTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "originSavedPlaceId",
+          "destinationSavedPlaceId"
+        ]
+      },
+      "TransitRouteStatus": {
+        "type": "string",
+        "enum": [
+          "available",
+          "unavailable"
+        ]
+      },
+      "TransitRouteResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransitRouteStatus"
+              }
+            ]
+          },
+          "durationMinutes": {
+            "type": "number",
+            "nullable": true
+          },
+          "distanceMeters": {
+            "type": "number",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
       "SubscriptionTier": {
         "type": "string",
         "enum": [
           "free",
           "plus"
+        ]
+      },
+      "BillingProvider": {
+        "type": "string",
+        "enum": [
+          "disabled",
+          "mock"
         ]
       },
       "EntitlementsResponseDto": {
@@ -1607,6 +1690,13 @@
           "aiGenerationsUsed": {
             "type": "number",
             "example": 0
+          },
+          "upgradeMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BillingProvider"
+              }
+            ]
           }
         },
         "required": [
@@ -1614,7 +1704,8 @@
           "tripLimit",
           "tripCount",
           "aiGenerationLimit",
-          "aiGenerationsUsed"
+          "aiGenerationsUsed",
+          "upgradeMode"
         ]
       },
       "PlaceTag": {
@@ -1882,61 +1973,6 @@
         },
         "required": [
           "placeIds"
-        ]
-      },
-      "TransitRouteRequestDto": {
-        "type": "object",
-        "properties": {
-          "originSavedPlaceId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "destinationSavedPlaceId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "departureTime": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "originSavedPlaceId",
-          "destinationSavedPlaceId"
-        ]
-      },
-      "TransitRouteStatus": {
-        "type": "string",
-        "enum": [
-          "available",
-          "unavailable"
-        ]
-      },
-      "TransitRouteResponseDto": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/TransitRouteStatus"
-              }
-            ]
-          },
-          "durationMinutes": {
-            "type": "number",
-            "nullable": true
-          },
-          "distanceMeters": {
-            "type": "number",
-            "nullable": true
-          },
-          "reason": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "status"
         ]
       },
       "TripListStatus": {
