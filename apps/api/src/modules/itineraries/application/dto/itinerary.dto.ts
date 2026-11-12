@@ -4,8 +4,13 @@ import { IsArray, IsBoolean, IsDateString, IsInt, IsOptional, IsString, IsUUID, 
 
 import { ItineraryItemEntity, ItinerarySource, VisitStatus } from '../../domain/entities/itinerary-item.entity';
 
+export enum ItineraryBoundaryType {
+  StartPoint = 'start_point',
+  EndPoint = 'end_point',
+}
+
 export class ItineraryItemResponseDto {
-  @ApiProperty({ type: String, format: 'uuid' })
+  @ApiProperty({ type: String })
   id!: string;
 
   @ApiProperty({ type: String, format: 'uuid' })
@@ -59,6 +64,9 @@ export class ItineraryItemResponseDto {
   @ApiPropertyOptional({ type: String, nullable: true })
   review!: string | null;
 
+  @ApiPropertyOptional({ enum: ItineraryBoundaryType, enumName: 'ItineraryBoundaryType', nullable: true })
+  boundaryType?: ItineraryBoundaryType | null;
+
   static fromEntity(entity: ItineraryItemEntity): ItineraryItemResponseDto {
     return {
       id: entity.id,
@@ -79,6 +87,7 @@ export class ItineraryItemResponseDto {
       visitStatus: entity.visitStatus,
       rating: entity.rating,
       review: entity.review,
+      boundaryType: null,
     };
   }
 }

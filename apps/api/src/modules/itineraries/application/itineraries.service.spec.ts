@@ -4,7 +4,32 @@ import { describe, expect, it, vi } from 'vitest';
 import { PlacePreference, PlaceTag, type SavedPlaceEntity } from '../../places/domain/entities/saved-place.entity';
 import type { TripEntity } from '../../trips/domain/entities/trip.entity';
 import { ItineraryItemEntity } from '../domain/entities/itinerary-item.entity';
-import { ItinerariesService } from './itineraries.service';
+import { addTripBoundaryPoints, ItinerariesService } from './itineraries.service';
+
+describe('trip boundary itinerary items', () => {
+  it('adds the configured start first and configured end last', () => {
+    const items = [
+      { id: 'visit-1', savedPlaceId: 'place-1', placeName: '경복궁', date: '2026-11-08', position: 0 },
+      { id: 'visit-2', savedPlaceId: 'place-2', placeName: '서울숲', date: '2026-11-10', position: 0 },
+    ] as never;
+    const result = addTripBoundaryPoints(items, {
+      id: '10000000-0000-4000-8000-000000000001',
+      startDate: '2026-11-08',
+      endDate: '2026-11-10',
+      startPoint: { googlePlaceId: 'airport-1', name: '인천공항 제1터미널', address: '인천', latitude: 37.46, longitude: 126.44, time: '09:30' },
+      endPoint: { googlePlaceId: 'airport-2', name: '인천공항 제2터미널', address: '인천', latitude: 37.46, longitude: 126.43, time: '18:00' },
+    });
+
+    expect(result.filter((item) => item.date === '2026-11-08').map((item) => [item.boundaryType, item.placeName, item.position])).toEqual([
+      ['start_point', '인천공항 제1터미널', 0],
+      [undefined, '경복궁', 1],
+    ]);
+    expect(result.filter((item) => item.date === '2026-11-10').map((item) => [item.boundaryType, item.placeName, item.position])).toEqual([
+      [undefined, '서울숲', 0],
+      ['end_point', '인천공항 제2터미널', 1],
+    ]);
+  });
+});
 
 describe('ItinerariesService', () => {
   it('does not expose lodging as an unplaced travel place', async () => {
@@ -14,7 +39,9 @@ describe('ItinerariesService', () => {
       { id: '20000000-0000-4000-8000-000000000001', tripId, name: '감천문화마을', tag: PlaceTag.Attraction, preference: PlacePreference.MustVisit, isPrimaryLodging: false },
       { id: '20000000-0000-4000-8000-000000000002', tripId, name: '기본 호텔', tag: PlaceTag.Lodging, preference: PlacePreference.WantToVisit, isPrimaryLodging: true },
     ]) };
-    const trips = { findOneBy: vi.fn().mockResolvedValue({ id: tripId, active: true }) };
+    const trips = { findOneBy: vi.fn().mockResolvedValue({
+      id: tripId, active: true, startDate: '2026-11-08', endDate: '2026-11-10', startPoint: null, endPoint: null,
+    }) };
     const identity = { getCurrentUserId: vi.fn().mockReturnValue('user-1') };
 
     const service = new ItinerariesService(
@@ -39,7 +66,9 @@ describe('ItinerariesService', () => {
       countBy: vi.fn().mockResolvedValue(1),
       find: vi.fn().mockResolvedValue([]),
     };
-    const trips = { findOneBy: vi.fn().mockResolvedValue({ id: tripId, active: true, startDate: '2026-11-08', endDate: '2026-11-10' }) };
+    const trips = { findOneBy: vi.fn().mockResolvedValue({
+      id: tripId, active: true, startDate: '2026-11-08', endDate: '2026-11-10', startPoint: null, endPoint: null,
+    }) };
     const manager = {
       create: vi.fn((_entity: typeof ItineraryItemEntity, value: Partial<ItineraryItemEntity>) => value as ItineraryItemEntity),
       delete: vi.fn().mockResolvedValue(undefined),

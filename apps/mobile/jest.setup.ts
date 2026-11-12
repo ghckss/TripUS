@@ -94,8 +94,18 @@ jest.mock("react-native-maps", () => {
       callback?.(this.value);
     }
 
-    timing() {
-      return { start: jest.fn(), stop: jest.fn(), reset: jest.fn() };
+    timing(config: Record<string, number>) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      return {
+        start: jest.fn((callback?: (result: { finished: boolean }) => void) => {
+          timer = setTimeout(() => {
+            this.value = { ...this.value, latitude: config.latitude, longitude: config.longitude };
+            callback?.({ finished: true });
+          }, config.duration ?? 0);
+        }),
+        stop: jest.fn(() => { if (timer) clearTimeout(timer); }),
+        reset: jest.fn(),
+      };
     }
   }
 

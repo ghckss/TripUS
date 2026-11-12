@@ -20,6 +20,7 @@ function createService() {
   const places = {
     create: vi.fn((value: Partial<SavedPlaceEntity>) => value as SavedPlaceEntity),
     find: vi.fn(),
+    findBy: vi.fn(),
     findOneBy: vi.fn(),
     remove: vi.fn(),
     save: vi.fn(),
@@ -156,5 +157,32 @@ describe('PlacesService', () => {
 
     expect(trips.findOneBy).toHaveBeenCalledWith({ id: tripId, ownerId: userId, active: true });
     expect(places.remove).toHaveBeenCalledWith(place);
+  });
+
+  it('deletes multiple saved places after validating all IDs belong to the trip', async () => {
+    const { places, service, trips } = createService();
+    const selected = [
+      { id: '20000000-0000-4000-8000-000000000001', tripId },
+      { id: '20000000-0000-4000-8000-000000000002', tripId },
+    ] as SavedPlaceEntity[];
+    trips.findOneBy.mockResolvedValue({ id: tripId });
+    places.findBy.mockResolvedValue(selected);
+
+    await service.removeMany(tripId, selected.map((place) => place.id));
+
+    expect(places.findBy).toHaveBeenCalledOnce();
+    expect(places.remove).toHaveBeenCalledWith(selected);
+  });
+
+  it('does not partially delete when a selected place is missing', async () => {
+    const { places, service, trips } = createService();
+    trips.findOneBy.mockResolvedValue({ id: tripId });
+    places.findBy.mockResolvedValue([{ id: '20000000-0000-4000-8000-000000000001', tripId }]);
+
+    await expect(service.removeMany(tripId, [
+      '20000000-0000-4000-8000-000000000001',
+      '20000000-0000-4000-8000-000000000002',
+    ])).rejects.toBeInstanceOf(NotFoundException);
+    expect(places.remove).not.toHaveBeenCalled();
   });
 });

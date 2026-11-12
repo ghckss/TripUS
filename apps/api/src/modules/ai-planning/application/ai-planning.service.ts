@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,19 +15,21 @@ import {
   AiPlannerError,
   type AiPlannerDay,
   type AiPlannerLodging,
+  type AiPlannerInput,
   type AiPlannerOutput,
   type AiPlannerPort,
   AI_PLANNING_TASK,
   TRAVEL_STYLE_POLICIES,
+  TravelStyle,
 } from '../domain/ai-planner.port';
 import { AiPlanGenerationStatus, GenerateAiPlanResponseDto } from './dto/generate-ai-plan.dto';
 import { AiPlanningRateLimiter } from './ai-planning-rate-limiter';
 import { EntitlementsService } from '../../entitlements/application/entitlements.service';
-import { TripDaySettingsService } from '../../trip-day-settings/application/trip-day-settings.service';
 import { PlacePreference, PlaceTag } from '../../places/domain/entities/saved-place.entity';
 import { PLACE_SEARCH_PORT, type PlaceSearchCandidate, type PlaceSearchPort } from '../../places/domain/place-search.port';
 import { ROUTES_PORT, type RoutesPort } from '../../routes/domain/routes.port';
 import { AiTransportMode, type GenerateAiPlanDto } from './dto/generate-ai-plan.dto';
+import { writeStructuredLog } from '../../../common/http/json-logger';
 
 type PlannedPlacement = {
   savedPlaceId: string;
@@ -39,6 +43,12 @@ type PlannedPlacement = {
   travelDurationMinutes?: number;
 };
 
+const MAX_PLANNER_ATTEMPTS = 3;
+const MAX_MATERIALIZATION_ATTEMPTS = 2;
+const DEFAULT_DAY_START_MINUTES = 9 * 60;
+const DEFAULT_DAY_END_MINUTES = 21 * 60;
+const BOUNDARY_TRANSITION_BUFFER_MINUTES = 60;
+
 @Injectable()
 export class AiPlanningService {
   private readonly logger = new Logger(AiPlanningService.name);
@@ -50,13 +60,14 @@ export class AiPlanningService {
     @Inject(IDENTITY_PORT) private readonly identity: IdentityPort,
     @Inject(AiPlanningRateLimiter) private readonly rateLimiter: AiPlanningRateLimiter,
     @Inject(EntitlementsService) private readonly entitlements: EntitlementsService,
-    @Inject(TripDaySettingsService) private readonly daySettings: TripDaySettingsService,
     @Inject(PLACE_SEARCH_PORT) private readonly placeSearch: PlaceSearchPort,
     @Inject(ROUTES_PORT) private readonly routes: RoutesPort,
   ) {}
 
   async generate(tripId: string, request: GenerateAiPlanDto): Promise<GenerateAiPlanResponseDto> {
     const { style } = request;
+    const generationId = randomUUID();
+    const startedAt = performance.now();
     this.rateLimiter.assertAllowed(this.identity.getCurrentUserId());
     await this.entitlements.assertCanGenerateAiPlan();
     const trip = await this.trips.findOneBy({ id: tripId, ownerId: this.identity.getCurrentUserId(), active: true });
@@ -67,24 +78,37 @@ export class AiPlanningService {
     const placesById = new Map(places.map((place) => [place.id, place]));
     const locked = current.items.filter((item) =>
       item.locked
+      && !item.boundaryType
       && item.date !== null
       && item.position !== null
       && placesById.get(item.savedPlaceId)?.tag !== PlaceTag.Lodging,
     );
     const lockedIds = new Set(locked.map((item) => item.savedPlaceId));
+    const previousAiRecommendations = places.filter(isAiRecommendedPlace);
     const selectedRegions = trip.regions ?? [];
     const planningPlaces = places.filter((place) =>
       place.tag !== PlaceTag.Lodging
       && !lockedIds.has(place.id)
+      && !isAiRecommendedPlace(place)
       && isSavedPlaceWithinSelectedRegions(place, selectedRegions),
     );
-    if (planningPlaces.length === 0) throw new BadRequestException('Save at least one non-lodging place within the selected regions before generating an itinerary');
     if (planningPlaces.length > 100) throw new BadRequestException('AI planning supports at most 100 saved places');
-    const settings = await this.daySettings.get(tripId);
-    const days = buildPlannerDays(settings, current.items, places, primaryLodging);
+    const days = applyDailyPlanningTargets(
+      buildPlannerDays(enumerateTripDates(trip.startDate, trip.endDate), current.items, places, primaryLodging),
+      style,
+      trip.startPoint?.time ?? null,
+      trip.endPoint?.time ?? null,
+    );
     let createdRecommendationEntities: SavedPlaceEntity[] = [];
     try {
-      const output = await this.planner.generate({
+      writeStructuredLog('info', 'ai.generation.started', {
+        generationId,
+        tripId,
+        dayCount: days.length,
+        savedPlaceCount: planningPlaces.length,
+        style,
+      });
+      const plannerInput: AiPlannerInput = {
         task: AI_PLANNING_TASK,
         trip: {
           title: trip.title,
@@ -93,6 +117,8 @@ export class AiPlanningService {
           timezone: trip.timezone,
           startDate: trip.startDate,
           endDate: trip.endDate,
+          startPoint: trip.startPoint ?? null,
+          endPoint: trip.endPoint ?? null,
         },
         style: TRAVEL_STYLE_POLICIES[style],
         travelerContext: {
@@ -114,41 +140,125 @@ export class AiPlanningService {
         })),
         days,
         lockedPlacements: locked.map((item) => ({ savedPlaceId: item.savedPlaceId, date: item.date!, position: item.position! })),
-      });
+        priorRecommendations: previousAiRecommendations.map((place) => place.name),
+      };
+      let output = await this.planner.generate(plannerInput);
+      const allowedPlannerPlaceIds = new Set(planningPlaces.map((place) => place.id));
+      for (let attempt = 1; attempt < MAX_PLANNER_ATTEMPTS; attempt += 1) {
+        const outputContractIssues = assessRawOutputContract(allowedPlannerPlaceIds, output);
+        const coverageIssues = assessRawDayCoverage(days, output, style, allowedPlannerPlaceIds);
+        if (outputContractIssues.length === 0 && coverageIssues.length === 0) break;
+        writeStructuredLog('warn', 'ai.generation.draft_revision', {
+          generationId,
+          tripId,
+          attempt,
+          maxAttempts: MAX_PLANNER_ATTEMPTS,
+          contractIssues: outputContractIssues,
+          underfilledDates: coverageIssues,
+        });
+        const revisionGuidance = [
+          ...(outputContractIssues.includes('unknown_placement_ids')
+            ? ['Every placements.savedPlaceId must exactly match an ID from places. Never create or guess an ID.']
+            : []),
+          ...(outputContractIssues.includes('recommendations_required')
+            ? ['The places array is empty. Return placements as [] and put every concrete itinerary visit in recommendations.']
+            : []),
+          ...(coverageIssues.length > 0
+            ? [
+              `The previous draft is still too short on: ${coverageIssues.join(', ')}.`,
+              `Required totals by date are: ${formatCoverageTargets(days, coverageIssues, style)}.`,
+              'Update the entire itinerary by adding nearby recommendations, meals, cafes, and activities so each listed date reaches that total without rushing.',
+              'Keep previous recommendations that are still optimal, but add or replace places as needed. Return the complete revised itinerary, not only the added visits.',
+            ]
+            : []),
+        ];
+        output = await this.planner.generate({
+          ...plannerInput,
+          revisionGuidance: revisionGuidance.join(' '),
+        });
+      }
       this.logger.log(
         `AI itinerary generated placements=${output.placements.length} recommendations=${output.recommendations.length}`
         + (output.usage ? ` inputTokens=${output.usage.inputTokens} outputTokens=${output.usage.outputTokens}` : ''),
       );
       const validDates = new Set(days.map((day) => day.date));
-      const materialized = await this.materializeRecommendations(
-        trip.id,
-        trip.destination,
-        selectedRegions,
-        output.recommendations,
-        places,
-        validDates,
-      );
-      createdRecommendationEntities = materialized.created;
-      const recommended = materialized.placements;
-      this.logger.log(`AI recommendations materialized received=${output.recommendations.length} saved=${recommended.length}`);
-      const allowed = new Set([...planningPlaces.map((place) => place.id), ...recommended.map((item) => item.savedPlaceId)]);
-      const generated = normalizeGeneratedPlacements(output.placements, allowed, validDates);
-      const verifiedPlanBs = await this.verifyPlanBs(output.planBs, trip.destination, selectedRegions, validDates);
-      const qualityIssues = assessPlanQuality({
-        days,
-        style: TRAVEL_STYLE_POLICIES[style],
-        planningPlaces,
-        generated,
-        recommended,
-        locked,
-        output,
-        verifiedPlanBs,
-        recommendedPlaces: materialized.created,
-      });
-      if (qualityIssues.length > 0) {
+      let materialized: Awaited<ReturnType<AiPlanningService['materializeRecommendations']>>;
+      let generated: PlannedPlacement[];
+      let qualityIssues: string[];
+      for (let materializationAttempt = 1; ; materializationAttempt += 1) {
+        materialized = await this.materializeRecommendations(
+          trip.id,
+          trip.destination,
+          selectedRegions,
+          output.recommendations,
+          places,
+          validDates,
+        );
+        createdRecommendationEntities = materialized.created;
+        const allowed = new Set([...planningPlaces.map((place) => place.id), ...materialized.placements.map((item) => item.savedPlaceId)]);
+        generated = normalizeGeneratedPlacements(output.placements, allowed, validDates);
+        qualityIssues = assessPlanQuality({
+          days,
+          style,
+          planningPlaces,
+          generated,
+          recommended: materialized.placements,
+          locked,
+          output,
+        });
+        const repairableIssues = qualityIssues.filter(isRepairableQualityIssue);
+        if (repairableIssues.length === 0 || materializationAttempt >= MAX_MATERIALIZATION_ATTEMPTS) break;
+
+        writeStructuredLog('warn', 'ai.generation.materialization_revision', {
+          generationId,
+          tripId,
+          attempt: materializationAttempt,
+          issues: repairableIssues,
+          rejectedRecommendations: materialized.rejected,
+        });
         if (createdRecommendationEntities.length > 0) await this.places.remove(createdRecommendationEntities);
         createdRecommendationEntities = [];
-        this.logger.warn(`AI itinerary rejected quality=${qualityIssues.join(',')}`);
+        output = await this.planner.generate({
+          ...plannerInput,
+          revisionGuidance: [
+            `The verified itinerary still has these issues: ${repairableIssues.join(', ')}.`,
+            materialized.rejected.length > 0
+              ? `These recommendations could not be verified and must be replaced with different concrete places: ${materialized.rejected.map((item) => item.placeName).join(', ')}.`
+              : '',
+            `Required totals by date are: ${formatCoverageTargets(days, days.map((day) => day.date), style)}.`,
+            'Return the complete corrected itinerary. Keep valid saved-place placements, replace unverifiable recommendations, and use chronological non-overlapping times.',
+          ].filter(Boolean).join(' '),
+        });
+      }
+      const recommended = materialized.placements;
+      const reusedRecommendationIds = new Set(recommended.map((item) => item.savedPlaceId));
+      const staleAiRecommendations = previousAiRecommendations.filter((place) =>
+        !lockedIds.has(place.id) && !reusedRecommendationIds.has(place.id),
+      );
+      writeStructuredLog('info', 'ai.generation.recommendations_materialized', {
+        generationId,
+        tripId,
+        received: output.recommendations.length,
+        saved: recommended.length,
+        rejected: materialized.rejected,
+      });
+      const blockingQualityIssues = qualityIssues.filter(isBlockingQualityIssue);
+      const qualityWarnings = qualityIssues.filter((issue) => !isBlockingQualityIssue(issue));
+      if (qualityWarnings.length > 0) {
+        writeStructuredLog('warn', 'ai.generation.accepted_with_warnings', {
+          generationId,
+          tripId,
+          warnings: qualityWarnings,
+        });
+      }
+      if (blockingQualityIssues.length > 0) {
+        if (createdRecommendationEntities.length > 0) await this.places.remove(createdRecommendationEntities);
+        createdRecommendationEntities = [];
+        writeStructuredLog('warn', 'ai.generation.rejected', {
+          generationId,
+          tripId,
+          issues: blockingQualityIssues,
+        });
         throw new AiPlannerError('invalid_output');
       }
       const placementsWithLodging = addLodgingEndpoints(
@@ -161,18 +271,34 @@ export class AiPlanningService {
         request.transportMode,
       );
       const result = await this.itineraries.replace(tripId, placements, ItinerarySource.Ai);
+      let finalItinerary = result.itinerary;
       if (result.status === ItineraryUpdateStatus.Updated) {
-        await this.daySettings.applyAiPlanBs(tripId, verifiedPlanBs);
         await this.entitlements.recordSuccessfulAiGeneration();
+        createdRecommendationEntities = [];
+        if (staleAiRecommendations.length > 0) {
+          try {
+            await this.places.remove(staleAiRecommendations);
+            finalItinerary = await this.itineraries.get(tripId);
+          } catch {
+            this.logger.error('Previous AI recommendation cleanup failed');
+          }
+        }
       } else if (createdRecommendationEntities.length > 0) {
         await this.places.remove(createdRecommendationEntities);
         createdRecommendationEntities = [];
       }
+      writeStructuredLog('info', 'ai.generation.completed', {
+        generationId,
+        tripId,
+        status: result.status,
+        durationMs: Math.round(performance.now() - startedAt),
+        placementCount: placements.length,
+      });
       return {
         status: result.status === ItineraryUpdateStatus.Updated ? AiPlanGenerationStatus.Generated : AiPlanGenerationStatus.Conflict,
         style,
         conflicts: result.conflicts,
-        itinerary: result.itinerary,
+        itinerary: finalItinerary,
         failureReason: null,
       };
     } catch (error) {
@@ -184,7 +310,16 @@ export class AiPlanningService {
         }
       }
       const reason = error instanceof AiPlannerError ? error.reason : 'provider_failure';
-      this.logger.warn(`AI itinerary unavailable reason=${reason}`);
+      writeStructuredLog('error', 'ai.generation.failed', {
+        generationId,
+        tripId,
+        reason,
+        durationMs: Math.round(performance.now() - startedAt),
+        ...(error instanceof AiPlannerError ? { details: error.details } : {
+          errorName: error instanceof Error ? error.name : typeof error,
+          errorMessage: error instanceof Error ? error.message.slice(0, 500) : undefined,
+        }),
+      });
       return {
         status: AiPlanGenerationStatus.Unavailable,
         style,
@@ -198,15 +333,21 @@ export class AiPlanningService {
   private async materializeRecommendations(
     tripId: string,
     destination: string,
-    selectedRegions: Array<{ name: string }>,
+    selectedRegions: Array<{ name: string; latitude?: number | null; longitude?: number | null }>,
     recommendations: AiPlannerOutput['recommendations'],
     existingPlaces: SavedPlaceEntity[],
     validDates: Set<string>,
-  ): Promise<{ placements: PlannedPlacement[]; created: SavedPlaceEntity[] }> {
+  ): Promise<{
+    placements: PlannedPlacement[];
+    created: SavedPlaceEntity[];
+    rejected: Array<{ placeName: string; suggestedDate: string; reason: string }>;
+  }> {
     const knownGoogleIds = new Set(existingPlaces.flatMap((place) => place.googlePlaceId ? [place.googlePlaceId] : []));
     const knownNames = new Set(existingPlaces.map((place) => place.name.trim().toLocaleLowerCase()));
     const placements: PlannedPlacement[] = [];
     const created: SavedPlaceEntity[] = [];
+    const placedIds = new Set<string>();
+    const rejected: Array<{ placeName: string; suggestedDate: string; reason: string }> = [];
 
     for (const recommendation of recommendations) {
       if (!validDates.has(recommendation.suggestedDate)) continue;
@@ -215,17 +356,27 @@ export class AiPlanningService {
           recommendation.placeName,
           `${recommendation.regionName}, ${destination}`,
         );
-        const uniqueCandidates = candidates.filter((item) =>
-          !knownGoogleIds.has(item.googlePlaceId)
-          && !knownNames.has(item.name.trim().toLocaleLowerCase()),
-        );
-        const candidate = uniqueCandidates.find((item) =>
+        const candidate = candidates.find((item) =>
           isWithinSelectedRegions(recommendation.regionName, item, selectedRegions)
           && isRecommendableCandidate(item),
         );
         if (!candidate) {
-          const reason = uniqueCandidates.length === 0 ? 'not_found_or_duplicate' : 'outside_selected_regions';
-          this.logger.warn(`AI recommendation rejected reason=${reason} name=${recommendation.placeName}`);
+          this.logger.warn(`AI recommendation rejected reason=not_found_or_outside_region name=${recommendation.placeName}`);
+          rejected.push({ placeName: recommendation.placeName, suggestedDate: recommendation.suggestedDate, reason: 'not_found_or_outside_region' });
+          continue;
+        }
+        const normalizedCandidateName = candidate.name.trim().toLocaleLowerCase();
+        const priorAiPlace = findReusableAiRecommendation(existingPlaces, candidate);
+        if (priorAiPlace) {
+          if (!placedIds.has(priorAiPlace.id)) {
+            placedIds.add(priorAiPlace.id);
+            placements.push(toRecommendedPlacement(priorAiPlace.id, recommendation));
+          }
+          continue;
+        }
+        if (knownGoogleIds.has(candidate.googlePlaceId) || knownNames.has(normalizedCandidateName)) {
+          this.logger.warn(`AI recommendation rejected reason=duplicate_saved_place name=${recommendation.placeName}`);
+          rejected.push({ placeName: recommendation.placeName, suggestedDate: recommendation.suggestedDate, reason: 'duplicate_saved_place' });
           continue;
         }
         const entity = await this.places.save(this.places.create({
@@ -241,46 +392,16 @@ export class AiPlanningService {
           isPrimaryLodging: false,
         }));
         knownGoogleIds.add(candidate.googlePlaceId);
-        knownNames.add(candidate.name.trim().toLocaleLowerCase());
+        knownNames.add(normalizedCandidateName);
         created.push(entity);
-        placements.push({
-          savedPlaceId: entity.id,
-          date: recommendation.suggestedDate,
-          position: recommendation.position,
-          scheduledTime: recommendation.startTime,
-          durationMinutes: recommendation.durationMinutes,
-          activitySummary: recommendation.activity,
-          travelMethod: recommendation.travelMethod,
-          travelDurationMinutes: recommendation.travelDurationMinutes,
-        });
+        placedIds.add(entity.id);
+        placements.push(toRecommendedPlacement(entity.id, recommendation));
       } catch {
         this.logger.warn(`AI recommended place could not be verified name=${recommendation.placeName}`);
+        rejected.push({ placeName: recommendation.placeName, suggestedDate: recommendation.suggestedDate, reason: 'verification_failed' });
       }
     }
-    return { placements, created };
-  }
-
-  private async verifyPlanBs(
-    planBs: AiPlannerOutput['planBs'],
-    destination: string,
-    selectedRegions: Array<{ name: string }>,
-    validDates: Set<string>,
-  ): Promise<Array<{ date: string; placeName: string; address: string | null; reason: string }>> {
-    const verified = [];
-    for (const planB of planBs) {
-      if (!validDates.has(planB.date)) continue;
-      try {
-        const candidates = await this.placeSearch.search(planB.placeName, `${planB.regionName}, ${destination}`);
-        const candidate = candidates.find((item) =>
-          isWithinSelectedRegions(planB.regionName, item, selectedRegions)
-          && isRecommendableCandidate(item),
-        );
-        if (candidate) verified.push({ date: planB.date, placeName: candidate.name, address: candidate.address, reason: planB.reason });
-      } catch {
-        this.logger.warn(`AI Plan B could not be verified name=${planB.placeName}`);
-      }
-    }
-    return verified;
+    return { placements, created, rejected };
   }
 
   private async enrichTravelEstimates(
@@ -313,13 +434,55 @@ export class AiPlanningService {
 }
 
 export function isWithinSelectedRegions(
-  _recommendationRegionName: string,
-  candidate: Pick<PlaceSearchCandidate, 'name' | 'address'>,
-  selectedRegions: Array<{ name: string }>,
+  recommendationRegionName: string,
+  candidate: Pick<PlaceSearchCandidate, 'name' | 'address'> & Partial<Pick<PlaceSearchCandidate, 'latitude' | 'longitude'>>,
+  selectedRegions: Array<{ name: string; latitude?: number | null; longitude?: number | null }>,
 ): boolean {
   if (selectedRegions.length === 0) return true;
   const candidateLocation = normalizeRegionName(`${candidate.name} ${candidate.address ?? ''}`);
-  return selectedRegions.some(({ name }) => candidateLocation.includes(normalizeRegionName(name)));
+  const recommendedRegion = normalizeRegionName(recommendationRegionName);
+  return selectedRegions.some((region) => {
+    const selectedName = normalizeRegionName(region.name);
+    if (candidateLocation.includes(selectedName)) return true;
+    if (recommendedRegion.includes(selectedName) && candidateLocation.includes(recommendedRegion)) return true;
+    if (
+      candidate.latitude == null
+      || candidate.longitude == null
+      || region.latitude == null
+      || region.longitude == null
+    ) return false;
+    return distanceKilometers(
+      candidate.latitude,
+      candidate.longitude,
+      region.latitude,
+      region.longitude,
+    ) <= 80;
+  });
+}
+
+function distanceKilometers(latitude1: number, longitude1: number, latitude2: number, longitude2: number): number {
+  const toRadians = (degrees: number) => degrees * Math.PI / 180;
+  const latitudeDelta = toRadians(latitude2 - latitude1);
+  const longitudeDelta = toRadians(longitude2 - longitude1);
+  const a = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(toRadians(latitude1)) * Math.cos(toRadians(latitude2)) * Math.sin(longitudeDelta / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function toRecommendedPlacement(
+  savedPlaceId: string,
+  recommendation: AiPlannerOutput['recommendations'][number],
+): PlannedPlacement {
+  return {
+    savedPlaceId,
+    date: recommendation.suggestedDate,
+    position: recommendation.position,
+    scheduledTime: recommendation.startTime,
+    durationMinutes: recommendation.durationMinutes,
+    activitySummary: recommendation.activity,
+    travelMethod: recommendation.travelMethod,
+    travelDurationMinutes: recommendation.travelDurationMinutes,
+  };
 }
 
 export function isSavedPlaceWithinSelectedRegions(
@@ -397,22 +560,22 @@ export function addLodgingEndpoints(
 }
 
 export function buildPlannerDays(
-  settings: Array<{ date: string; startTime: string; endTime: string }>,
+  dates: string[],
   itineraryItems: Array<{ savedPlaceId: string; date: string | null; position: number | null }>,
   places: Array<Pick<SavedPlaceEntity, 'id' | 'name' | 'address' | 'latitude' | 'longitude' | 'tag' | 'isPrimaryLodging'>>,
   primaryLodging?: Pick<SavedPlaceEntity, 'id' | 'name' | 'address' | 'latitude' | 'longitude' | 'tag' | 'isPrimaryLodging'>,
 ): AiPlannerDay[] {
   const placesById = new Map(places.map((place) => [place.id, place]));
-  return settings.map((setting) => {
+  return dates.map((date, index) => {
     const items = itineraryItems
-      .filter((item) => item.date === setting.date && item.position !== null)
+      .filter((item) => item.date === date && item.position !== null)
       .sort((left, right) => left.position! - right.position!);
     const first = placesById.get(items[0]?.savedPlaceId ?? '');
     const last = placesById.get(items.at(-1)?.savedPlaceId ?? '');
     return {
-      ...setting,
-      startLodging: toLodging(isLodging(first) ? first : primaryLodging),
-      endLodging: toLodging(isLodging(last) ? last : primaryLodging),
+      date,
+      startLodging: index === 0 ? null : toLodging(isLodging(first) ? first : primaryLodging),
+      endLodging: index === dates.length - 1 ? null : toLodging(isLodging(last) ? last : primaryLodging),
     };
   });
 }
@@ -442,14 +605,12 @@ export function normalizeGeneratedPlacements(
 
 type QualityAssessmentInput = {
   days: AiPlannerDay[];
-  style: { recommendedPlacesPerDay: number };
+  style: TravelStyle;
   planningPlaces: SavedPlaceEntity[];
   generated: PlannedPlacement[];
   recommended: PlannedPlacement[];
   locked: Array<{ savedPlaceId: string; date: string | null; position: number | null }>;
   output: AiPlannerOutput;
-  verifiedPlanBs: Array<{ date: string }>;
-  recommendedPlaces: SavedPlaceEntity[];
 };
 
 export function assessPlanQuality(input: QualityAssessmentInput): string[] {
@@ -467,29 +628,17 @@ export function assessPlanQuality(input: QualityAssessmentInput): string[] {
     issues.push('must_visit_missing');
   }
 
-  const knownPlaces = new Map(
-    [...input.planningPlaces, ...input.recommendedPlaces].map((place) => [place.id, place]),
-  );
   const allPlacements = [...input.generated, ...input.recommended];
   for (const day of input.days) {
-    const visits = [
-      ...allPlacements.filter((item) => item.date === day.date),
-      ...input.locked.filter((item) => item.date === day.date).map((item) => ({
-        savedPlaceId: item.savedPlaceId,
-        date: item.date!,
-        position: item.position!,
-      })),
-    ];
-    const meaningfulVisitCount = visits.filter((item) => knownPlaces.get(item.savedPlaceId)?.tag !== PlaceTag.Transport).length;
-    const availableMinutes = timeToMinutes(day.endTime) - timeToMinutes(day.startTime);
-    const densityTarget = Math.min(input.style.recommendedPlacesPerDay, Math.max(1, Math.floor(availableMinutes / 180)));
-    if (meaningfulVisitCount < densityTarget) issues.push(`underfilled_day:${day.date}`);
-    if (!input.verifiedPlanBs.some((planB) => planB.date === day.date)) issues.push(`plan_b_missing:${day.date}`);
-
     const timedVisits = allPlacements
       .filter((item) => item.date === day.date)
       .sort((left, right) => left.position - right.position);
-    let previousEnd = timeToMinutes(day.startTime);
+    const lockedVisitCount = input.locked.filter((item) => item.date === day.date).length;
+    const plannedMinutes = timedVisits.reduce((total, visit) =>
+      total + (visit.durationMinutes ?? 0) + (visit.travelDurationMinutes ?? 0), lockedVisitCount * 110);
+    if (plannedMinutes < targetPlannedMinutes(day, input.style)) issues.push(`underfilled_day:${day.date}`);
+
+    let previousEnd: number | undefined;
     for (const visit of timedVisits) {
       if (
         !visit.scheduledTime
@@ -504,17 +653,133 @@ export function assessPlanQuality(input: QualityAssessmentInput): string[] {
       if (visit.travelDurationMinutes > 30) issues.push(`long_travel_leg:${day.date}`);
       const start = timeToMinutes(visit.scheduledTime);
       const end = start + visit.durationMinutes;
-      if (
-        start < timeToMinutes(day.startTime)
-        || end > timeToMinutes(day.endTime)
-        || start < previousEnd + (visit.travelDurationMinutes ?? 0)
-      ) {
+      if (previousEnd !== undefined && start < previousEnd) {
         issues.push(`invalid_time_window:${day.date}`);
       }
       previousEnd = end;
     }
   }
   return [...new Set(issues)];
+}
+
+export function isBlockingQualityIssue(issue: string): boolean {
+  return ![
+    'long_travel_leg:',
+    'underfilled_day:',
+  ].some((warningPrefix) => issue.startsWith(warningPrefix));
+}
+
+function isRepairableQualityIssue(issue: string): boolean {
+  if (issue === 'saved_places_missing' || issue === 'must_visit_missing') return true;
+  return [
+    'underfilled_day:',
+    'schedule_detail_missing:',
+    'invalid_time_window:',
+  ].some((prefix) => issue.startsWith(prefix));
+}
+
+export function assessRawDayCoverage(
+  days: AiPlannerDay[],
+  output: AiPlannerOutput,
+  style: TravelStyle,
+  allowedPlaceIds?: Set<string>,
+): string[] {
+  return days.flatMap((day) => {
+    const visits = [
+      ...output.placements.filter((item) =>
+        item.date === day.date && (!allowedPlaceIds || allowedPlaceIds.has(item.savedPlaceId)),
+      ),
+      ...output.recommendations.filter((item) => item.suggestedDate === day.date),
+    ];
+    const plannedMinutes = visits.reduce((total, visit) =>
+      total + (visit.durationMinutes ?? 0) + (visit.travelDurationMinutes ?? 0), 0);
+    return plannedMinutes < targetPlannedMinutes(day, style) ? [day.date] : [];
+  });
+}
+
+export function assessRawOutputContract(
+  allowedPlaceIds: Set<string>,
+  output: AiPlannerOutput,
+): string[] {
+  const issues: string[] = [];
+  if (output.placements.some((item) => !allowedPlaceIds.has(item.savedPlaceId))) {
+    issues.push('unknown_placement_ids');
+  }
+  if (allowedPlaceIds.size === 0 && output.recommendations.length === 0) {
+    issues.push('recommendations_required');
+  }
+  return issues;
+}
+
+function minimumPlannedMinutes(style: TravelStyle): number {
+  switch (style) {
+    case TravelStyle.Relaxed: return 420;
+    case TravelStyle.Highlights: return 480;
+    case TravelStyle.Balanced:
+    case TravelStyle.Food:
+    default: return 450;
+  }
+}
+
+function targetPlannedMinutes(day: AiPlannerDay, style: TravelStyle): number {
+  return day.targetPlannedMinutes ?? minimumPlannedMinutes(style);
+}
+
+function formatCoverageTargets(days: AiPlannerDay[], dates: string[], style: TravelStyle): string {
+  const includedDates = new Set(dates);
+  return days
+    .filter((day) => includedDates.has(day.date))
+    .map((day) => `${day.date}=${targetPlannedMinutes(day, style)} minutes`)
+    .join(', ');
+}
+
+export function applyDailyPlanningTargets(
+  days: AiPlannerDay[],
+  style: TravelStyle,
+  startPointTime: string | null,
+  endPointTime: string | null,
+): AiPlannerDay[] {
+  const lastIndex = days.length - 1;
+  return days.map((day, index) => {
+    const availableStart = index === 0 && startPointTime
+      ? Math.max(DEFAULT_DAY_START_MINUTES, timeToMinutes(startPointTime))
+      : DEFAULT_DAY_START_MINUTES;
+    const availableEnd = index === lastIndex && endPointTime
+      ? Math.min(DEFAULT_DAY_END_MINUTES, timeToMinutes(endPointTime))
+      : DEFAULT_DAY_END_MINUTES;
+    const availableMinutes = Math.max(0, availableEnd - availableStart);
+    const realisticVisitMinutes = Math.max(0, availableMinutes - BOUNDARY_TRANSITION_BUFFER_MINUTES);
+    return {
+      ...day,
+      targetPlannedMinutes: Math.min(minimumPlannedMinutes(style), realisticVisitMinutes),
+    };
+  });
+}
+
+export function enumerateTripDates(startDate: string, endDate: string): string[] {
+  const dates: string[] = [];
+  const current = new Date(`${startDate}T00:00:00.000Z`);
+  const end = new Date(`${endDate}T00:00:00.000Z`);
+  while (current <= end) {
+    dates.push(current.toISOString().slice(0, 10));
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+  return dates;
+}
+
+export function isAiRecommendedPlace(place: Pick<SavedPlaceEntity, 'note'>): boolean {
+  return place.note?.startsWith('AI 추천 ·') ?? false;
+}
+
+export function findReusableAiRecommendation<T extends Pick<SavedPlaceEntity, 'googlePlaceId' | 'name' | 'note'>>(
+  places: T[],
+  candidate: Pick<PlaceSearchCandidate, 'googlePlaceId' | 'name'>,
+): T | undefined {
+  const candidateName = candidate.name.trim().toLocaleLowerCase();
+  return places.find((place) =>
+    isAiRecommendedPlace(place)
+    && (place.googlePlaceId === candidate.googlePlaceId || place.name.trim().toLocaleLowerCase() === candidateName),
+  );
 }
 
 function timeToMinutes(value: string): number {

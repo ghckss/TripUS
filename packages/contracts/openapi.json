@@ -282,82 +282,6 @@
         ]
       }
     },
-    "/v1/trips/{tripId}/day-settings": {
-      "get": {
-        "operationId": "TripDaySettingsController_get",
-        "parameters": [
-          {
-            "name": "tripId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/TripDaySettingResponseDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "trip-day-settings"
-        ]
-      },
-      "put": {
-        "operationId": "TripDaySettingsController_replace",
-        "parameters": [
-          {
-            "name": "tripId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReplaceTripDaySettingsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/TripDaySettingResponseDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "trip-day-settings"
-        ]
-      }
-    },
     "/v1/trips/{tripId}/places": {
       "get": {
         "operationId": "PlacesController_list",
@@ -424,6 +348,38 @@
                 }
               }
             }
+          }
+        },
+        "tags": [
+          "places"
+        ]
+      },
+      "delete": {
+        "operationId": "PlacesController_removeMany",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveSavedPlacesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
           }
         },
         "tags": [
@@ -1342,12 +1298,18 @@
           "not_visited"
         ]
       },
+      "ItineraryBoundaryType": {
+        "type": "string",
+        "enum": [
+          "start_point",
+          "end_point"
+        ]
+      },
       "ItineraryItemResponseDto": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "format": "uuid"
+            "type": "string"
           },
           "savedPlaceId": {
             "type": "string",
@@ -1423,6 +1385,14 @@
           "review": {
             "type": "string",
             "nullable": true
+          },
+          "boundaryType": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ItineraryBoundaryType"
+              }
+            ]
           }
         },
         "required": [
@@ -1645,99 +1615,6 @@
           "tripCount",
           "aiGenerationLimit",
           "aiGenerationsUsed"
-        ]
-      },
-      "TripDaySettingResponseDto": {
-        "type": "object",
-        "properties": {
-          "date": {
-            "type": "string",
-            "format": "date"
-          },
-          "startTime": {
-            "type": "string",
-            "example": "09:00",
-            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
-          },
-          "endTime": {
-            "type": "string",
-            "example": "21:00",
-            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
-          },
-          "planBPlaceName": {
-            "type": "string",
-            "nullable": true,
-            "maxLength": 180
-          },
-          "planBAddress": {
-            "type": "string",
-            "nullable": true,
-            "maxLength": 300
-          },
-          "planBReason": {
-            "type": "string",
-            "nullable": true,
-            "maxLength": 500
-          }
-        },
-        "required": [
-          "date",
-          "startTime",
-          "endTime"
-        ]
-      },
-      "TripDaySettingInputDto": {
-        "type": "object",
-        "properties": {
-          "date": {
-            "type": "string",
-            "format": "date"
-          },
-          "startTime": {
-            "type": "string",
-            "example": "09:00",
-            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
-          },
-          "endTime": {
-            "type": "string",
-            "example": "21:00",
-            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
-          },
-          "planBPlaceName": {
-            "type": "string",
-            "nullable": true,
-            "maxLength": 180
-          },
-          "planBAddress": {
-            "type": "string",
-            "nullable": true,
-            "maxLength": 300
-          },
-          "planBReason": {
-            "type": "string",
-            "nullable": true,
-            "maxLength": 500
-          }
-        },
-        "required": [
-          "date",
-          "startTime",
-          "endTime"
-        ]
-      },
-      "ReplaceTripDaySettingsDto": {
-        "type": "object",
-        "properties": {
-          "settings": {
-            "maxItems": 31,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TripDaySettingInputDto"
-            }
-          }
-        },
-        "required": [
-          "settings"
         ]
       },
       "PlaceTag": {
@@ -1990,6 +1867,23 @@
           }
         }
       },
+      "RemoveSavedPlacesDto": {
+        "type": "object",
+        "properties": {
+          "placeIds": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "placeIds"
+        ]
+      },
       "TransitRouteRequestDto": {
         "type": "object",
         "properties": {
@@ -2088,6 +1982,45 @@
           "longitude"
         ]
       },
+      "TripBoundaryPointDto": {
+        "type": "object",
+        "properties": {
+          "googlePlaceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          },
+          "latitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "time": {
+            "type": "string",
+            "nullable": true,
+            "example": "15:30"
+          }
+        },
+        "required": [
+          "googlePlaceId",
+          "name",
+          "address",
+          "latitude",
+          "longitude",
+          "time"
+        ]
+      },
       "TripResponseDto": {
         "type": "object",
         "properties": {
@@ -2118,6 +2051,24 @@
           "endDate": {
             "type": "string",
             "format": "date"
+          },
+          "startPoint": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripBoundaryPointDto"
+              }
+            ]
+          },
+          "endPoint": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripBoundaryPointDto"
+              }
+            ]
           },
           "active": {
             "type": "boolean"
@@ -2174,6 +2125,24 @@
             "type": "string",
             "example": "2026-11-02",
             "format": "date"
+          },
+          "startPoint": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripBoundaryPointDto"
+              }
+            ]
+          },
+          "endPoint": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripBoundaryPointDto"
+              }
+            ]
           }
         },
         "required": [
@@ -2213,6 +2182,24 @@
           "endDate": {
             "type": "string",
             "format": "date"
+          },
+          "startPoint": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripBoundaryPointDto"
+              }
+            ]
+          },
+          "endPoint": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TripBoundaryPointDto"
+              }
+            ]
           }
         }
       },

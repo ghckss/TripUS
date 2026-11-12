@@ -83,21 +83,23 @@ export function DraggableItineraryItem({
         <AppText variant="heading" color={colors.muted}>×</AppText>
       </Pressable>}
     </View>
-    {!fixed && (travelMethod || travelDurationMinutes != null) && <View style={styles.travelRow}>
-      <AppText variant="caption" color={colors.secondary}>↳ {travelMethod ?? "이동"}{travelDurationMinutes != null ? ` 약 ${travelDurationMinutes}분` : ""}</AppText>
+    {!fixed && <View style={styles.travelRow}>
+      <AppText variant="caption" color={travelMethod || travelDurationMinutes != null ? colors.secondary : colors.muted} numberOfLines={1}>
+        이동 · {travelMethod ?? "방법 미정"}{travelDurationMinutes != null ? ` · 약 ${travelDurationMinutes}분` : " · 시간 미정"}
+      </AppText>
     </View>}
-    {!fixed && (scheduledTime || durationMinutes || activitySummary) && <View style={styles.details}>
-      {(scheduledTime || durationMinutes) && <AppText variant="caption" color={colors.primary}>
-        {scheduledTime?.slice(0, 5) ?? "시간 미정"}{durationMinutes ? ` · ${durationMinutes}분` : ""}
-      </AppText>}
-      {activitySummary && <AppText variant="caption" color={colors.muted}>{activitySummary}</AppText>}
+    {!fixed && <View style={styles.details}>
+      <AppText variant="caption" color={colors.primary} numberOfLines={1}>
+        도착 {scheduledTime?.slice(0, 5) ?? "미정"} · 소요 {durationMinutes ? `${durationMinutes}분` : "미정"}
+      </AppText>
+      <AppText variant="caption" color={colors.muted} numberOfLines={2}>{activitySummary || "상세 설명이 아직 없어요."}</AppText>
     </View>}
     {children}
   </View>;
 }
 
 const styles = StyleSheet.create({
-  card: { gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface, shadowColor: colors.ink, shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  card: { height: 176, gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
   header: { minHeight: 40, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   dragSurface: { flex: 1, minHeight: 44, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   dragHandle: { width: 32, minHeight: 44, alignItems: "center", justifyContent: "center" },

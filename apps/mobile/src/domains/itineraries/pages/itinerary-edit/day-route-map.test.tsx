@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import type { ItineraryItem } from "../../api/itineraries.api";
 import { DayRouteMap } from "./day-route-map";
@@ -69,5 +69,32 @@ describe("DayRouteMap", () => {
     await fireEvent(screen.getByTestId("day-route-map"), "mapReady");
 
     await waitFor(() => expect(screen.getByLabelText("1번 일정 상세")).toBeOnTheScreen());
+  });
+
+  it("hides at the last stop before restarting from the first stop", async () => {
+    jest.useFakeTimers();
+    const screen = await render(<DayRouteMap items={[
+      itineraryItem(),
+      itineraryItem({ id: "item-2", savedPlaceId: "place-2", placeName: "부산 타워", latitude: 35.101, longitude: 129.03, position: 1 }),
+    ]} />);
+
+    expect(screen.getByTestId("route-moving-marker")).toBeOnTheScreen();
+    await act(() => { jest.advanceTimersByTime(1200); });
+    expect(screen.queryByTestId("route-moving-marker")).not.toBeOnTheScreen();
+    await act(() => { jest.advanceTimersByTime(400); });
+    expect(screen.getByTestId("route-moving-marker")).toBeOnTheScreen();
+    jest.useRealTimers();
+  });
+
+  it("stops the decorative marker while the itinerary is scrolling", async () => {
+    const items = [
+      itineraryItem(),
+      itineraryItem({ id: "item-2", savedPlaceId: "place-2", latitude: 35.101, longitude: 129.03, position: 1 }),
+    ];
+    const screen = await render(<DayRouteMap items={items} />);
+
+    expect(screen.getByTestId("route-moving-marker")).toBeOnTheScreen();
+    await screen.rerender(<DayRouteMap animationPaused items={items} />);
+    expect(screen.queryByTestId("route-moving-marker")).not.toBeOnTheScreen();
   });
 });

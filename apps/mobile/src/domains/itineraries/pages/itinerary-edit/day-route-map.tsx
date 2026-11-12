@@ -1,12 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE, type LatLng } from "react-native-maps";
+import MapView, { AnimatedRegion, Marker, Polyline, PROVIDER_GOOGLE, type LatLng } from "react-native-maps";
 
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import type { ItineraryItem } from "../../api/itineraries.api";
 
 const MAP_HEIGHT = 240;
+const ANIMATED_COORDINATE_DELTA = { latitudeDelta: 0, longitudeDelta: 0 };
+const MovingMarker = Marker.Animated as unknown as ComponentType<{
+  coordinate: AnimatedRegion;
+  pinColor?: string;
+  testID?: string;
+  zIndex?: number;
+}>;
 
 type LocatedItem = {
   item: ItineraryItem;
@@ -28,7 +35,13 @@ type MapFocusTarget = {
   request: number;
 };
 
-export function DayRouteMap({ focusTarget, items }: { focusTarget?: MapFocusTarget; items: ItineraryItem[] }) {
+type DayRouteMapProps = {
+  animationPaused?: boolean;
+  focusTarget?: MapFocusTarget;
+  items: ItineraryItem[];
+};
+
+export const DayRouteMap = memo(function DayRouteMap({ animationPaused = false, focusTarget, items }: DayRouteMapProps) {
   const locatedItems = useMemo<LocatedItem[]>(() => items.flatMap((item, index) =>
     item.latitude == null || item.longitude == null
       ? []
@@ -48,7 +61,8 @@ export function DayRouteMap({ focusTarget, items }: { focusTarget?: MapFocusTarg
   const firstCoordinate = coordinates[0] ?? { latitude: 37.5665, longitude: 126.978 };
   const mapRef = useRef<MapView>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [movingCoordinate, setMovingCoordinate] = useState<LatLng>(firstCoordinate);
+  const [movingCoordinate] = useState(() => new AnimatedRegion({ ...firstCoordinate, ...ANIMATED_COORDINATE_DELTA }));
+  const [movingMarkerVisible, setMovingMarkerVisible] = useState(coordinates.length > 1);
   const [selectedMarkerId, setSelectedMarkerId] = useState<string>();
   const [dismissedFocusRequest, setDismissedFocusRequest] = useState<number>();
   const focusedEntry = locatedItems.find(({ item }) => item.id === focusTarget?.itemId);
@@ -86,25 +100,58 @@ export function DayRouteMap({ focusTarget, items }: { focusTarget?: MapFocusTarg
   }, [focusLatitude, focusLongitude, focusRequest, mapReady]);
 
   useEffect(() => {
-    if (coordinates.length === 0) return;
-    if (coordinates.length < 2) return;
-    let fromIndex = 0;
-    let startedAt = Date.now();
-    const timer = setInterval(() => {
-      const progress = Math.min((Date.now() - startedAt) / 1200, 1);
-      const from = coordinates[fromIndex];
-      const to = coordinates[(fromIndex + 1) % coordinates.length];
-      setMovingCoordinate({
-        latitude: from.latitude + (to.latitude - from.latitude) * progress,
-        longitude: from.longitude + (to.longitude - from.longitude) * progress,
+    movingCoordinate.stopAnimation(() => undefined);
+    if (coordinates.length < 2 || animationPaused) return;
+
+    let cancelled = false;
+    let kickoffTimer: ReturnType<typeof setTimeout> | undefined;
+    let restartTimer: ReturnType<typeof setTimeout> | undefined;
+    let activeAnimation: ReturnType<AnimatedRegion["timing"]> | undefined;
+
+    const animateSegment = (fromIndex: number) => {
+      if (cancelled) return;
+      const destination = coordinates[fromIndex + 1];
+      activeAnimation = movingCoordinate.timing({
+        latitude: destination.latitude,
+        longitude: destination.longitude,
+        ...ANIMATED_COORDINATE_DELTA,
+        duration: 1200,
+        // React Native 0.88's timing type requires this even though
+        // AnimatedRegion replaces it for each coordinate internally.
+        toValue: 0,
+        useNativeDriver: false,
       });
-      if (progress === 1) {
-        fromIndex = (fromIndex + 1) % coordinates.length;
-        startedAt = Date.now();
-      }
-    }, 50);
-    return () => clearInterval(timer);
-  }, [coordinates, signature]);
+      activeAnimation.start(({ finished }) => {
+        if (cancelled || !finished) return;
+        if (fromIndex < coordinates.length - 2) {
+          animateSegment(fromIndex + 1);
+          return;
+        }
+        setMovingMarkerVisible(false);
+        restartTimer = setTimeout(() => {
+          if (cancelled) return;
+          movingCoordinate.setValue({ ...coordinates[0], ...ANIMATED_COORDINATE_DELTA });
+          setMovingMarkerVisible(true);
+          animateSegment(0);
+        }, 400);
+      });
+    };
+
+    movingCoordinate.setValue({ ...coordinates[0], ...ANIMATED_COORDINATE_DELTA });
+    kickoffTimer = setTimeout(() => {
+      if (cancelled) return;
+      setMovingMarkerVisible(true);
+      animateSegment(0);
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      activeAnimation?.stop();
+      movingCoordinate.stopAnimation(() => undefined);
+      if (kickoffTimer) clearTimeout(kickoffTimer);
+      if (restartTimer) clearTimeout(restartTimer);
+    };
+  }, [animationPaused, coordinates, movingCoordinate, signature]);
 
   if (items.length === 0) return <MapEmptyState title="오늘의 동선이 비어 있어요" description="장소를 추가하면 실제 위치를 지도에 보여줄게요." />;
   if (locatedItems.length === 0) return <MapEmptyState title="장소 위치를 확인하고 있어요" description="Google Places 위치 정보가 확인되면 실제 지도 동선이 표시돼요." />;
@@ -145,7 +192,7 @@ export function DayRouteMap({ focusTarget, items }: { focusTarget?: MapFocusTarg
           </View>
         </Marker>;
       })}
-      {coordinates.length > 1 && <Marker coordinate={movingCoordinate} pinColor={colors.secondary} zIndex={0} />}
+      {coordinates.length > 1 && !animationPaused && movingMarkerVisible && <MovingMarker coordinate={movingCoordinate} pinColor={colors.secondary} testID="route-moving-marker" zIndex={0} />}
     </MapView>
     {selectedMarkerGroup && <View accessibilityLabel={`${markerOrderLabel(selectedMarkerGroup.entries)}번 일정 상세`} style={styles.markerDetails}>
       <Pressable accessibilityLabel="일정 상세 닫기" hitSlop={8} onPress={() => {
@@ -169,7 +216,7 @@ export function DayRouteMap({ focusTarget, items }: { focusTarget?: MapFocusTarg
       <AppText variant="caption" color={colors.muted}>실제 위치 기반 방문 동선</AppText>
     </View>
   </View>;
-}
+});
 
 function MapEmptyState({ title, description }: { title: string; description: string }) {
   return <View style={[styles.container, styles.empty]}>

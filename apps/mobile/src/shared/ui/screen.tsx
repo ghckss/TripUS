@@ -1,13 +1,18 @@
 import { forwardRef, PropsWithChildren } from "react";
-import { ScrollView, StyleProp, StyleSheet, View, ViewStyle, type ScrollViewInstance } from "react-native";
+import { ScrollView, StyleProp, StyleSheet, View, ViewStyle, type ScrollViewInstance, type ScrollViewProps } from "react-native";
 import { useNetInfo } from "@react-native-community/netinfo";
 import { GestureDetector, type NativeGesture } from "react-native-gesture-handler";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 
-export const Screen = forwardRef<ScrollViewInstance, PropsWithChildren<{ contentStyle?: StyleProp<ViewStyle>; gesture?: NativeGesture; scrollEnabled?: boolean; testID?: string }>>(function Screen({ children, contentStyle, gesture, scrollEnabled = true, testID }, ref) {
+type ScreenProps = PropsWithChildren<Omit<ScrollViewProps, "contentContainerStyle"> & {
+  contentStyle?: StyleProp<ViewStyle>;
+  gesture?: NativeGesture;
+}>;
+
+export const Screen = forwardRef<ScrollViewInstance, ScreenProps>(function Screen({ children, contentStyle, gesture, scrollEnabled = true, testID, ...scrollProps }, ref) {
   const network = useNetInfo();
-  const scrollView = <ScrollView ref={ref} testID={testID} style={styles.screen} contentContainerStyle={[styles.content, contentStyle]} keyboardShouldPersistTaps="handled" scrollEnabled={scrollEnabled}>
+  const scrollView = <ScrollView {...scrollProps} ref={ref} testID={testID} style={[styles.screen, scrollProps.style]} contentContainerStyle={[styles.content, contentStyle]} keyboardShouldPersistTaps="handled" scrollEnabled={scrollEnabled}>
     {network.isConnected === false && <View accessibilityLiveRegion="polite" style={styles.offlineBanner}>
       <AppText variant="caption" color={colors.warning}>오프라인 상태예요. 마지막으로 저장된 정보를 보여드려요.</AppText>
     </View>}

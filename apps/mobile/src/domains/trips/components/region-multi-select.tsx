@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { searchCities, searchPlacesByDestination, type PlaceSearchCandidate } from "@/domains/places/api/places.api";
 import type { TravelCountry } from "@/domains/trips/components/country-options";
+import { safeErrorMessage } from "@/shared/api/trip-us-api";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
@@ -45,7 +46,7 @@ export function RegionMultiSelect({ country, value, onChange }: RegionMultiSelec
       )));
       if (options.length === 0) setMessage("선택할 도시가 없어요. 도시 이름으로 다시 검색해 주세요.");
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "도시 목록을 불러오지 못했어요.");
+      setMessage(safeErrorMessage(caught, "도시 목록을 불러오지 못했어요."));
     } finally {
       setSearching(false);
     }

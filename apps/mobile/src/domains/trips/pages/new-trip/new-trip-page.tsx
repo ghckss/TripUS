@@ -10,6 +10,8 @@ import { defaultTravelCountry, type TravelCountry } from "@/domains/trips/compon
 import { DateField } from "@/domains/trips/components/date-field";
 import { LodgingSearchField, type SelectedLodging } from "@/domains/trips/components/lodging-search-field";
 import { RegionMultiSelect, type SelectedRegion } from "@/domains/trips/components/region-multi-select";
+import { isBoundaryPointValid, TripBoundarySearchField, type SelectedBoundaryPoint } from "@/domains/trips/components/trip-boundary-search-field";
+import { safeErrorMessage } from "@/shared/api/trip-us-api";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
@@ -32,6 +34,8 @@ export default function NewTripScreen() {
   const [startDate, setStartDate] = useState(() => initialDate(0));
   const [endDate, setEndDate] = useState(() => initialDate(2));
   const [lodging, setLodging] = useState<SelectedLodging>();
+  const [startPoint, setStartPoint] = useState<SelectedBoundaryPoint>();
+  const [endPoint, setEndPoint] = useState<SelectedBoundaryPoint>();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
   const [entitlements, setEntitlements] = useState<Entitlements>();
@@ -42,6 +46,8 @@ export default function NewTripScreen() {
     setCountry(next);
     setRegions([]);
     setLodging(undefined);
+    setStartPoint(undefined);
+    setEndPoint(undefined);
   };
 
   const changeStartDate = (next: string) => {
@@ -60,6 +66,8 @@ export default function NewTripScreen() {
         timezone: country.timezone,
         startDate,
         endDate,
+        startPoint: startPoint ?? null,
+        endPoint: endPoint ?? null,
       });
       if (lodging) {
         try {
@@ -79,7 +87,7 @@ export default function NewTripScreen() {
       }
       router.replace(`/trips/${trip.id}`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "여행을 만들지 못했어요.");
+      setError(safeErrorMessage(caught, "여행을 만들지 못했어요."));
     } finally {
       setSaving(false);
     }
@@ -97,6 +105,8 @@ export default function NewTripScreen() {
       <RegionMultiSelect country={country} value={regions} onChange={setRegions} />
       <DateField label="출발일" testID="new-trip-start-date" value={startDate} onChange={changeStartDate} />
       <DateField label="종료일" testID="new-trip-end-date" value={endDate} minimumDate={startDate} onChange={setEndDate} />
+      <TripBoundarySearchField destination={country.name} kind="start" value={startPoint} onChange={setStartPoint} />
+      <TripBoundarySearchField destination={country.name} kind="end" value={endPoint} onChange={setEndPoint} />
       <LodgingSearchField destination={[...regions.map((region) => region.name), country.name].join(", ")} value={lodging} onChange={setLodging} />
     </Card>
     {limitReached && <Card>
@@ -105,7 +115,7 @@ export default function NewTripScreen() {
       <Button label="내 여행에서 확인" variant="ghost" onPress={() => router.replace("/(tabs)/trips")} />
     </Card>}
     {error && <AppText color={colors.danger}>{error}</AppText>}
-    <Button label={saving ? "여행 만드는 중…" : "여행 만들기"} disabled={saving || limitReached || !title.trim() || regions.length === 0} testID="new-trip-submit" onPress={() => void submit()} />
+    <Button label={saving ? "여행 만드는 중…" : "여행 만들기"} disabled={saving || limitReached || !title.trim() || regions.length === 0 || !isBoundaryPointValid(startPoint) || !isBoundaryPointValid(endPoint)} testID="new-trip-submit" onPress={() => void submit()} />
   </Screen>;
 }
 

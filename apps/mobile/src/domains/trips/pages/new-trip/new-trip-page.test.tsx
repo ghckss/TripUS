@@ -1,5 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import { router } from "expo-router";
+import { Platform } from "react-native";
 
 import NewTripScreen from "./new-trip-page";
 
@@ -38,6 +39,16 @@ function localDate(offset: number): string {
   return `${year}-${month}-${day}`;
 }
 
+async function selectTime(screen: Awaited<ReturnType<typeof render>>, testID: string, hours: number, minutes: number) {
+  const selected = new Date();
+  selected.setHours(hours, minutes, 0, 0);
+  await fireEvent.press(screen.getByTestId(testID));
+  await fireEvent(screen.getByTestId(`${testID}-picker`), "onChange", {
+    nativeEvent: { timestamp: selected.getTime(), utcOffset: 0 },
+  });
+  if (Platform.OS === "ios") await fireEvent.press(screen.getByTestId(`${testID}-confirm`));
+}
+
 describe("NewTripScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -64,10 +75,12 @@ describe("NewTripScreen", () => {
     await waitFor(() => expect(mockCreateTrip).toHaveBeenCalledWith({
       destination: "일본",
       endDate: localDate(2),
+      endPoint: null,
       regions: [{
         googlePlaceId: "region-tokyo", name: "도쿄", address: "일본 도쿄도", latitude: 35.6762, longitude: 139.6503,
       }],
       startDate: localDate(0),
+      startPoint: null,
       timezone: "Asia/Tokyo",
       title: "일본 단풍 여행",
     }));
@@ -113,6 +126,38 @@ describe("NewTripScreen", () => {
           latitude: 38.0695, longitude: 128.1707,
         },
       ],
+    })));
+  });
+
+  it("saves optional trip start and end points with their times", async () => {
+    mockCreateTrip.mockResolvedValue({ id: "trip-1" });
+    mockSearchPlacesByDestination.mockImplementation((_destination: string, query: string) => Promise.resolve({
+      "서울": [{ googlePlaceId: "region-seoul", name: "서울", address: "대한민국 서울특별시", latitude: 37.5665, longitude: 126.978 }],
+      "김포공항": [{ googlePlaceId: "airport-gimpo", name: "김포국제공항", address: "서울 강서구", latitude: 37.5583, longitude: 126.7906 }],
+      "서울역": [{ googlePlaceId: "station-seoul", name: "서울역", address: "서울 용산구", latitude: 37.5547, longitude: 126.9707 }],
+    }[query] ?? []));
+    const screen = await render(<NewTripScreen />);
+
+    await fireEvent.changeText(screen.getByTestId("new-trip-title"), "서울 여행");
+    await fireEvent.press(screen.getByTestId("region-dropdown-open"));
+    await fireEvent.changeText(screen.getByTestId("region-search-input"), "서울");
+    await fireEvent.press(screen.getByTestId("region-search-button"));
+    await fireEvent.press(await screen.findByTestId("region-result-region-seoul"));
+
+    await fireEvent.changeText(screen.getByTestId("trip-start-point-search-input"), "김포공항");
+    await fireEvent.press(screen.getByTestId("trip-start-point-search-button"));
+    await fireEvent.press(await screen.findByTestId("trip-start-point-result-airport-gimpo"));
+    await selectTime(screen, "trip-start-point-time", 10, 30);
+
+    await fireEvent.changeText(screen.getByTestId("trip-end-point-search-input"), "서울역");
+    await fireEvent.press(screen.getByTestId("trip-end-point-search-button"));
+    await fireEvent.press(await screen.findByTestId("trip-end-point-result-station-seoul"));
+    await selectTime(screen, "trip-end-point-time", 18, 0);
+    await fireEvent.press(screen.getByTestId("new-trip-submit"));
+
+    await waitFor(() => expect(mockCreateTrip).toHaveBeenCalledWith(expect.objectContaining({
+      startPoint: expect.objectContaining({ googlePlaceId: "airport-gimpo", name: "김포국제공항", time: "10:30" }),
+      endPoint: expect.objectContaining({ googlePlaceId: "station-seoul", name: "서울역", time: "18:00" }),
     })));
   });
 

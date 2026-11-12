@@ -74,6 +74,5 @@ export const cacheKeys = {
   trip: (tripId: string) => `trips:${tripId}`,
   places: (tripId: string) => `trips:${tripId}:places`,
   itinerary: (tripId: string) => `trips:${tripId}:itinerary`,
-  daySettings: (tripId: string) => `trips:${tripId}:day-settings`,
   aiUndo: (tripId: string) => `trips:${tripId}:ai-undo`,
 } as const;

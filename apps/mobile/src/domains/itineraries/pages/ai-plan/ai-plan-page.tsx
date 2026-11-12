@@ -13,6 +13,7 @@ import {
   type TravelStyle,
 } from "../../api/itineraries.api";
 import { useAiPlan } from "./use-ai-plan";
+import { AiPlanLoadingScreen } from "./ai-plan-loading-screen";
 
 const stylesList: { label: string; value: TravelStyle; description: string }[] = [
   { label: "균형 있게", value: "balanced", description: "명소와 휴식을 고르게 배치해요." },
@@ -50,7 +51,7 @@ export default function AiPlanScreen() {
     preferences: preferences.trim() || undefined,
     avoidances: avoidances.trim() || undefined,
   }).then((created) => {
-    if (created) router.replace(`/trips/${tripId}/itinerary?aiGenerated=1`);
+    if (created) router.replace(`/trips/${tripId}/itinerary`);
   });
   const confirmPlan = () => {
     const freeAttempt = entitlements?.tier === "free" && entitlements.aiGenerationsUsed === 0;
@@ -60,10 +61,11 @@ export default function AiPlanScreen() {
       { text: "일정 만들기", onPress: createPlan },
     ]);
   };
+  if (loading) return <AiPlanLoadingScreen />;
   return (
     <Screen>
       <AppText variant="title">어떤 여행을 원하나요?</AppText>
-      <AppText color={colors.muted}>저장한 장소를 중심으로 동선, 시간, 식사와 비 오는 날 대안까지 구성해요.</AppText>
+      <AppText color={colors.muted}>저장한 장소를 중심으로 동선, 시간과 식사까지 빈틈없이 구성해요.</AppText>
       <AppText variant="label">여행 스타일</AppText>
       <View style={styles.wrap}>{stylesList.map((item) => <Pill key={item.value} label={item.label} selected={selected === item.value} onPress={() => setSelected(item.value)} />)}</View>
       <Card><AppText variant="heading">{selectedStyle.label} 둘러보는 일정</AppText><AppText color={colors.muted}>{selectedStyle.description}</AppText></Card>
@@ -118,7 +120,7 @@ export default function AiPlanScreen() {
         <Button label="도시/지역 설정하기" variant="ghost" onPress={() => router.push(`/trips/${tripId}/edit`)} />
       </Card>}
       {error && <Card><AppText color={colors.danger}>{error}</AppText></Card>}
-      <Button label={loading ? "일정 만드는 중…" : "AI 일정 만들기"} disabled={loading} testID="ai-plan-generate" onPress={confirmPlan} />
+      <Button label="AI 일정 만들기" testID="ai-plan-generate" onPress={confirmPlan} />
     </Screen>
   );
 }

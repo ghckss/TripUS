@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { In, QueryFailedError, Repository } from 'typeorm';
 
 import { IDENTITY_PORT, type IdentityPort } from '../../identity/domain/identity.port';
 import { TripEntity } from '../../trips/domain/entities/trip.entity';
@@ -98,6 +98,13 @@ export class PlacesService {
     await this.assertOwnedActiveTrip(tripId);
     const entity = await this.findSavedPlace(tripId, placeId);
     await this.places.remove(entity);
+  }
+
+  async removeMany(tripId: string, placeIds: string[]): Promise<void> {
+    await this.assertOwnedActiveTrip(tripId);
+    const entities = await this.places.findBy({ tripId, id: In(placeIds) });
+    if (entities.length !== placeIds.length) throw new NotFoundException('One or more saved places were not found');
+    await this.places.remove(entities);
   }
 
   private async assertOwnedActiveTrip(tripId: string): Promise<TripEntity> {

@@ -56,7 +56,6 @@ export async function deleteTrip(tripId: string): Promise<void> {
   await deleteCache(cacheKeys.trip(tripId));
   await deleteCache(cacheKeys.places(tripId));
   await deleteCache(cacheKeys.itinerary(tripId));
-  await deleteCache(cacheKeys.daySettings(tripId));
   const trips = await readCache<Trip[]>(cacheKeys.trips);
   if (trips) await writeCache(cacheKeys.trips, trips.filter((trip) => trip.id !== tripId));
   trackEvent("trip.deleted", { tripId });

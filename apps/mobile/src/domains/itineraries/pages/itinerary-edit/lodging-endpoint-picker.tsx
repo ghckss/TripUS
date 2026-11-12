@@ -3,6 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { savePlace, searchPlaces, updatePlace, type PlaceSearchCandidate, type SavedPlace } from "@/domains/places/api/places.api";
+import { safeErrorMessage } from "@/shared/api/trip-us-api";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
@@ -43,7 +44,7 @@ export function LodgingEndpointPicker({ current, date, dayIndex, edge, places, t
       const candidates = await searchPlaces(tripId, normalized);
       setResults(candidates);
       if (candidates.length === 0) setMessage("검색 결과가 없어요.");
-    } catch (caught) { setMessage(caught instanceof Error ? caught.message : "숙소를 검색하지 못했어요."); }
+    } catch (caught) { setMessage(safeErrorMessage(caught, "숙소를 검색하지 못했어요.")); }
     finally { setSearching(false); }
   };
 
@@ -69,7 +70,7 @@ export function LodgingEndpointPicker({ current, date, dayIndex, edge, places, t
         : [lodging, ...availablePlaces];
       setAvailablePlaces(nextPlaces);
       apply(lodging, nextPlaces);
-    } catch (caught) { setMessage(caught instanceof Error ? caught.message : "숙소를 저장하지 못했어요."); }
+    } catch (caught) { setMessage(safeErrorMessage(caught, "숙소를 저장하지 못했어요.")); }
     finally { setSavingId(undefined); }
   };
 

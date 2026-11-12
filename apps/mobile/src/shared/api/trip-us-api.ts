@@ -2,6 +2,8 @@ import { createTripUsApiClient } from "@tripus/api-client";
 import Constants from "expo-constants";
 import { clearSession, getSession, saveSession, type AuthSession } from "@/shared/auth/session";
 
+export { apiErrorMessage, safeErrorMessage } from "./api-error-message";
+
 function resolveApiBaseUrl(): string {
   const configuredUrl = process.env.EXPO_PUBLIC_API_URL;
   if (configuredUrl) {
@@ -55,10 +57,3 @@ export const authenticatedFetch: typeof fetch = async (input, init) => {
 };
 
 export const tripUsApi = createTripUsApiClient({ baseUrl: tripUsApiBaseUrl, fetch: authenticatedFetch });
-
-export function apiErrorMessage(error: unknown): string {
-  if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
-    return error.message;
-  }
-  return "서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.";
-}

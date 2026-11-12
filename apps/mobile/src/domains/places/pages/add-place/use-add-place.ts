@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { savePlace, searchPlaces, type PlaceSearchCandidate } from "@/domains/places/api/places.api";
 import { inferPlaceTag } from "@/domains/places/model/infer-place-tag";
+import { safeErrorMessage } from "@/shared/api/trip-us-api";
 
 export function useAddPlace(tripId: string, initialQuery = "") {
   const [query, setQuery] = useState(initialQuery);
@@ -25,7 +26,7 @@ export function useAddPlace(tripId: string, initialQuery = "") {
       setResults(candidates);
       if (candidates.length === 0) setMessage("검색 결과가 없어요. 다른 검색어를 입력해 보세요.");
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "장소를 검색하지 못했어요.");
+      setMessage(safeErrorMessage(caught, "장소를 검색하지 못했어요."));
     } finally {
       setSearching(false);
     }
@@ -49,7 +50,7 @@ export function useAddPlace(tripId: string, initialQuery = "") {
       setSavedIds((current) => new Set(current).add(candidate.googlePlaceId));
       setMessage(result.status === "created" ? `${candidate.name}을(를) 추가했어요.` : "이미 추가한 장소예요.");
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "장소를 추가하지 못했어요.");
+      setMessage(safeErrorMessage(caught, "장소를 추가하지 못했어요."));
     } finally {
       setSavingId(undefined);
     }

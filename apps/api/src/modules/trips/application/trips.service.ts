@@ -43,6 +43,8 @@ export class TripsService {
     const entity = this.trips.create({
       ...input,
       regions: normalizeRegions(input.regions ?? []),
+      startPoint: normalizeBoundaryPoint(input.startPoint),
+      endPoint: normalizeBoundaryPoint(input.endPoint),
       ownerId: this.identity.getCurrentUserId(),
       active: true,
       archivedAt: null,
@@ -64,6 +66,8 @@ export class TripsService {
     Object.assign(entity, {
       ...input,
       ...(input.regions ? { regions: normalizeRegions(input.regions) } : {}),
+      ...(input.startPoint !== undefined ? { startPoint: normalizeBoundaryPoint(input.startPoint) } : {}),
+      ...(input.endPoint !== undefined ? { endPoint: normalizeBoundaryPoint(input.endPoint) } : {}),
     });
     return TripResponseDto.fromEntity(await this.trips.save(entity));
   }
@@ -85,6 +89,23 @@ export class TripsService {
     }
     return entity;
   }
+}
+
+function normalizeBoundaryPoint(point: CreateTripDto['startPoint']) {
+  if (!point) return null;
+  const name = point.name.trim();
+  if (!name) throw new BadRequestException('Trip boundary point name must not be empty');
+  const hasLatitude = point.latitude !== null && point.latitude !== undefined;
+  const hasLongitude = point.longitude !== null && point.longitude !== undefined;
+  if (hasLatitude !== hasLongitude) throw new BadRequestException('Trip boundary point coordinates must include both latitude and longitude');
+  return {
+    googlePlaceId: point.googlePlaceId?.trim() || null,
+    name,
+    address: point.address?.trim() || null,
+    latitude: point.latitude ?? null,
+    longitude: point.longitude ?? null,
+    time: point.time?.trim() || null,
+  };
 }
 
 function normalizeRegions(regions: TripRegionDto[]) {

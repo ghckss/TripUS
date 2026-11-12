@@ -6,6 +6,7 @@ import { SavedPlaceResponseDto, SavePlaceResultDto } from '../application/dto/sa
 import { PlacesService } from '../application/places.service';
 import { PlaceSearchCandidateDto, SearchCitiesQueryDto, SearchPlacesByDestinationQueryDto, SearchPlacesQueryDto } from '../application/dto/search-places.dto';
 import { UpdateSavedPlaceDto } from '../application/dto/update-saved-place.dto';
+import { RemoveSavedPlacesDto } from '../application/dto/remove-saved-places.dto';
 
 @ApiTags('places')
 @Controller('trips/:tripId/places')
@@ -52,6 +53,18 @@ export class PlacesController {
     @Body() input: UpdateSavedPlaceDto,
   ): Promise<SavedPlaceResponseDto> {
     return this.places.update(tripId, placeId, input);
+  }
+
+  @Delete()
+  @HttpCode(204)
+  @ApiParam({ name: 'tripId', type: String, format: 'uuid' })
+  @ApiBody({ type: RemoveSavedPlacesDto })
+  @ApiNoContentResponse()
+  removeMany(
+    @Param('tripId', new ParseUUIDPipe()) tripId: string,
+    @Body() input: RemoveSavedPlacesDto,
+  ): Promise<void> {
+    return this.places.removeMany(tripId, input.placeIds);
   }
 
   @Delete(':placeId')

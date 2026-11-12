@@ -93,3 +93,16 @@ export async function deletePlace(tripId: string, placeId: string): Promise<void
   if (places) await writeCache(cacheKeys.places(tripId), places.filter((place) => place.id !== placeId));
   await deleteCache(cacheKeys.itinerary(tripId));
 }
+
+export async function deletePlaces(tripId: string, placeIds: string[]): Promise<void> {
+  if (placeIds.length === 0) return;
+  const { error } = await tripUsApi.DELETE("/v1/trips/{tripId}/places", {
+    params: { path: { tripId } },
+    body: { placeIds },
+  });
+  if (error) throw new Error(apiErrorMessage(error));
+  const removed = new Set(placeIds);
+  const places = await readCache<SavedPlace[]>(cacheKeys.places(tripId));
+  if (places) await writeCache(cacheKeys.places(tripId), places.filter((place) => !removed.has(place.id)));
+  await deleteCache(cacheKeys.itinerary(tripId));
+}

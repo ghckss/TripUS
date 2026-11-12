@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 
 import { listTrips, type Trip } from "@/domains/trips/api/trips.api";
+import { safeErrorMessage } from "@/shared/api/trip-us-api";
 
 export function useTripList() {
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -14,7 +15,7 @@ export function useTripList() {
     try {
       setTrips(await listTrips());
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "여행을 불러오지 못했어요.");
+      setError(safeErrorMessage(caught, "여행을 불러오지 못했어요."));
     } finally {
       setLoading(false);
     }

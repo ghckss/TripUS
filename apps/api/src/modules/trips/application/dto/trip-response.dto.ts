@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import { TripEntity } from '../../domain/entities/trip.entity';
 import { TripRegionDto } from './trip-region.dto';
+import { TripBoundaryPointDto } from './trip-boundary-point.dto';
 
 export class TripResponseDto {
   @ApiProperty({ type: String, format: 'uuid' })
@@ -25,6 +26,12 @@ export class TripResponseDto {
   @ApiProperty({ type: String, format: 'date' })
   endDate!: string;
 
+  @ApiPropertyOptional({ type: TripBoundaryPointDto, nullable: true })
+  startPoint!: TripBoundaryPointDto | null;
+
+  @ApiPropertyOptional({ type: TripBoundaryPointDto, nullable: true })
+  endPoint!: TripBoundaryPointDto | null;
+
   @ApiProperty({ type: Boolean })
   active!: boolean;
 
@@ -40,6 +47,8 @@ export class TripResponseDto {
       timezone: entity.timezone,
       startDate: entity.startDate,
       endDate: entity.endDate,
+      startPoint: entity.startPoint ?? null,
+      endPoint: entity.endPoint ?? null,
       active: entity.active,
       archivedAt: entity.archivedAt,
     };

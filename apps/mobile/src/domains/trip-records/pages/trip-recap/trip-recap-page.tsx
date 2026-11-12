@@ -6,7 +6,7 @@ import { useMemo, useRef, useState } from "react";
 import { Alert, Platform, ScrollView, StyleSheet, View, useWindowDimensions, type ImageStyle, type StyleProp } from "react-native";
 import ViewShot, { type ViewShotRef } from "react-native-view-shot";
 
-import { tripUsApiBaseUrl } from "@/shared/api/trip-us-api";
+import { safeErrorMessage, tripUsApiBaseUrl } from "@/shared/api/trip-us-api";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
@@ -116,7 +116,7 @@ export default function TripRecapPage() {
       const uri = await captureSlide(activeIndex);
       await Sharing.shareAsync(uri, { mimeType: "image/png", UTI: "public.png", dialogTitle: `${activeIndex + 1}번째 여행 이미지 공유` });
     } catch (caught) {
-      Alert.alert("공유하지 못했어요", caught instanceof Error ? caught.message : "잠시 후 다시 시도해 주세요.");
+      Alert.alert("공유하지 못했어요", safeErrorMessage(caught, "잠시 후 다시 시도해 주세요."));
     } finally { setExporting(false); }
   };
 
@@ -131,7 +131,7 @@ export default function TripRecapPage() {
       }
       Alert.alert("캐러셀을 저장했어요", `${slides.length}장을 순서대로 사진 앱에 저장했어요. 인스타그램에서 여러 장을 선택해 게시해 보세요.`);
     } catch (caught) {
-      Alert.alert("저장하지 못했어요", caught instanceof Error ? caught.message : "잠시 후 다시 시도해 주세요.");
+      Alert.alert("저장하지 못했어요", safeErrorMessage(caught, "잠시 후 다시 시도해 주세요."));
     } finally { setExporting(false); }
   };
 

@@ -23,6 +23,15 @@ export interface TripRegion {
   longitude: number | null;
 }
 
+export interface TripBoundaryPoint {
+  googlePlaceId: string | null;
+  name: string;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  time: string | null;
+}
+
 @Entity({ name: 'trips' })
 @Index('idx_trips_owner_active', ['ownerId', 'active'])
 @Check('chk_trips_date_range', '"end_date" >= "start_date"')
@@ -54,6 +63,12 @@ export class TripEntity {
 
   @Column({ name: 'end_date', type: 'date' })
   endDate!: string;
+
+  @Column({ name: 'start_point', type: 'jsonb', nullable: true })
+  startPoint!: TripBoundaryPoint | null;
+
+  @Column({ name: 'end_point', type: 'jsonb', nullable: true })
+  endPoint!: TripBoundaryPoint | null;
 
   @Column({ type: 'boolean', default: true })
   active!: boolean;

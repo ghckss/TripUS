@@ -19,10 +19,27 @@ describe('ApiExceptionFilter', () => {
 
     expect(status).toHaveBeenCalledWith(400);
     expect(json).toHaveBeenCalledWith({
-      code: 'invalid_request',
-      details: ['name must be a string'],
-      message: 'Request validation failed',
+      code: 'VALIDATION_FAILED',
+      details: null,
       requestId: 'request-1',
+    });
+  });
+
+  it('returns a UPPER_SNAKE_CASE code without exposing the server message', () => {
+    const json = vi.fn();
+    const status = vi.fn(() => ({ json }));
+    const response = { status } as unknown as Response;
+    const request = { method: 'GET', originalUrl: '/v1/trips/missing', requestId: 'request-2' } as RequestWithContext;
+    const host = {
+      switchToHttp: () => ({ getRequest: () => request, getResponse: () => response }),
+    } as unknown as ArgumentsHost;
+
+    new ApiExceptionFilter().catch(new BadRequestException('Trip not found'), host);
+
+    expect(json).toHaveBeenCalledWith({
+      code: 'TRIP_NOT_FOUND',
+      details: null,
+      requestId: 'request-2',
     });
   });
 });

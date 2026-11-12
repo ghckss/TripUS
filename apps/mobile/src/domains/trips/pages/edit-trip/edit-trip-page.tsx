@@ -9,6 +9,8 @@ import { defaultTravelCountry, resolveTravelCountry, type TravelCountry } from "
 import { DateField } from "@/domains/trips/components/date-field";
 import { LodgingSearchField, type SelectedLodging } from "@/domains/trips/components/lodging-search-field";
 import { RegionMultiSelect, type SelectedRegion } from "@/domains/trips/components/region-multi-select";
+import { isBoundaryPointValid, TripBoundarySearchField, type SelectedBoundaryPoint } from "@/domains/trips/components/trip-boundary-search-field";
+import { safeErrorMessage } from "@/shared/api/trip-us-api";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
@@ -23,6 +25,8 @@ export default function EditTripScreen() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [lodging, setLodging] = useState<SelectedLodging>();
+  const [startPoint, setStartPoint] = useState<SelectedBoundaryPoint>();
+  const [endPoint, setEndPoint] = useState<SelectedBoundaryPoint>();
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
@@ -34,6 +38,8 @@ export default function EditTripScreen() {
       setRegions(trip.regions ?? []);
       setStartDate(trip.startDate);
       setEndDate(trip.endDate);
+      setStartPoint(trip.startPoint ?? undefined);
+      setEndPoint(trip.endPoint ?? undefined);
       setLodging(currentLodging ? {
         googlePlaceId: currentLodging.googlePlaceId ?? undefined,
         name: currentLodging.name,
@@ -41,7 +47,7 @@ export default function EditTripScreen() {
         latitude: currentLodging.latitude,
         longitude: currentLodging.longitude,
       } : undefined);
-    }).catch((caught) => setError(caught instanceof Error ? caught.message : "여행 정보를 불러오지 못했어요."))
+    }).catch((caught) => setError(safeErrorMessage(caught, "여행 정보를 불러오지 못했어요.")))
       .finally(() => setLoading(false));
   }, [tripId]);
 
@@ -49,6 +55,8 @@ export default function EditTripScreen() {
     setCountry(next);
     setRegions([]);
     setLodging(undefined);
+    setStartPoint(undefined);
+    setEndPoint(undefined);
   };
 
   const changeStartDate = (next: string) => {
@@ -67,6 +75,8 @@ export default function EditTripScreen() {
         timezone: country.timezone,
         startDate,
         endDate,
+        startPoint: startPoint ?? null,
+        endPoint: endPoint ?? null,
       });
       await savePrimaryLodging(tripId, {
         googlePlaceId: lodging?.googlePlaceId,
@@ -78,7 +88,7 @@ export default function EditTripScreen() {
       });
       router.back();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "여행 정보를 저장하지 못했어요.");
+      setError(safeErrorMessage(caught, "여행 정보를 저장하지 못했어요."));
     } finally {
       setSaving(false);
     }
@@ -96,10 +106,12 @@ export default function EditTripScreen() {
       <RegionMultiSelect country={country} value={regions} onChange={setRegions} />
       {startDate && <DateField label="출발일" value={startDate} onChange={changeStartDate} />}
       {endDate && <DateField label="종료일" value={endDate} minimumDate={startDate} onChange={setEndDate} />}
+      <TripBoundarySearchField destination={country.name} kind="start" value={startPoint} onChange={setStartPoint} />
+      <TripBoundarySearchField destination={country.name} kind="end" value={endPoint} onChange={setEndPoint} />
       <LodgingSearchField destination={[...regions.map((region) => region.name), country.name].join(", ")} value={lodging} onChange={setLodging} />
     </Card>
     {error && <AppText color={colors.danger}>{error}</AppText>}
-    <Button label={saving ? "저장 중…" : "변경사항 저장"} disabled={loading || saving || !title.trim() || !startDate || !endDate || regions.length === 0} onPress={() => void submit()} />
+    <Button label={saving ? "저장 중…" : "변경사항 저장"} disabled={loading || saving || !title.trim() || !startDate || !endDate || regions.length === 0 || !isBoundaryPointValid(startPoint) || !isBoundaryPointValid(endPoint)} onPress={() => void submit()} />
   </Screen>;
 }
 

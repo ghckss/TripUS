@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsDateString, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 
 import { TripRegionDto } from './trip-region.dto';
+import { TripBoundaryPointDto } from './trip-boundary-point.dto';
 
 export class CreateTripDto {
   @ApiProperty({ type: String, example: '서울 가을 여행', maxLength: 120 })
@@ -38,4 +39,16 @@ export class CreateTripDto {
   @ApiProperty({ type: String, example: '2026-11-02', format: 'date' })
   @IsDateString({ strict: true })
   endDate!: string;
+
+  @ApiPropertyOptional({ type: TripBoundaryPointDto, nullable: true })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TripBoundaryPointDto)
+  startPoint?: TripBoundaryPointDto | null;
+
+  @ApiPropertyOptional({ type: TripBoundaryPointDto, nullable: true })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TripBoundaryPointDto)
+  endPoint?: TripBoundaryPointDto | null;
 }

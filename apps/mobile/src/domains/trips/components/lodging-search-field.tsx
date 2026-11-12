@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 
 import { searchPlacesByDestination, type PlaceSearchCandidate } from "@/domains/places/api/places.api";
+import { safeErrorMessage } from "@/shared/api/trip-us-api";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
@@ -39,7 +40,7 @@ export function LodgingSearchField({ destination, value, onChange }: LodgingSear
       setResults(candidates);
       if (candidates.length === 0) setMessage("검색 결과가 없어요. 다른 이름으로 검색해 주세요.");
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "숙소를 검색하지 못했어요.");
+      setMessage(safeErrorMessage(caught, "숙소를 검색하지 못했어요."));
     } finally {
       setSearching(false);
     }
@@ -47,7 +48,7 @@ export function LodgingSearchField({ destination, value, onChange }: LodgingSear
 
   return <View style={styles.container}>
     <AppText variant="heading">기본 숙소</AppText>
-    <AppText color={colors.muted}>지도 검색 결과에서 선택하세요. 기본 숙소는 매일 일정의 시작과 끝에 자동 추가돼요.</AppText>
+    <AppText color={colors.muted}>지도 검색 결과에서 선택하세요. 숙소는 첫날 종료부터 마지막 날 시작까지 자동 연결돼요.</AppText>
     {value && <Card style={styles.selected}>
       <AppText variant="label">선택한 숙소</AppText>
       <AppText variant="heading">{value.name}</AppText>

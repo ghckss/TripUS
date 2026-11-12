@@ -13,6 +13,10 @@ export type AiBudgetLevel = components["schemas"]["AiBudgetLevel"];
 export type ReplaceItineraryItem = components["schemas"]["ReplaceItineraryItemDto"];
 export type TransitRoute = components["schemas"]["TransitRouteResponseDto"];
 
+export function isItineraryBoundary(item: ItineraryItem): boolean {
+  return item.boundaryType === "start_point" || item.boundaryType === "end_point";
+}
+
 export async function getItinerary(tripId: string): Promise<Itinerary> {
   return cachedRequest(cacheKeys.itinerary(tripId), async () => {
     const { data, error } = await tripUsApi.GET("/v1/trips/{tripId}/itinerary", { params: { path: { tripId } } });
@@ -44,7 +48,7 @@ export async function generateAiPlan(tripId: string, request: AiPlanRequest): Pr
 export async function undoAiPlan(tripId: string): Promise<Itinerary | undefined> {
   const previous = await readCache<Itinerary>(cacheKeys.aiUndo(tripId));
   if (!previous) return undefined;
-  const restored = await replaceItinerary(tripId, previous.items.map((item) => ({
+  const restored = await replaceItinerary(tripId, previous.items.filter((item) => !isItineraryBoundary(item)).map((item) => ({
     savedPlaceId: item.savedPlaceId,
     date: item.date!,
     position: item.position!,

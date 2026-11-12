@@ -4,7 +4,7 @@ import { useFocusEffect } from "expo-router";
 import { apiErrorMessage } from "@/shared/api/trip-us-api";
 import { getTrip } from "@/domains/trips";
 import { listPlaces, type SavedPlace } from "@/domains/places/api/places.api";
-import { getItinerary, replaceItinerary, undoAiPlan, type Itinerary } from "../../api/itineraries.api";
+import { getItinerary, isItineraryBoundary, replaceItinerary, undoAiPlan, type Itinerary } from "../../api/itineraries.api";
 import { ensureLodgingEndpoints, isLodgingPlace, replaceLodgingBoundary, type LodgingEdge } from "./itinerary-lodging-endpoints";
 
 function enumerateDates(startDate: string, endDate: string): string[] {
@@ -50,6 +50,7 @@ export function useItineraryEdit(tripId: string) {
   const [dates, setDates] = useState<string[]>([]);
   const [places, setPlaces] = useState<SavedPlace[]>([]);
   const [undoing, setUndoing] = useState(false);
+  const [undoMessage, setUndoMessage] = useState<string>();
 
   const reload = useCallback(async () => {
     setError(undefined);
@@ -71,9 +72,11 @@ export function useItineraryEdit(tripId: string) {
     const currentItems = itinerary.items
       .filter((item) => item.date === date)
       .sort((left, right) => (left.position ?? 0) - (right.position ?? 0));
+    const dateIndex = dates.indexOf(date);
     const endpointItemIds = new Set([
-      ...(isLodgingPlace(currentItems[0]?.savedPlaceId ? placesById.get(currentItems[0].savedPlaceId) : undefined) ? [currentItems[0].id] : []),
-      ...(currentItems.length > 1 && isLodgingPlace(currentItems.at(-1)?.savedPlaceId ? placesById.get(currentItems.at(-1)!.savedPlaceId) : undefined) ? [currentItems.at(-1)!.id] : []),
+      ...currentItems.filter(isItineraryBoundary).map((item) => item.id),
+      ...(dateIndex > 0 && isLodgingPlace(currentItems[0]?.savedPlaceId ? placesById.get(currentItems[0].savedPlaceId) : undefined) ? [currentItems[0].id] : []),
+      ...(dateIndex < dates.length - 1 && isLodgingPlace(currentItems.at(-1)?.savedPlaceId ? placesById.get(currentItems.at(-1)!.savedPlaceId) : undefined) ? [currentItems.at(-1)!.id] : []),
     ]);
     const currentVisitIds = new Set(currentItems.filter((item) => !endpointItemIds.has(item.id)).map((item) => item.savedPlaceId));
 
@@ -115,7 +118,7 @@ export function useItineraryEdit(tripId: string) {
     setItinerary((current) => {
       if (!current) return current;
       const item = current.items.find((candidate) => candidate.id === itemId);
-      if (!item) return current;
+      if (!item || isItineraryBoundary(item)) return current;
       const sameDay = current.items
         .filter((candidate) => candidate.date === item.date)
         .sort((left, right) => (left.position ?? 0) - (right.position ?? 0));
@@ -147,7 +150,7 @@ export function useItineraryEdit(tripId: string) {
       const item = current.items.find((candidate) => candidate.id === itemId);
       const currentIndex = item?.date ? dates.indexOf(item.date) : -1;
       const nextDate = dates[currentIndex + direction];
-      if (!item || !nextDate) return current;
+      if (!item || !nextDate || isItineraryBoundary(item)) return current;
       return normalizePositions({
         ...current,
         items: current.items.map((candidate) => candidate.id === itemId
@@ -160,7 +163,7 @@ export function useItineraryEdit(tripId: string) {
   const removeFromItinerary = (itemId: string) => {
     if (!itinerary) return;
     const item = itinerary.items.find((candidate) => candidate.id === itemId);
-    if (!item) return;
+    if (!item || isItineraryBoundary(item)) return;
     const nextItems = itinerary.items.filter((candidate) => candidate.id !== itemId);
     const stillPlaced = nextItems.some((candidate) => candidate.savedPlaceId === item.savedPlaceId);
     setItinerary(normalizePositions({ items: nextItems, unplaced: stillPlaced ? itinerary.unplaced : [...itinerary.unplaced, { savedPlaceId: item.savedPlaceId, placeName: item.placeName }] }));
@@ -171,7 +174,7 @@ export function useItineraryEdit(tripId: string) {
     setSaving(true); setError(undefined);
     try {
       const prepared = ensureLodgingEndpoints(itinerary, dates, places);
-      setItinerary(await replaceItinerary(tripId, prepared.items.map((item) => ({
+      setItinerary(await replaceItinerary(tripId, prepared.items.filter((item) => !isItineraryBoundary(item)).map((item) => ({
         savedPlaceId: item.savedPlaceId, date: item.date!, position: item.position!, locked: false,
         ...(item.scheduledTime ? { scheduledTime: item.scheduledTime } : {}),
         ...(item.durationMinutes ? { durationMinutes: item.durationMinutes } : {}),
@@ -184,14 +187,14 @@ export function useItineraryEdit(tripId: string) {
   };
 
   const undoAiChange = async () => {
-    setUndoing(true); setError(undefined);
+    setUndoing(true); setError(undefined); setUndoMessage(undefined);
     try {
       const restored = await undoAiPlan(tripId);
-      if (!restored) { setError("되돌릴 AI 변경이 없어요."); return; }
+      if (!restored) { setUndoMessage("되돌릴 AI 변경이 없어요."); return; }
       setItinerary(restored);
     } catch (caught) { setError(apiErrorMessage(caught)); }
     finally { setUndoing(false); }
   };
 
-  return { dates, error, itinerary, moveToAdjacentDay, places, reload, removeFromItinerary, reorderWithinDay, replaceDayLodging, save, saving, setPlacesForDate, undoAiChange, undoing };
+  return { dates, error, itinerary, moveToAdjacentDay, places, reload, removeFromItinerary, reorderWithinDay, replaceDayLodging, save, saving, setPlacesForDate, undoAiChange, undoing, undoMessage };
 }

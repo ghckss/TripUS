@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { savePlace, searchPlaces, type PlaceSearchCandidate, type SavedPlace } from "@/domains/places/api/places.api";
 import { inferPlaceTag } from "@/domains/places/model/infer-place-tag";
+import { safeErrorMessage } from "@/shared/api/trip-us-api";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
@@ -54,7 +55,7 @@ export function DayPlacePicker({ tripId, date, dayIndex, items, places, onApply,
       const candidates = await searchPlaces(tripId, normalized);
       setResults(candidates);
       if (candidates.length === 0) setMessage("검색 결과가 없어요.");
-    } catch (caught) { setMessage(caught instanceof Error ? caught.message : "장소를 검색하지 못했어요."); }
+    } catch (caught) { setMessage(safeErrorMessage(caught, "장소를 검색하지 못했어요.")); }
     finally { setSearching(false); }
   };
   const addNewPlace = async (candidate: PlaceSearchCandidate) => {
@@ -74,7 +75,7 @@ export function DayPlacePicker({ tripId, date, dayIndex, items, places, onApply,
       setAvailablePlaces((current) => current.some((place) => place.id === result.place.id) ? current : [...current, result.place]);
       setSelected((current) => new Set(current).add(result.place.id));
       setMessage(`${candidate.name}을(를) 저장하고 선택했어요.`);
-    } catch (caught) { setMessage(caught instanceof Error ? caught.message : "장소를 추가하지 못했어요."); }
+    } catch (caught) { setMessage(safeErrorMessage(caught, "장소를 추가하지 못했어요.")); }
     finally { setSavingId(undefined); }
   };
 

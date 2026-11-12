@@ -4,6 +4,7 @@ import { useFocusEffect } from "expo-router";
 import { getTrip, type Trip } from "@/domains/trips/api/trips.api";
 import { getItinerary } from "@/domains/itineraries";
 import { listTravelPlaces } from "@/domains/places/api/places.api";
+import { safeErrorMessage } from "@/shared/api/trip-us-api";
 
 export function useTripDetail(tripId: string) {
   const [trip, setTrip] = useState<Trip>();
@@ -19,7 +20,7 @@ export function useTripDetail(tripId: string) {
       setPlaceCount(places.length);
       setScheduledCount(itinerary.items.length);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "여행을 불러오지 못했어요.");
+      setError(safeErrorMessage(caught, "여행을 불러오지 못했어요."));
     }
   }, [tripId]);
 

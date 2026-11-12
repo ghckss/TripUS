@@ -6,23 +6,20 @@ import { AiPlannerInput, AiPlannerOutput, AiPlannerPort } from '../domain/ai-pla
 export class MockAiPlannerAdapter implements AiPlannerPort {
   generate(input: AiPlannerInput): Promise<AiPlannerOutput> {
     const dates = enumerateDates(input.trip.startDate, input.trip.endDate);
-    const perDay = input.style.recommendedPlacesPerDay;
-    const capacity = dates.length * perDay;
     const ranked = [...input.places].sort((a, b) => preferenceScore(b.preference) - preferenceScore(a.preference));
     return Promise.resolve({
-      placements: ranked.slice(0, capacity).map((place, index) => ({
+      placements: ranked.map((place, index) => ({
         savedPlaceId: place.id,
-        date: dates[Math.floor(index / perDay)]!,
-        position: index % perDay,
-        startTime: `${String(9 + (index % perDay) * 2).padStart(2, '0')}:00`,
+        date: dates[index % dates.length]!,
+        position: Math.floor(index / dates.length),
+        startTime: `${String(9 + Math.floor(index / dates.length) * 2).padStart(2, '0')}:00`,
         durationMinutes: 90,
         activity: `${place.name} 방문`,
         travelMethod: '대중교통',
         travelDurationMinutes: 20,
       })),
-      unplaced: ranked.slice(capacity).map((place) => ({ savedPlaceId: place.id, reason: 'DAILY_CAPACITY' })),
+      unplaced: [],
       recommendations: [],
-      planBs: [],
     });
   }
 }

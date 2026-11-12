@@ -15,7 +15,6 @@ import { AuthModule } from './modules/auth/auth.module';
 import { PhotosModule } from './modules/photos/photos.module';
 import { TelemetryModule } from './modules/telemetry/telemetry.module';
 import { EntitlementsModule } from './modules/entitlements/entitlements.module';
-import { TripDaySettingsModule } from './modules/trip-day-settings/trip-day-settings.module';
 
 @Module({
   imports: [
@@ -46,7 +45,6 @@ import { TripDaySettingsModule } from './modules/trip-day-settings/trip-day-sett
     PhotosModule,
     TelemetryModule,
     EntitlementsModule,
-    TripDaySettingsModule,
   ],
 })
 export class AppModule {}

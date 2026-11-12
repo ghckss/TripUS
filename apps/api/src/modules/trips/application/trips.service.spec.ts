@@ -79,6 +79,29 @@ describe('TripsService', () => {
     expect(result.regions).toHaveLength(2);
   });
 
+  it('normalizes optional start and end points', async () => {
+    const { repository, service } = createService();
+    repository.save.mockImplementation((trip: unknown) => Promise.resolve(trip as TripEntity));
+
+    await service.create({
+      title: '도쿄 여행', destination: '일본', timezone: 'Asia/Tokyo',
+      startDate: '2026-11-10', endDate: '2026-11-12',
+      startPoint: {
+        googlePlaceId: ' airport-1 ', name: ' 나리타 국제공항 ', address: ' 일본 지바현 ',
+        latitude: 35.77, longitude: 140.39, time: '15:30',
+      },
+      endPoint: null,
+    });
+
+    expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({
+      startPoint: {
+        googlePlaceId: 'airport-1', name: '나리타 국제공항', address: '일본 지바현',
+        latitude: 35.77, longitude: 140.39, time: '15:30',
+      },
+      endPoint: null,
+    }));
+  });
+
   it('rejects duplicate trip regions', async () => {
     const { service } = createService();
     await expect(service.create({

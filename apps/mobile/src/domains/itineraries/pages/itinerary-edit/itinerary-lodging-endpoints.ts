@@ -1,5 +1,6 @@
 import type { SavedPlace } from "@/domains/places/api/places.api";
 import type { Itinerary } from "../../api/itineraries.api";
+import { isItineraryBoundary } from "../../api/itineraries.api";
 
 export type LodgingEdge = "start" | "end";
 
@@ -73,18 +74,32 @@ export function ensureLodgingEndpoints(itinerary: Itinerary, dates: string[], pl
   const placesById = new Map(places.map((place) => [place.id, place]));
   const datedItems = new Set(dates);
   const nextItems = itinerary.items.filter((item) => !datedItems.has(item.date ?? ""));
-  dates.forEach((date) => {
+  dates.forEach((date, dateIndex) => {
     const day = itinerary.items.filter((item) => item.date === date).sort((left, right) => (left.position ?? 0) - (right.position ?? 0));
+    const startBoundary = day.find((item) => item.boundaryType === "start_point");
+    const endBoundary = day.find((item) => item.boundaryType === "end_point");
+    const dayWithoutBoundaries = day.filter((item) => !isItineraryBoundary(item));
     const isLodgingItem = (item: Itinerary["items"][number] | undefined) => isLodgingPlace(item ? placesById.get(item.savedPlaceId) : undefined);
-    const existingStart = isLodgingItem(day[0]) ? day[0] : undefined;
-    const existingEnd = [...day].reverse().find((item) => item.id !== existingStart?.id && isLodgingItem(item));
-    const start = existingStart ?? lodgingEndpoint(lodging, date, "start");
-    const end = existingEnd ?? lodgingEndpoint(lodging, date, "end");
-    const visits = day.filter((item) => !isLodgingItem(item));
+    const includeStart = dateIndex > 0;
+    const includeEnd = dateIndex < dates.length - 1;
+    const existingStart = includeStart && isLodgingItem(dayWithoutBoundaries[0]) ? dayWithoutBoundaries[0] : undefined;
+    const existingEnd = includeEnd
+      ? [...dayWithoutBoundaries].reverse().find((item) => item.id !== existingStart?.id && isLodgingItem(item))
+      : undefined;
+    const start = includeStart ? existingStart ?? lodgingEndpoint(lodging, date, "start") : undefined;
+    const end = includeEnd ? existingEnd ?? lodgingEndpoint(lodging, date, "end") : undefined;
+    const visits = dayWithoutBoundaries.filter((item) => !isLodgingItem(item));
+    const boundaryStartItems = startBoundary ? [{ ...startBoundary, position: 0 }] : [];
+    const startItems = start ? [{ ...start, position: boundaryStartItems.length }] : [];
+    const visitOffset = boundaryStartItems.length + startItems.length;
+    const endItems = end ? [{ ...end, position: visits.length + visitOffset }] : [];
+    const boundaryEndItems = endBoundary ? [{ ...endBoundary, position: visits.length + visitOffset + endItems.length }] : [];
     nextItems.push(
-      { ...start, position: 0 },
-      ...visits.map((item, index) => ({ ...item, position: index + 1 })),
-      { ...end, position: visits.length + 1 },
+      ...boundaryStartItems,
+      ...startItems,
+      ...visits.map((item, index) => ({ ...item, position: index + visitOffset })),
+      ...endItems,
+      ...boundaryEndItems,
     );
   });
   const endpointIds = new Set(dates.flatMap((date) => {

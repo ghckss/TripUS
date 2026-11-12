@@ -148,22 +148,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/trips/{tripId}/day-settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["TripDaySettingsController_get"];
-        put: operations["TripDaySettingsController_replace"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/trips/{tripId}/places": {
         parameters: {
             query?: never;
@@ -174,7 +158,7 @@ export interface paths {
         get: operations["PlacesController_list"];
         put?: never;
         post: operations["PlacesController_create"];
-        delete?: never;
+        delete: operations["PlacesController_removeMany"];
         options?: never;
         head?: never;
         patch?: never;
@@ -439,8 +423,9 @@ export interface components {
         ItinerarySource: "manual" | "ai";
         /** @enum {string} */
         VisitStatus: "rated" | "unrated" | "not_visited";
+        /** @enum {string} */
+        ItineraryBoundaryType: "start_point" | "end_point";
         ItineraryItemResponseDto: {
-            /** Format: uuid */
             id: string;
             /** Format: uuid */
             savedPlaceId: string;
@@ -462,6 +447,7 @@ export interface components {
             visitStatus?: components["schemas"]["VisitStatus"] | null;
             rating?: number | null;
             review?: string | null;
+            boundaryType?: components["schemas"]["ItineraryBoundaryType"] | null;
         };
         UnplacedPlaceResponseDto: {
             /** Format: uuid */
@@ -516,31 +502,6 @@ export interface components {
             aiGenerationLimit: number | null;
             /** @example 0 */
             aiGenerationsUsed: number;
-        };
-        TripDaySettingResponseDto: {
-            /** Format: date */
-            date: string;
-            /** @example 09:00 */
-            startTime: string;
-            /** @example 21:00 */
-            endTime: string;
-            planBPlaceName?: string | null;
-            planBAddress?: string | null;
-            planBReason?: string | null;
-        };
-        TripDaySettingInputDto: {
-            /** Format: date */
-            date: string;
-            /** @example 09:00 */
-            startTime: string;
-            /** @example 21:00 */
-            endTime: string;
-            planBPlaceName?: string | null;
-            planBAddress?: string | null;
-            planBReason?: string | null;
-        };
-        ReplaceTripDaySettingsDto: {
-            settings: components["schemas"]["TripDaySettingInputDto"][];
         };
         /** @enum {string} */
         PlaceTag: "attraction" | "food" | "cafe" | "shopping" | "lodging" | "transport" | "activity" | "other";
@@ -599,6 +560,9 @@ export interface components {
             note?: string | null;
             isPrimaryLodging?: boolean;
         };
+        RemoveSavedPlacesDto: {
+            placeIds: string[];
+        };
         TransitRouteRequestDto: {
             /** Format: uuid */
             originSavedPlaceId: string;
@@ -625,6 +589,15 @@ export interface components {
             latitude: number | null;
             longitude: number | null;
         };
+        TripBoundaryPointDto: {
+            googlePlaceId: string | null;
+            name: string;
+            address: string | null;
+            latitude: number | null;
+            longitude: number | null;
+            /** @example 15:30 */
+            time: string | null;
+        };
         TripResponseDto: {
             /** Format: uuid */
             id: string;
@@ -637,6 +610,8 @@ export interface components {
             startDate: string;
             /** Format: date */
             endDate: string;
+            startPoint?: components["schemas"]["TripBoundaryPointDto"] | null;
+            endPoint?: components["schemas"]["TripBoundaryPointDto"] | null;
             active: boolean;
             /** Format: date-time */
             archivedAt?: string | null;
@@ -660,6 +635,8 @@ export interface components {
              * @example 2026-11-02
              */
             endDate: string;
+            startPoint?: components["schemas"]["TripBoundaryPointDto"] | null;
+            endPoint?: components["schemas"]["TripBoundaryPointDto"] | null;
         };
         UpdateTripDto: {
             title?: string;
@@ -670,6 +647,8 @@ export interface components {
             startDate?: string;
             /** Format: date */
             endDate?: string;
+            startPoint?: components["schemas"]["TripBoundaryPointDto"] | null;
+            endPoint?: components["schemas"]["TripBoundaryPointDto"] | null;
         };
         CompleteTripItemDto: {
             /** Format: uuid */
@@ -954,52 +933,6 @@ export interface operations {
             };
         };
     };
-    TripDaySettingsController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                tripId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TripDaySettingResponseDto"][];
-                };
-            };
-        };
-    };
-    TripDaySettingsController_replace: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                tripId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReplaceTripDaySettingsDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TripDaySettingResponseDto"][];
-                };
-            };
-        };
-    };
     PlacesController_list: {
         parameters: {
             query?: never;
@@ -1043,6 +976,29 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SavePlaceResultDto"];
                 };
+            };
+        };
+    };
+    PlacesController_removeMany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoveSavedPlacesDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

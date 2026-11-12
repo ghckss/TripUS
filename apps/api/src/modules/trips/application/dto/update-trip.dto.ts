@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsDateString, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 
 import { TripRegionDto } from './trip-region.dto';
+import { TripBoundaryPointDto } from './trip-boundary-point.dto';
 
 export class UpdateTripDto {
   @ApiPropertyOptional({ type: String, maxLength: 120 })
@@ -43,4 +44,16 @@ export class UpdateTripDto {
   @IsOptional()
   @IsDateString({ strict: true })
   endDate?: string;
+
+  @ApiPropertyOptional({ type: TripBoundaryPointDto, nullable: true })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TripBoundaryPointDto)
+  startPoint?: TripBoundaryPointDto | null;
+
+  @ApiPropertyOptional({ type: TripBoundaryPointDto, nullable: true })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TripBoundaryPointDto)
+  endPoint?: TripBoundaryPointDto | null;
 }
