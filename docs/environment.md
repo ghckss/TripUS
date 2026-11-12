@@ -120,6 +120,22 @@ APPLE_OIDC_CLIENT_IDS=<Apple Service ID 또는 Bundle ID>
 ACCESS_TOKEN_SECRET=<32자 이상의 무작위 비밀값>
 ```
 
+Google 로그인은 네이티브 Google Sign-In SDK를 사용한다. Google Cloud의 OAuth 클라이언트는 다음 세 종류를 각각 만들어야 한다.
+
+- Android: package name `com.tripus.app`과 현재 빌드 인증서의 SHA-1 등록
+- iOS: Bundle ID `com.tripus.app` 등록
+- Web application: 모바일에서 발급받을 ID 토큰의 audience로 사용
+
+OAuth 동의 화면이 `External · Testing` 상태라면 실제 로그인에 사용할 Google 계정을 Auth Platform의 테스트 사용자에 추가한다. Android OAuth 클라이언트의 SHA-1은 개발 빌드와 Play 배포 빌드가 서로 다를 수 있으므로 각각 등록한다.
+
+Google 로그인 SDK와 iOS URL Scheme은 네이티브 빌드에 포함된다. Client ID를 처음 설정하거나 로그인 SDK 구성을 변경한 뒤에는 Metro만 다시 시작하지 말고 네이티브 프로젝트와 Development Build를 다시 생성한다.
+
+```bash
+pnpm --filter @tripus/mobile prebuild:ios
+pnpm --filter @tripus/mobile ios
+pnpm --filter @tripus/mobile android
+```
+
 Apple 로그인에는 별도 모바일 비밀값이 필요하지 않으며 앱의 Bundle ID와 Apple Developer 설정이 일치해야 한다.
 
 ## AWS 배포

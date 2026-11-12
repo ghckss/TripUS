@@ -7,6 +7,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const expo = baseConfig.expo as ExpoConfig;
   const iosGoogleMapsApiKey = process.env.GOOGLE_MAPS_IOS_API_KEY;
   const androidGoogleMapsApiKey = process.env.GOOGLE_MAPS_ANDROID_API_KEY;
+  const iosGoogleClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+  const iosGoogleUrlScheme = iosGoogleClientId
+    ?.replace(/\.apps\.googleusercontent\.com$/, "")
+    .replace(/^(.*)$/, "com.googleusercontent.apps.$1");
   const plugins = enableAppleSignIn
     ? [...(expo.plugins ?? [])]
     : ["./plugins/without-local-apple-sign-in", ...(expo.plugins ?? [])];
@@ -19,6 +23,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
   ]);
   plugins.push("expo-sharing");
+  if (iosGoogleUrlScheme) {
+    plugins.push([
+      "@react-native-google-signin/google-signin",
+      { iosUrlScheme: iosGoogleUrlScheme },
+    ]);
+  }
   plugins.push([
     "expo-media-library",
     {
