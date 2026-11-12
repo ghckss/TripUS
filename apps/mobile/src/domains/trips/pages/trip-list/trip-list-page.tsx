@@ -30,7 +30,6 @@ export default function TripsScreen() {
           </Card>
         </Pressable>
       ))}
-      <Card><AppText variant="heading">장소부터 가볍게 모아보세요</AppText><AppText color={colors.muted}>일정에 넣을지는 나중에 일정 편집에서 결정할 수 있어요.</AppText></Card>
     </Screen>
   );
 }

@@ -13,6 +13,8 @@ const googleDiscovery = {
   revocationEndpoint: "https://oauth2.googleapis.com/revoke",
 };
 
+const LOGIN_CANCELLED = Symbol("LOGIN_CANCELLED");
+
 export function useLogin() {
   const [loading, setLoading] = useState<"development" | "google" | "apple">();
   const [error, setError] = useState<string>();
@@ -25,7 +27,10 @@ export function useLogin() {
   const finish = () => router.replace("/(tabs)/trips");
   const run = async (kind: typeof loading, action: () => Promise<unknown>) => {
     setLoading(kind); setError(undefined);
-    try { await action(); finish(); }
+    try {
+      const result = await action();
+      if (result !== LOGIN_CANCELLED) finish();
+    }
     catch (caught) { setError(apiErrorMessage(caught)); }
     finally { setLoading(undefined); }
   };
@@ -43,7 +48,8 @@ export function useLogin() {
       usePKCE: true,
     });
     const result = await request.promptAsync(googleDiscovery);
-    if (result.type !== "success" || !result.params.code) throw new Error("Google 로그인이 취소됐어요.");
+    if (result.type === "cancel" || result.type === "dismiss") return LOGIN_CANCELLED;
+    if (result.type !== "success" || !result.params.code) throw new Error("Google 로그인을 완료하지 못했어요. 다시 시도해 주세요.");
     const tokens = await exchangeCodeAsync({
       clientId: googleClientId,
       code: result.params.code,
