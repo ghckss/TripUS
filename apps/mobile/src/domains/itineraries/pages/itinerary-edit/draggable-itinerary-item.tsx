@@ -39,10 +39,6 @@ export function DraggableItineraryItem({
   return <View style={styles.card}>
     <View style={styles.header}>
       {!fixed ? <>
-        <Pressable accessibilityLabel={`${placeName} 지도에서 보기`} accessibilityRole="button" onPress={onPress} style={styles.placeContent}>
-          <View style={styles.order}><AppText variant="caption" color={colors.white}>{index + 1}</AppText></View>
-          <AppText numberOfLines={2} variant="label" style={styles.name}>{placeName}</AppText>
-        </Pressable>
         <SortableItem.Handle>
           <Pressable
             accessibilityActions={accessibilityActions}
@@ -60,10 +56,17 @@ export function DraggableItineraryItem({
             <AppText variant="heading" color={colors.primary}>⠿</AppText>
           </Pressable>
         </SortableItem.Handle>
-      </> : <Pressable accessibilityLabel={`${placeName} 지도에서 보기`} accessibilityRole="button" onPress={onPress} style={styles.placeSummary}>
+        <Pressable accessibilityLabel={`${placeName} 지도에서 보기`} accessibilityRole="button" onPress={onPress} style={styles.placeContent}>
+          <View style={styles.order}><AppText variant="caption" color={colors.white}>{index + 1}</AppText></View>
+          <AppText numberOfLines={2} variant="label" style={styles.name}>{placeName}</AppText>
+        </Pressable>
+      </> : <>
+        <View style={styles.fixedHandleSpacer} />
+        <Pressable accessibilityLabel={`${placeName} 지도에서 보기`} accessibilityRole="button" onPress={onPress} style={styles.placeSummary}>
         <View style={styles.order}><AppText variant="caption" color={colors.white}>{index + 1}</AppText></View>
         <AppText numberOfLines={2} variant="label" style={styles.name}>{placeName}</AppText>
-      </Pressable>}
+        </Pressable>
+      </>}
       {fixed && onEdit && <Pressable accessibilityLabel={`${placeName} ${fixedLabel} 수정`} hitSlop={8} onPress={onEdit} style={styles.edit}>
         <AppText variant="label" color={colors.primary}>수정</AppText>
       </Pressable>}
@@ -78,6 +81,7 @@ const styles = StyleSheet.create({
   card: { height: 80, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
   header: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   dragHandle: { width: 32, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  fixedHandleSpacer: { width: 32 },
   placeContent: { flex: 1, minHeight: 44, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   placeSummary: { flex: 1, minHeight: 44, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   order: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary },

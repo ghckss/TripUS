@@ -246,8 +246,8 @@ const styles = StyleSheet.create({
   sortableContent: { overflow: "visible" },
   sortableItem: { height: ITINERARY_ITEM_HEIGHT, overflow: "visible" },
   connector: { height: TRAVEL_CONNECTOR_HEIGHT, justifyContent: "center" },
-  connectorLine: { position: "absolute", top: 0, bottom: 0, left: 27, width: 2, backgroundColor: colors.line },
-  connectorDot: { position: "absolute", left: 24, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.secondary },
-  connectorLabel: { alignSelf: "flex-start", marginLeft: 48, borderRadius: radius.pill, backgroundColor: colors.secondarySoft, paddingHorizontal: spacing.sm, paddingVertical: 2 },
+  connectorLine: { position: "absolute", top: 0, bottom: 0, left: 67, width: 2, backgroundColor: colors.line },
+  connectorDot: { position: "absolute", left: 64, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.secondary },
+  connectorLabel: { alignSelf: "flex-start", marginLeft: 88, borderRadius: radius.pill, backgroundColor: colors.secondarySoft, paddingHorizontal: spacing.sm, paddingVertical: 2 },
   undoMessage: { marginTop: -spacing.sm, textAlign: "center" },
 });
