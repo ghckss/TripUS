@@ -1,21 +1,25 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 
 import { IDENTITY_PORT, type IdentityPort } from '../../identity/domain/identity.port';
 import { SavedPlaceEntity } from '../../places/domain/entities/saved-place.entity';
 import { TripEntity } from '../../trips/domain/entities/trip.entity';
+import { ROUTES_PORT, type RoutesPort } from '../../routes/domain/routes.port';
 import { ItineraryItemEntity, ItinerarySource } from '../domain/entities/itinerary-item.entity';
 import { ItineraryBoundaryType, ItineraryResponseDto, ItineraryUpdateResultDto, ItineraryUpdateStatus, ReplaceItineraryItemDto } from './dto/itinerary.dto';
 
 @Injectable()
 export class ItinerariesService {
+  private readonly logger = new Logger(ItinerariesService.name);
+
   constructor(
     @InjectRepository(ItineraryItemEntity) private readonly items: Repository<ItineraryItemEntity>,
     @InjectRepository(SavedPlaceEntity) private readonly places: Repository<SavedPlaceEntity>,
     @InjectRepository(TripEntity) private readonly trips: Repository<TripEntity>,
     @Inject(DataSource) private readonly dataSource: DataSource,
     @Inject(IDENTITY_PORT) private readonly identity: IdentityPort,
+    @Inject(ROUTES_PORT) private readonly routes: RoutesPort,
   ) {}
 
   async get(tripId: string): Promise<ItineraryResponseDto> {
@@ -62,12 +66,43 @@ export class ItinerariesService {
       this.places.find({ where: { tripId, isPrimaryLodging: false }, order: { createdAt: 'ASC' } }),
     ]);
     const placedIds = new Set(items.map((item) => item.savedPlaceId));
+    const boundaryTravel = await this.estimateBoundaryTravel(items, trip);
+    const responseItems = items.map(ItineraryResponseDtoItem);
+    const firstStartDateItem = responseItems.find((item) => item.date === trip.startDate);
+    if (firstStartDateItem && boundaryTravel.startDurationMinutes != null) {
+      firstStartDateItem.travelMethod = '대중교통';
+      firstStartDateItem.travelDurationMinutes = boundaryTravel.startDurationMinutes;
+    }
     return {
-      items: addTripBoundaryPoints(items.map(ItineraryResponseDtoItem), trip),
+      items: addTripBoundaryPoints(responseItems, trip, boundaryTravel.endDurationMinutes),
       unplaced: places
         .filter((place) => !place.isPrimaryLodging && !placedIds.has(place.id))
         .map((place) => ({ savedPlaceId: place.id, placeName: place.name })),
     };
+  }
+
+  private async estimateBoundaryTravel(items: ItineraryItemEntity[], trip: TripEntity): Promise<{
+    startDurationMinutes: number | null;
+    endDurationMinutes: number | null;
+  }> {
+    const startItems = items.filter((item) => item.date === trip.startDate);
+    const endItems = items.filter((item) => item.date === trip.endDate);
+    const first = startItems[0];
+    const last = endItems.at(-1);
+    const estimate = async (originGooglePlaceId?: string | null, destinationGooglePlaceId?: string | null) => {
+      if (!originGooglePlaceId || !destinationGooglePlaceId) return null;
+      try {
+        return (await this.routes.transit({ originGooglePlaceId, destinationGooglePlaceId }))?.durationMinutes ?? null;
+      } catch {
+        this.logger.warn(`Boundary route estimate unavailable origin=${originGooglePlaceId} destination=${destinationGooglePlaceId}`);
+        return null;
+      }
+    };
+    const [startDurationMinutes, endDurationMinutes] = await Promise.all([
+      estimate(trip.startPoint?.googlePlaceId, first?.savedPlace?.googlePlaceId),
+      estimate(last?.savedPlace?.googlePlaceId, trip.endPoint?.googlePlaceId),
+    ]);
+    return { startDurationMinutes, endDurationMinutes };
   }
 
   private async findConflicts(trip: TripEntity, input: ReplaceItineraryItemDto[]): Promise<string[]> {
@@ -121,6 +156,7 @@ function ItineraryResponseDtoItem(entity: ItineraryItemEntity) {
 export function addTripBoundaryPoints(
   items: ItineraryResponseDto['items'],
   trip: Pick<TripEntity, 'id' | 'startDate' | 'endDate' | 'startPoint' | 'endPoint'>,
+  endTravelDurationMinutes: number | null = null,
 ): ItineraryResponseDto['items'] {
   const withoutVirtualBoundaries = items.filter((item) => !item.boundaryType);
   const byDate = new Map<string, ItineraryResponseDto['items']>();
@@ -138,7 +174,7 @@ export function addTripBoundaryPoints(
       : [];
     const shifted = dateItems.map((item, index) => ({ ...item, position: index + start.length }));
     const end = date === trip.endDate && trip.endPoint
-      ? [boundaryItem(trip, ItineraryBoundaryType.EndPoint, date, trip.endPoint, shifted.length + start.length)]
+      ? [boundaryItem(trip, ItineraryBoundaryType.EndPoint, date, trip.endPoint, shifted.length + start.length, endTravelDurationMinutes)]
       : [];
     result.push(...start, ...shifted, ...end);
   }
@@ -151,6 +187,7 @@ function boundaryItem(
   date: string,
   point: NonNullable<TripEntity['startPoint']>,
   position: number,
+  travelDurationMinutes: number | null = null,
 ): ItineraryResponseDto['items'][number] {
   const isStart = boundaryType === ItineraryBoundaryType.StartPoint;
   return {
@@ -166,7 +203,7 @@ function boundaryItem(
     durationMinutes: null,
     activitySummary: isStart ? '여행 시작 지점' : '여행 종료 지점',
     travelMethod: null,
-    travelDurationMinutes: null,
+    travelDurationMinutes,
     locked: true,
     source: ItinerarySource.Manual,
     visitStatus: null,

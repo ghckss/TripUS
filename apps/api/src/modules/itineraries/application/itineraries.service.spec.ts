@@ -18,7 +18,7 @@ describe('trip boundary itinerary items', () => {
       endDate: '2026-11-10',
       startPoint: { googlePlaceId: 'airport-1', name: '인천공항 제1터미널', address: '인천', latitude: 37.46, longitude: 126.44, time: '09:30' },
       endPoint: { googlePlaceId: 'airport-2', name: '인천공항 제2터미널', address: '인천', latitude: 37.46, longitude: 126.43, time: '18:00' },
-    });
+    }, 37);
 
     expect(result.filter((item) => item.date === '2026-11-08').map((item) => [item.boundaryType, item.placeName, item.position])).toEqual([
       ['start_point', '인천공항 제1터미널', 0],
@@ -28,10 +28,65 @@ describe('trip boundary itinerary items', () => {
       [undefined, '서울숲', 0],
       ['end_point', '인천공항 제2터미널', 1],
     ]);
+    expect(result.at(-1)?.travelDurationMinutes).toBe(37);
   });
 });
 
 describe('ItinerariesService', () => {
+  it('calculates travel time from the final visit to the configured end point', async () => {
+    const tripId = '10000000-0000-4000-8000-000000000001';
+    const visit = {
+      id: '30000000-0000-4000-8000-000000000001',
+      tripId,
+      savedPlaceId: '20000000-0000-4000-8000-000000000001',
+      date: '2026-11-08',
+      position: 0,
+      scheduledTime: null,
+      durationMinutes: null,
+      activitySummary: null,
+      travelMethod: null,
+      travelDurationMinutes: null,
+      locked: false,
+      source: 'ai',
+      visitStatus: null,
+      rating: null,
+      review: null,
+      savedPlace: { name: '경복궁', address: '서울 종로구', latitude: 37.5796, longitude: 126.977, googlePlaceId: 'visit-google-id' },
+    };
+    const items = { find: vi.fn().mockResolvedValue([visit]) };
+    const places = { find: vi.fn().mockResolvedValue([]) };
+    const trips = { findOneBy: vi.fn().mockResolvedValue({
+      id: tripId,
+      active: true,
+      startDate: '2026-11-08',
+      endDate: '2026-11-08',
+      startPoint: { googlePlaceId: 'start-google-id', name: '서울역', time: '09:00' },
+      endPoint: { googlePlaceId: 'end-google-id', name: '인천공항', time: '18:00' },
+    }) };
+    const identity = { getCurrentUserId: vi.fn().mockReturnValue('user-1') };
+    const routes = { transit: vi.fn()
+      .mockResolvedValueOnce({ durationMinutes: 14, distanceMeters: 3_000 })
+      .mockResolvedValueOnce({ durationMinutes: 61, distanceMeters: 58_000 }) };
+    const service = new ItinerariesService(
+      items as unknown as Repository<ItineraryItemEntity>,
+      places as unknown as Repository<SavedPlaceEntity>,
+      trips as unknown as Repository<TripEntity>,
+      {} as DataSource,
+      identity,
+      routes,
+    );
+
+    const result = await service.get(tripId);
+
+    expect(routes.transit).toHaveBeenNthCalledWith(1, { originGooglePlaceId: 'start-google-id', destinationGooglePlaceId: 'visit-google-id' });
+    expect(routes.transit).toHaveBeenNthCalledWith(2, { originGooglePlaceId: 'visit-google-id', destinationGooglePlaceId: 'end-google-id' });
+    expect(result.items.map((item) => [item.boundaryType, item.travelDurationMinutes])).toEqual([
+      ['start_point', null],
+      [null, 14],
+      ['end_point', 61],
+    ]);
+  });
+
   it('does not expose lodging as an unplaced travel place', async () => {
     const tripId = '10000000-0000-4000-8000-000000000001';
     const items = { find: vi.fn().mockResolvedValue([]) };
@@ -43,6 +98,7 @@ describe('ItinerariesService', () => {
       id: tripId, active: true, startDate: '2026-11-08', endDate: '2026-11-10', startPoint: null, endPoint: null,
     }) };
     const identity = { getCurrentUserId: vi.fn().mockReturnValue('user-1') };
+    const routes = { transit: vi.fn() };
 
     const service = new ItinerariesService(
       items as unknown as Repository<ItineraryItemEntity>,
@@ -50,6 +106,7 @@ describe('ItinerariesService', () => {
       trips as unknown as Repository<TripEntity>,
       {} as DataSource,
       identity,
+      routes,
     );
 
     await expect(service.get(tripId)).resolves.toEqual({
@@ -76,12 +133,14 @@ describe('ItinerariesService', () => {
     };
     const dataSource = { transaction: vi.fn(async (callback: (transactionManager: typeof manager) => Promise<void>) => callback(manager)) };
     const identity = { getCurrentUserId: vi.fn().mockReturnValue('user-1') };
+    const routes = { transit: vi.fn() };
     const service = new ItinerariesService(
       items as unknown as Repository<ItineraryItemEntity>,
       places as unknown as Repository<SavedPlaceEntity>,
       trips as unknown as Repository<TripEntity>,
       dataSource as unknown as DataSource,
       identity,
+      routes,
     );
 
     const result = await service.replace(tripId, [
