@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
 import { Sortable, SortableItem, type SortableRenderItemProps } from "react-native-reanimated-dnd";
 
@@ -24,10 +24,9 @@ function dayLabel(date: string, index: number) {
   return { day: `Day ${index + 1}`, date: shortDate };
 }
 
-// A two-line description produces the tallest supported card. Starting from
-// that upper bound prevents items from overlapping before native measurement
-// reports their exact content height.
-const ESTIMATED_ITINERARY_ITEM_HEIGHT = 180;
+const ITINERARY_CARD_HEIGHT = 80;
+const TRAVEL_CONNECTOR_HEIGHT = 44;
+const ITINERARY_ITEM_HEIGHT = ITINERARY_CARD_HEIGHT + TRAVEL_CONNECTOR_HEIGHT;
 
 export default function ItineraryScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
@@ -40,7 +39,6 @@ export default function ItineraryScreen() {
   const reorderCommitTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [activeDate, setActiveDate] = useState<string>();
   const [mapAnimationPaused, setMapAnimationPaused] = useState(false);
-  const [measuredSortable, setMeasuredSortable] = useState({ signature: "", height: 0 });
   const [mapFocusTarget, setMapFocusTarget] = useState<{ itemId: string; request: number }>();
   const [placePickerDay, setPlacePickerDay] = useState<{ date: string; index: number }>();
   const [lodgingPicker, setLodgingPicker] = useState<{ current: SavedPlace; date: string; dayIndex: number; edge: LodgingEdge }>();
@@ -65,14 +63,8 @@ export default function ItineraryScreen() {
   const movableStartIndex = hasFixedStart ? 1 : 0;
   const movableEndIndex = hasFixedEnd ? items.length - 1 : items.length;
   const movableItems = items.slice(movableStartIndex, movableEndIndex);
-  const movableSignature = movableItems.map(({ id }) => id).join("|");
-  const sortableHeight = measuredSortable.signature === movableSignature
-    ? measuredSortable.height
-    : movableItems.length * ESTIMATED_ITINERARY_ITEM_HEIGHT;
-  const handleHeightsMeasured = useCallback((heights: Record<string, number>) => {
-    const height = Object.values(heights).reduce((total, itemHeight) => total + itemHeight, 0);
-    setMeasuredSortable({ signature: movableSignature, height });
-  }, [movableSignature]);
+  const sortableHeight = movableItems.length * ITINERARY_ITEM_HEIGHT
+    - (hasFixedEnd ? 0 : TRAVEL_CONNECTOR_HEIGHT);
 
   const focusPlaceOnMap = (itemId: string) => {
     setMapFocusTarget((current) => ({ itemId, request: (current?.request ?? 0) + 1 }));
@@ -152,9 +144,8 @@ export default function ItineraryScreen() {
           onRemove={() => undefined}
           onReorder={() => undefined}
           placeName={items[0].placeName}
-          scheduledTime={items[0].scheduledTime}
-          activitySummary={items[0].activitySummary}
         />}
+        {hasFixedStart && items.length > 1 && <TravelConnector durationMinutes={items[1].travelDurationMinutes} />}
         {movableItems.length > 0 && <View
           style={[styles.sortableViewport, { height: sortableHeight }]}
           testID="itinerary-sortable-list"
@@ -162,9 +153,7 @@ export default function ItineraryScreen() {
           <Sortable
             contentContainerStyle={styles.sortableContent}
             data={movableItems}
-            enableDynamicHeights
-            estimatedItemHeight={ESTIMATED_ITINERARY_ITEM_HEIGHT}
-            onHeightsMeasured={handleHeightsMeasured}
+            itemHeight={ITINERARY_ITEM_HEIGHT}
             style={styles.sortableList}
             useFlatList={false}
             renderItem={(props: SortableRenderItemProps<ItineraryItem>) => {
@@ -174,6 +163,7 @@ export default function ItineraryScreen() {
                 {...sortableProps}
                 data={item}
                 id={id}
+                itemHeight={ITINERARY_ITEM_HEIGHT}
                 key={id}
                 onDragStart={startItemDrag}
                 onDrop={(_, targetIndex) => {
@@ -191,12 +181,8 @@ export default function ItineraryScreen() {
                   onRemove={() => removeFromItinerary(item.id)}
                   onReorder={(targetIndex) => reorderWithinDay(item.id, targetIndex)}
                   placeName={item.placeName}
-                  scheduledTime={item.scheduledTime}
-                  durationMinutes={item.durationMinutes}
-                  activitySummary={item.activitySummary}
-                  travelMethod={item.travelMethod}
-                  travelDurationMinutes={item.travelDurationMinutes}
                 />
+                {placeIndex < items.length - 1 && <TravelConnector durationMinutes={items[placeIndex + 1].travelDurationMinutes} />}
               </SortableItem>;
             }}
           />
@@ -212,8 +198,6 @@ export default function ItineraryScreen() {
           onRemove={() => undefined}
           onReorder={() => undefined}
           placeName={items.at(-1)!.placeName}
-          scheduledTime={items.at(-1)!.scheduledTime}
-          activitySummary={items.at(-1)!.activitySummary}
         />}
       </View>
       <AppText variant="caption" color={colors.muted}>왼쪽 핸들을 누른 채 위·아래로 끌어 순서를 바꿔요. 숙소와 시작·종료 지점은 고정돼요.</AppText>
@@ -237,6 +221,18 @@ export default function ItineraryScreen() {
   </Screen>;
 }
 
+function TravelConnector({ durationMinutes }: { durationMinutes?: number | null }) {
+  return <View accessibilityLabel={durationMinutes != null ? `이동 시간 약 ${durationMinutes}분` : "이동 시간 미정"} style={styles.connector}>
+    <View style={styles.connectorLine} />
+    <View style={styles.connectorDot} />
+    <View style={styles.connectorLabel}>
+      <AppText variant="caption" color={durationMinutes != null ? colors.secondary : colors.muted}>
+        {durationMinutes != null ? `이동 약 ${durationMinutes}분` : "이동시간 미정"}
+      </AppText>
+    </View>
+  </View>;
+}
+
 const styles = StyleSheet.create({
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   tabs: { gap: spacing.sm, paddingRight: spacing.lg },
@@ -244,10 +240,14 @@ const styles = StyleSheet.create({
   tab: { minWidth: 88, gap: 2, alignItems: "center", borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   selectedTab: { borderColor: colors.primary, backgroundColor: colors.primary },
   scheduleHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: spacing.sm },
-  placeList: { gap: spacing.sm, overflow: "visible" },
+  placeList: { overflow: "visible" },
   sortableViewport: { zIndex: 2, elevation: 2, overflow: "visible" },
   sortableList: { flex: 1, overflow: "visible", backgroundColor: "transparent" },
   sortableContent: { overflow: "visible" },
-  sortableItem: { paddingBottom: spacing.sm, overflow: "visible" },
+  sortableItem: { height: ITINERARY_ITEM_HEIGHT, overflow: "visible" },
+  connector: { height: TRAVEL_CONNECTOR_HEIGHT, justifyContent: "center" },
+  connectorLine: { position: "absolute", top: 0, bottom: 0, left: 27, width: 2, backgroundColor: colors.line },
+  connectorDot: { position: "absolute", left: 24, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.secondary },
+  connectorLabel: { alignSelf: "flex-start", marginLeft: 48, borderRadius: radius.pill, backgroundColor: colors.secondarySoft, paddingHorizontal: spacing.sm, paddingVertical: 2 },
   undoMessage: { marginTop: -spacing.sm, textAlign: "center" },
 });

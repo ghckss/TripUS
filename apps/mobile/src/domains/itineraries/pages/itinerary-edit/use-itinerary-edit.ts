@@ -6,6 +6,7 @@ import { getTrip } from "@/domains/trips";
 import { listPlaces, type SavedPlace } from "@/domains/places/api/places.api";
 import { getItinerary, isItineraryBoundary, replaceItinerary, undoAiPlan, type Itinerary } from "../../api/itineraries.api";
 import { ensureLodgingEndpoints, isLodgingPlace, replaceLodgingBoundary, type LodgingEdge } from "./itinerary-lodging-endpoints";
+import { reorderItineraryWithinDay } from "./itinerary-reorder";
 
 function enumerateDates(startDate: string, endDate: string): string[] {
   const dates: string[] = [];
@@ -115,33 +116,7 @@ export function useItineraryEdit(tripId: string) {
   };
 
   const reorderWithinDay = (itemId: string, targetIndex: number) => {
-    setItinerary((current) => {
-      if (!current) return current;
-      const item = current.items.find((candidate) => candidate.id === itemId);
-      if (!item || isItineraryBoundary(item)) return current;
-      const sameDay = current.items
-        .filter((candidate) => candidate.date === item.date)
-        .sort((left, right) => (left.position ?? 0) - (right.position ?? 0));
-      const index = sameDay.findIndex((candidate) => candidate.id === itemId);
-      const boundedTargetIndex = Math.max(0, Math.min(targetIndex, sameDay.length - 1));
-      if (index < 0 || index === boundedTargetIndex) return current;
-      const reordered = [...sameDay];
-      const [moved] = reordered.splice(index, 1);
-      reordered.splice(boundedTargetIndex, 0, moved);
-      const nextPositions = new Map(reordered.map((candidate, position) => [candidate.id, position]));
-      return normalizePositions({
-        ...current,
-        items: current.items.map((candidate) => nextPositions.has(candidate.id)
-          ? {
-            ...candidate,
-            position: nextPositions.get(candidate.id)!,
-            scheduledTime: null,
-            travelMethod: null,
-            travelDurationMinutes: null,
-          }
-          : candidate),
-      });
-    });
+    setItinerary((current) => current ? reorderItineraryWithinDay(current, itemId, targetIndex) : current);
   };
 
   const moveToAdjacentDay = (itemId: string, direction: -1 | 1) => {

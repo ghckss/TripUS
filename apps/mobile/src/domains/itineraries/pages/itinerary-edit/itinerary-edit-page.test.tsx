@@ -165,7 +165,7 @@ describe("ItineraryScreen day editing", () => {
     expect(screen.getByText("흰여울문화마을")).toBeOnTheScreen();
   });
 
-  it("uses the same detail layout for a manually added place without AI details", async () => {
+  it("shows only the place name inside a manually added itinerary card", async () => {
     mockItinerary = {
       items: [{ id: "item-1", savedPlaceId: "place-1", placeName: "감천문화마을", date: "2026-11-08", position: 0, source: "manual" }],
       unplaced: [],
@@ -173,10 +173,26 @@ describe("ItineraryScreen day editing", () => {
 
     const screen = await render(<ItineraryScreen />);
 
-    expect(screen.getByText("이동 · 방법 미정 · 시간 미정")).toBeOnTheScreen();
-    expect(screen.getByText("도착 미정 · 소요 미정")).toBeOnTheScreen();
-    expect(screen.getByText("상세 설명이 아직 없어요.")).toBeOnTheScreen();
+    expect(screen.getByText("감천문화마을")).toBeOnTheScreen();
+    expect(screen.queryByText(/도착/)).not.toBeOnTheScreen();
+    expect(screen.queryByText(/소요/)).not.toBeOnTheScreen();
+    expect(screen.queryByText(/상세 설명/)).not.toBeOnTheScreen();
     expect(screen.getByTestId("mock-sortable").props.testUseFlatList).toBe(false);
+  });
+
+  it("shows travel time on the connector between itinerary cards", async () => {
+    mockItinerary = {
+      items: [
+        { id: "item-1", savedPlaceId: "place-1", placeName: "감천문화마을", date: "2026-11-08", position: 0 },
+        { id: "item-2", savedPlaceId: "place-2", placeName: "흰여울문화마을", date: "2026-11-08", position: 1, travelDurationMinutes: 18 },
+      ],
+      unplaced: [],
+    };
+
+    const screen = await render(<ItineraryScreen />);
+
+    expect(screen.getByText("이동 약 18분")).toBeOnTheScreen();
+    expect(screen.getByLabelText("이동 시간 약 18분")).toBeOnTheScreen();
   });
 
   it("does not show transit or external directions actions between visits", async () => {

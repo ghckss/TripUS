@@ -1,6 +1,31 @@
 import type { SavedPlace } from "@/domains/places/api/places.api";
 import type { Itinerary } from "../../api/itineraries.api";
 import { ensureLodgingEndpoints, replaceLodgingBoundary } from "./itinerary-lodging-endpoints";
+import { reorderItineraryWithinDay } from "./itinerary-reorder";
+
+describe("reorderItineraryWithinDay", () => {
+  it("changes only positions and preserves every itinerary detail", () => {
+    const first = {
+      id: "item-1", savedPlaceId: "place-1", placeName: "첫 장소", date: "2026-11-08", position: 0,
+      scheduledTime: "10:00", durationMinutes: 90, activitySummary: "첫 장소 설명",
+      travelMethod: "도보", travelDurationMinutes: 12, locked: false, source: "ai",
+      visitStatus: null, rating: null, review: null,
+    };
+    const second = {
+      id: "item-2", savedPlaceId: "place-2", placeName: "두 번째 장소", date: "2026-11-08", position: 1,
+      scheduledTime: "12:00", durationMinutes: 60, activitySummary: "두 번째 장소 설명",
+      travelMethod: "버스", travelDurationMinutes: 20, locked: false, source: "ai",
+      visitStatus: null, rating: null, review: null,
+    };
+
+    const result = reorderItineraryWithinDay({ items: [first, second], unplaced: [] } as Itinerary, first.id, 1);
+    const movedFirst = result.items.find(({ id }) => id === first.id)!;
+    const movedSecond = result.items.find(({ id }) => id === second.id)!;
+
+    expect(movedFirst).toEqual({ ...first, position: 1 });
+    expect(movedSecond).toEqual({ ...second, position: 0 });
+  });
+});
 
 describe("ensureLodgingEndpoints", () => {
   it("omits the first start and final end lodging", () => {

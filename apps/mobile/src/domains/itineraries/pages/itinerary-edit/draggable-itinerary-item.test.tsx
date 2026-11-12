@@ -98,4 +98,20 @@ describe("DraggableItineraryItem", () => {
     );
     expect(screen.getByTestId("itinerary-drag-area-감천문화마을")).toBeOnTheScreen();
   });
+
+  it("limits a long place name to two lines", async () => {
+    const longName = "아주 길어서 여러 줄이 될 수 있는 여행 장소 이름";
+    const screen = await render(
+      <DraggableItineraryItem
+        index={0}
+        itemCount={1}
+        onPress={jest.fn()}
+        onRemove={jest.fn()}
+        onReorder={jest.fn()}
+        placeName={longName}
+      />,
+    );
+
+    expect(screen.getByText(longName).props.numberOfLines).toBe(2);
+  });
 });
