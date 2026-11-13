@@ -5,6 +5,14 @@ import { Alert } from "react-native";
 import AiPlanScreen from "./ai-plan-page";
 
 const mockGenerate = jest.fn().mockResolvedValue(true);
+let mockLatestRequest: {
+  density: "busy";
+  themes: ["food", "cafes"];
+  companions: string;
+  transportModes: ["public_transit", "walking"];
+  budgetLevel: "premium";
+  additionalRequests: string;
+} | null;
 
 jest.mock("expo-router", () => ({
   router: { replace: jest.fn(), push: jest.fn() },
@@ -15,21 +23,24 @@ jest.mock("./use-ai-plan", () => ({
     entitlements: { tier: "pro", aiGenerationsUsed: 0 },
     error: undefined,
     generate: mockGenerate,
-    latestRequest: {
-      density: "busy",
-      themes: ["food", "cafes"],
-      companions: "친구 2명",
-      transportModes: ["public_transit", "walking"],
-      budgetLevel: "premium",
-      additionalRequests: "현지 맛집과 카페를 좋아하고 긴 대기는 피하고 싶어요.",
-    },
+    latestRequest: mockLatestRequest,
     loading: false,
     missingRegions: false,
   }),
 }));
 
 describe("AiPlanScreen", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockLatestRequest = {
+      density: "busy",
+      themes: ["food", "cafes"],
+      companions: "친구 2명",
+      transportModes: ["public_transit", "walking"],
+      budgetLevel: "premium",
+      additionalRequests: "현지 맛집과 카페를 좋아하고 긴 대기는 피하고 싶어요.",
+    };
+  });
 
   it("loads and reuses the latest request saved for the trip", async () => {
     const alert = jest.spyOn(Alert, "alert").mockImplementation((_title, _message, buttons) => {
@@ -57,5 +68,18 @@ describe("AiPlanScreen", () => {
       additionalRequests: "현지 맛집과 카페를 좋아하고 긴 대기는 피하고 싶어요.",
     }));
     expect(router.replace).toHaveBeenCalledWith("/trips/trip-1/itinerary");
+  });
+
+  it("explains when there is no latest request to load", async () => {
+    mockLatestRequest = null;
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+    const screen = await render(<AiPlanScreen />);
+
+    await fireEvent.press(screen.getByLabelText("최근 요청 불러오기"));
+
+    expect(alert).toHaveBeenCalledWith(
+      "불러올 최근 요청이 없어요",
+      "AI 일정을 한 번 만들면 다음 요청부터 최근 설정을 불러올 수 있어요.",
+    );
   });
 });

@@ -58,11 +58,17 @@ export default function AiPlanScreen() {
     setBudgetLevel(latestRequest.budgetLevel ?? "standard");
     setAdditionalRequests(latestRequest.additionalRequests ?? "");
   };
-  const confirmLoadLatestRequest = () => Alert.alert(
-    "최근 설정을 불러올까요?",
-    "현재 입력한 내용은 최근 요청 설정으로 바뀌어요.",
-    [{ text: "취소", style: "cancel" }, { text: "불러오기", onPress: loadLatestRequest }],
-  );
+  const confirmLoadLatestRequest = () => {
+    if (!latestRequest) {
+      Alert.alert("불러올 최근 요청이 없어요", "AI 일정을 한 번 만들면 다음 요청부터 최근 설정을 불러올 수 있어요.");
+      return;
+    }
+    Alert.alert(
+      "최근 설정을 불러올까요?",
+      "현재 입력한 내용은 최근 요청 설정으로 바뀌어요.",
+      [{ text: "취소", style: "cancel" }, { text: "불러오기", onPress: loadLatestRequest }],
+    );
+  };
   const toggleTheme = (value: TravelTheme) => setThemes((current) => current.includes(value)
     ? current.length > 1 ? current.filter((item) => item !== value) : current
     : [...current, value]);
@@ -92,13 +98,13 @@ export default function AiPlanScreen() {
     <Screen>
       <View style={styles.titleRow}>
         <AppText variant="title">어떤 여행을 원하나요?</AppText>
-        {latestRequest && <Pressable
+        <Pressable
           accessibilityLabel="최근 요청 불러오기"
           accessibilityRole="button"
           hitSlop={8}
           onPress={confirmLoadLatestRequest}
           style={({ pressed }) => [styles.loadButton, pressed && styles.loadButtonPressed]}
-        ><AppText style={styles.loadIcon}>↻</AppText></Pressable>}
+        ><AppText style={styles.loadIcon}>↻</AppText></Pressable>
       </View>
       <AppText color={colors.muted}>저장한 장소를 중심으로 동선, 시간과 식사까지 빈틈없이 구성해요.</AppText>
       <AppText variant="label">여행의 밀도</AppText>
