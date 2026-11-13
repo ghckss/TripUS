@@ -251,6 +251,7 @@ export class AiPlanningService {
           output.recommendations,
           places,
           validDates,
+          request.additionalRequests?.trim() ?? '',
         );
         createdRecommendationEntities = materialized.created;
         const allowed = new Set([...planningPlaces.map((place) => place.id), ...materialized.placements.map((item) => item.savedPlaceId)]);
@@ -412,6 +413,7 @@ export class AiPlanningService {
     recommendations: AiPlannerOutput['recommendations'],
     existingPlaces: SavedPlaceEntity[],
     validDates: Set<string>,
+    additionalRequests: string,
   ): Promise<{
     placements: PlannedPlacement[];
     created: SavedPlaceEntity[];
@@ -433,7 +435,7 @@ export class AiPlanningService {
         );
         const candidate = candidates.find((item) =>
           isWithinSelectedRegions(recommendation.regionName, item, selectedRegions)
-          && isRecommendableCandidate(item),
+          && isRecommendableCandidate(item, destination, additionalRequests),
         );
         if (!candidate) {
           this.logger.warn(`AI recommendation rejected reason=not_found_or_outside_region name=${recommendation.placeName}`);
@@ -589,6 +591,8 @@ function recommendationTag(candidate: PlaceSearchCandidate): PlaceTag {
 
 export function isRecommendableCandidate(
   candidate: Pick<PlaceSearchCandidate, 'name' | 'primaryType'>,
+  destination = '',
+  additionalRequests = '',
 ): boolean {
   const type = candidate.primaryType?.toLocaleLowerCase() ?? '';
   const blockedTypes = [
@@ -602,7 +606,40 @@ export function isRecommendableCandidate(
     'locality',
   ];
   if (blockedTypes.some((blocked) => type.includes(blocked))) return false;
+  if (isUnrequestedForeignHospitality(candidate, destination, additionalRequests)) return false;
   return !/(?:역|공항)$/u.test(candidate.name.trim());
+}
+
+const COUNTRY_THEME_ALIASES = [
+  ['대한민국', '한국', 'korea', '韓国', 'コリア'],
+  ['일본', 'japan', '日本'],
+  ['중국', 'china', '中国', '中華'],
+  ['미국', 'usa', 'america', 'american', 'アメリカ'],
+  ['프랑스', 'france', 'french', 'フランス'],
+  ['이탈리아', 'italy', 'italian', 'イタリア'],
+  ['태국', 'thailand', 'thai', 'タイ'],
+  ['베트남', 'vietnam', 'vietnamese', 'ベトナム'],
+] as const;
+
+function isUnrequestedForeignHospitality(
+  candidate: Pick<PlaceSearchCandidate, 'name' | 'primaryType'>,
+  destination: string,
+  additionalRequests: string,
+): boolean {
+  const type = candidate.primaryType?.toLocaleLowerCase() ?? '';
+  if (!['bar', 'night_club', 'restaurant', 'cafe', 'coffee', 'food'].some((value) => type.includes(value))) return false;
+  const normalizedDestination = destination.toLocaleLowerCase();
+  const destinationAliases = COUNTRY_THEME_ALIASES.find((aliases) =>
+    aliases.some((alias) => normalizedDestination.includes(alias.toLocaleLowerCase())),
+  );
+  if (!destinationAliases) return false;
+  const normalizedName = candidate.name.toLocaleLowerCase();
+  const normalizedRequests = additionalRequests.toLocaleLowerCase();
+  return COUNTRY_THEME_ALIASES.some((aliases) =>
+    aliases !== destinationAliases
+    && aliases.some((alias) => normalizedName.includes(alias.toLocaleLowerCase()))
+    && !aliases.some((alias) => normalizedRequests.includes(alias.toLocaleLowerCase())),
+  );
 }
 
 export function addLodgingEndpoints(

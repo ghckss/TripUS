@@ -5,7 +5,7 @@ import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Screen } from "@/shared/ui/screen";
 
-const stages = [
+const fullPlanStages = [
   { title: "저장한 장소를 살펴보고 있어요", detail: "꼭 가고 싶은 곳과 여행 취향을 확인하고 있어요." },
   { title: "가까운 장소끼리 묶고 있어요", detail: "이동이 꼬이지 않도록 날짜별 동선을 만들고 있어요." },
   { title: "이동 시간을 계산하고 있어요", detail: "장소 사이의 이동 방법과 시간을 맞추고 있어요." },
@@ -13,7 +13,18 @@ const stages = [
   { title: "마지막으로 일정을 다듬고 있어요", detail: "무리한 시간이나 빠진 장소가 없는지 확인하고 있어요." },
 ] as const;
 
-export function AiPlanLoadingScreen() {
+function loadingStages(dayLabel?: string) {
+  if (!dayLabel) return fullPlanStages;
+  return [
+    { title: `${dayLabel} 장소를 살펴보고 있어요`, detail: "사용자가 추가한 장소와 최근 여행 설정을 확인하고 있어요." },
+    { title: `${dayLabel} 동선을 다시 짜고 있어요`, detail: "다른 날짜는 그대로 두고 가까운 장소끼리 묶고 있어요." },
+    { title: "이동 시간을 계산하고 있어요", detail: "장소 사이의 이동 방법과 도착 시간을 맞추고 있어요." },
+    { title: "빈 시간에 어울리는 곳을 찾고 있어요", detail: "현지 경험을 더할 주변 장소를 자연스럽게 채우고 있어요." },
+    { title: `${dayLabel} 일정을 마무리하고 있어요`, detail: "새 일정이 완전히 저장될 때까지 잠시만 기다려 주세요." },
+  ] as const;
+}
+
+export function AiPlanLoadingScreen({ dayLabel }: { dayLabel?: string }) {
   const [stageIndex, setStageIndex] = useState(0);
   const [rotation] = useState(() => new Animated.Value(0));
   const [pulse] = useState(() => new Animated.Value(0));
@@ -31,6 +42,7 @@ export function AiPlanLoadingScreen() {
     ]));
     rotationAnimation.start();
     pulseAnimation.start();
+    const stages = loadingStages(dayLabel);
     const stageTimer = setInterval(() => {
       setStageIndex((current) => Math.min(current + 1, stages.length - 1));
     }, 3500);
@@ -39,8 +51,9 @@ export function AiPlanLoadingScreen() {
       rotationAnimation.stop();
       pulseAnimation.stop();
     };
-  }, [pulse, rotation]);
+  }, [dayLabel, pulse, rotation]);
 
+  const stages = loadingStages(dayLabel);
   const stage = stages[stageIndex];
   const rotate = rotation.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
   const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
@@ -55,7 +68,7 @@ export function AiPlanLoadingScreen() {
       <AppText color={colors.muted} style={styles.detail}>{stage.detail}</AppText>
     </View>
 
-    <View accessibilityLabel="AI가 여행 일정을 생성하는 중" accessibilityRole="progressbar" style={styles.animationArea}>
+    <View accessibilityLabel={dayLabel ? `AI가 ${dayLabel} 일정을 업데이트하는 중` : "AI가 여행 일정을 생성하는 중"} accessibilityRole="progressbar" style={styles.animationArea}>
       <Animated.View style={[styles.orbit, { transform: [{ rotate }] }]}>
         <View style={styles.orbitDot} />
       </Animated.View>

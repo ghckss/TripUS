@@ -20,6 +20,7 @@ import {
   buildPlannerDays,
   enumerateTripDates,
   findReusableAiRecommendation,
+  isRecommendableCandidate,
   isBlockingQualityIssue,
   isWithinSelectedRegions,
   normalizeGeneratedPlacements,
@@ -144,6 +145,19 @@ describe('previous AI recommendations', () => {
       googlePlaceId: 'google-palace',
       name: '경복궁',
     })).toBeUndefined();
+  });
+});
+
+describe('AI recommendation local relevance', () => {
+  it('rejects an unrequested foreign-themed bar but allows it when explicitly requested', () => {
+    const koreanBar = { name: '韓国バーヘブン', primaryType: 'bar' };
+
+    expect(isRecommendableCandidate(koreanBar, '일본', '늦은 밤 술집 바 방문')).toBe(false);
+    expect(isRecommendableCandidate(koreanBar, '일본', '한국식 술집을 방문하고 싶어요')).toBe(true);
+  });
+
+  it('keeps destination-local hospitality recommendations', () => {
+    expect(isRecommendableCandidate({ name: '도톤보리 이자카야', primaryType: 'bar' }, '일본', '')).toBe(true);
   });
 });
 

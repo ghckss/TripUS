@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
 import { Sortable, SortableItem, type SortableRenderItemProps } from "react-native-reanimated-dnd";
 
 import { colors, radius, spacing } from "@/shared/design/tokens";
@@ -18,6 +18,7 @@ import { isLodgingPlace, type LodgingEdge } from "./itinerary-lodging-endpoints"
 import { LodgingEndpointPicker } from "./lodging-endpoint-picker";
 import { useItineraryEdit } from "./use-itinerary-edit";
 import { useAppDialog } from "@/shared/ui/app-dialog";
+import { AiPlanLoadingScreen } from "../ai-plan/ai-plan-loading-screen";
 
 function dayLabel(date: string, index: number) {
   const parsed = new Date(`${date}T12:00:00`);
@@ -67,6 +68,7 @@ export default function ItineraryScreen() {
   const movableItems = items.slice(movableStartIndex, movableEndIndex);
   const sortableHeight = movableItems.length * ITINERARY_ITEM_HEIGHT
     - (hasFixedEnd ? 0 : TRAVEL_CONNECTOR_HEIGHT);
+  const updatingDayIndex = updatingDate ? dates.indexOf(updatingDate) : -1;
 
   const focusPlaceOnMap = (itemId: string) => {
     setMapFocusTarget((current) => ({ itemId, request: (current?.request ?? 0) + 1 }));
@@ -110,7 +112,8 @@ export default function ItineraryScreen() {
     ],
   });
 
-  return <Screen
+  return <>
+  <Screen
     ref={screenRef}
     testID="itinerary-screen"
     onScrollBeginDrag={() => setMapAnimationPaused(true)}
@@ -240,7 +243,17 @@ export default function ItineraryScreen() {
       onApply={(place, availablePlaces) => replaceDayLodging(lodgingPicker.date, lodgingPicker.edge, place, availablePlaces)}
       onClose={() => setLodgingPicker(undefined)}
     />}
-  </Screen>;
+  </Screen>
+  {updatingDate && <Modal
+    animationType="fade"
+    onRequestClose={() => undefined}
+    presentationStyle="fullScreen"
+    statusBarTranslucent
+    visible
+  >
+    <AiPlanLoadingScreen dayLabel={updatingDayIndex >= 0 ? `Day ${updatingDayIndex + 1}` : "선택한 날짜"} />
+  </Modal>}
+  </>;
 }
 
 function TravelConnector({ durationMinutes }: { durationMinutes?: number | null }) {

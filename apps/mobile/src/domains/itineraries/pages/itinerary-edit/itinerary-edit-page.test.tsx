@@ -15,6 +15,7 @@ let mockItinerary = { items: [] as Record<string, unknown>[], unplaced: [] as Re
 let mockPlaces: { id: string; name: string; address: string; tag: string; isPrimaryLodging?: boolean }[] = [{ id: "place-1", name: "감천문화마을", address: "부산 사하구", tag: "attraction" }];
 let mockSearchParams: { aiGenerated?: string; tripId: string } = { tripId: "trip-1" };
 let mockUndoMessage: string | undefined;
+let mockUpdatingDate: string | undefined;
 
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), push: jest.fn() },
@@ -43,7 +44,7 @@ jest.mock("./use-itinerary-edit", () => ({
     undoing: false,
     undoMessage: mockUndoMessage,
     updateDayWithAi: mockUpdateDayWithAi,
-    updatingDate: undefined,
+    updatingDate: mockUpdatingDate,
   }),
 }));
 
@@ -57,6 +58,7 @@ describe("ItineraryScreen day editing", () => {
     mockPlaces = [{ id: "place-1", name: "감천문화마을", address: "부산 사하구", tag: "attraction" }];
     mockSearchParams = { tripId: "trip-1" };
     mockUndoMessage = undefined;
+    mockUpdatingDate = undefined;
   });
 
   it("selects travel places from an individual day", async () => {
@@ -195,6 +197,16 @@ describe("ItineraryScreen day editing", () => {
     expect(screen.getByText(/다른 날짜 일정은 변경하지 않아요/)).toBeOnTheScreen();
     await fireEvent.press(screen.getByText("업데이트"));
     expect(mockUpdateDayWithAi).toHaveBeenCalledWith("2026-11-08");
+  });
+
+  it("blocks the itinerary with a full-screen loading view while a day is updating", async () => {
+    mockUpdatingDate = "2026-11-08";
+
+    const screen = await renderItineraryScreen();
+
+    expect(screen.getByTestId("ai-plan-loading")).toBeOnTheScreen();
+    expect(screen.getByText("Day 1 장소를 살펴보고 있어요")).toBeOnTheScreen();
+    expect(screen.getByLabelText("AI가 Day 1 일정을 업데이트하는 중")).toBeOnTheScreen();
   });
 
   it("shows travel time on the connector between itinerary cards", async () => {
