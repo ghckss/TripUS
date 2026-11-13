@@ -1,14 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { ArrayMinSize, ArrayUnique, IsArray, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { ItineraryResponseDto } from '../../../itineraries/application/dto/itinerary.dto';
-import { TravelStyle } from '../../domain/ai-planner.port';
+import { TravelDensity, TravelTheme } from '../../domain/ai-planner.port';
 
 export enum AiTransportMode {
   PublicTransit = 'public_transit',
   Walking = 'walking',
   Car = 'car',
-  Mixed = 'mixed',
 }
 
 export enum AiBudgetLevel {
@@ -18,9 +17,16 @@ export enum AiBudgetLevel {
 }
 
 export class GenerateAiPlanDto {
-  @ApiProperty({ enum: TravelStyle, enumName: 'TravelStyle' })
-  @IsEnum(TravelStyle)
-  style!: TravelStyle;
+  @ApiProperty({ enum: TravelDensity, enumName: 'TravelDensity' })
+  @IsEnum(TravelDensity)
+  density!: TravelDensity;
+
+  @ApiProperty({ enum: TravelTheme, enumName: 'TravelTheme', isArray: true })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayUnique()
+  @IsEnum(TravelTheme, { each: true })
+  themes!: TravelTheme[];
 
   @ApiPropertyOptional({ type: String, maxLength: 120, example: '친구 2명' })
   @IsOptional()
@@ -28,27 +34,23 @@ export class GenerateAiPlanDto {
   @MaxLength(120)
   companions?: string;
 
-  @ApiPropertyOptional({ enum: AiTransportMode, enumName: 'AiTransportMode' })
-  @IsOptional()
-  @IsEnum(AiTransportMode)
-  transportMode?: AiTransportMode;
+  @ApiProperty({ enum: AiTransportMode, enumName: 'AiTransportMode', isArray: true })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayUnique()
+  @IsEnum(AiTransportMode, { each: true })
+  transportModes!: AiTransportMode[];
 
   @ApiPropertyOptional({ enum: AiBudgetLevel, enumName: 'AiBudgetLevel' })
   @IsOptional()
   @IsEnum(AiBudgetLevel)
   budgetLevel?: AiBudgetLevel;
 
-  @ApiPropertyOptional({ type: String, maxLength: 500, example: '현지 맛집과 전시를 좋아함' })
+  @ApiPropertyOptional({ type: String, maxLength: 1000, example: '현지 맛집을 좋아하고 긴 대기와 이른 아침 일정은 피하고 싶어요.' })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
-  preferences?: string;
-
-  @ApiPropertyOptional({ type: String, maxLength: 500, example: '긴 대기와 하루 1만 보 이상 걷기' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  avoidances?: string;
+  @MaxLength(1000)
+  additionalRequests?: string;
 }
 
 export enum AiPlanGenerationStatus {
@@ -61,8 +63,11 @@ export class GenerateAiPlanResponseDto {
   @ApiProperty({ enum: AiPlanGenerationStatus, enumName: 'AiPlanGenerationStatus' })
   status!: AiPlanGenerationStatus;
 
-  @ApiProperty({ enum: TravelStyle, enumName: 'TravelStyle' })
-  style!: TravelStyle;
+  @ApiProperty({ enum: TravelDensity, enumName: 'TravelDensity' })
+  density!: TravelDensity;
+
+  @ApiProperty({ enum: TravelTheme, enumName: 'TravelTheme', isArray: true })
+  themes!: TravelTheme[];
 
   @ApiProperty({ type: String, isArray: true })
   conflicts!: string[];

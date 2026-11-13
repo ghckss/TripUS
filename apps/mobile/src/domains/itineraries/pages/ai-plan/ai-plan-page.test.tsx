@@ -1,5 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import { router } from "expo-router";
+import { Alert } from "react-native";
 
 import AiPlanScreen from "./ai-plan-page";
 
@@ -15,12 +16,12 @@ jest.mock("./use-ai-plan", () => ({
     error: undefined,
     generate: mockGenerate,
     latestRequest: {
-      style: "food",
+      density: "busy",
+      themes: ["food", "cafes"],
       companions: "친구 2명",
-      transportMode: "mixed",
+      transportModes: ["public_transit", "walking"],
       budgetLevel: "premium",
-      preferences: "현지 맛집과 카페",
-      avoidances: "긴 대기",
+      additionalRequests: "현지 맛집과 카페를 좋아하고 긴 대기는 피하고 싶어요.",
     },
     loading: false,
     missingRegions: false,
@@ -31,22 +32,29 @@ describe("AiPlanScreen", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("loads and reuses the latest request saved for the trip", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation((_title, _message, buttons) => {
+      buttons?.find((button) => button.text === "불러오기")?.onPress?.();
+    });
     const screen = await render(<AiPlanScreen />);
 
-    await fireEvent.press(screen.getByText("최근 요청 불러오기"));
+    await fireEvent.press(screen.getByLabelText("최근 요청 불러오기"));
+    expect(alert).toHaveBeenCalledWith(
+      "최근 설정을 불러올까요?",
+      expect.any(String),
+      expect.any(Array),
+    );
     expect(screen.getByLabelText("동행자").props.value).toBe("친구 2명");
-    expect(screen.getByLabelText("좋아하는 것").props.value).toBe("현지 맛집과 카페");
-    expect(screen.getByLabelText("피하고 싶은 것").props.value).toBe("긴 대기");
+    expect(screen.getByLabelText("추가 요청사항").props.value).toBe("현지 맛집과 카페를 좋아하고 긴 대기는 피하고 싶어요.");
 
     await fireEvent.press(screen.getByTestId("ai-plan-generate"));
 
     await waitFor(() => expect(mockGenerate).toHaveBeenCalledWith({
-      style: "food",
+      density: "busy",
+      themes: ["food", "cafes"],
       companions: "친구 2명",
-      transportMode: "mixed",
+      transportModes: ["public_transit", "walking"],
       budgetLevel: "premium",
-      preferences: "현지 맛집과 카페",
-      avoidances: "긴 대기",
+      additionalRequests: "현지 맛집과 카페를 좋아하고 긴 대기는 피하고 싶어요.",
     }));
     expect(router.replace).toHaveBeenCalledWith("/trips/trip-1/itinerary");
   });

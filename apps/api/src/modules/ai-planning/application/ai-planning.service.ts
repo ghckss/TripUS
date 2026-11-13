@@ -9,7 +9,7 @@ import { ItinerariesService } from '../../itineraries/application/itineraries.se
 import { ItinerarySource } from '../../itineraries/domain/entities/itinerary-item.entity';
 import { ItineraryUpdateStatus } from '../../itineraries/application/dto/itinerary.dto';
 import { SavedPlaceEntity } from '../../places/domain/entities/saved-place.entity';
-import { TripEntity } from '../../trips/domain/entities/trip.entity';
+import { TripEntity, type TripAiPlanRequest } from '../../trips/domain/entities/trip.entity';
 import {
   AI_PLANNER_PORT,
   AiPlannerError,
@@ -19,8 +19,9 @@ import {
   type AiPlannerOutput,
   type AiPlannerPort,
   AI_PLANNING_TASK,
-  TRAVEL_STYLE_POLICIES,
-  TravelStyle,
+  TRAVEL_DENSITY_POLICIES,
+  TravelDensity,
+  TravelTheme,
 } from '../domain/ai-planner.port';
 import {
   AiPlanGenerationStatus,
@@ -32,7 +33,7 @@ import { EntitlementsService } from '../../entitlements/application/entitlements
 import { PlacePreference, PlaceTag } from '../../places/domain/entities/saved-place.entity';
 import { PLACE_SEARCH_PORT, type PlaceSearchCandidate, type PlaceSearchPort } from '../../places/domain/place-search.port';
 import { ROUTES_PORT, type RoutesPort } from '../../routes/domain/routes.port';
-import { AiTransportMode, type GenerateAiPlanDto } from './dto/generate-ai-plan.dto';
+import { AiBudgetLevel, AiTransportMode, type GenerateAiPlanDto } from './dto/generate-ai-plan.dto';
 import { writeStructuredLog } from '../../../common/http/json-logger';
 
 type PlannedPlacement = {
@@ -75,11 +76,11 @@ export class AiPlanningService {
       active: true,
     });
     if (!trip) throw new NotFoundException('Trip not found');
-    return { request: trip.latestAiPlanRequest as GenerateAiPlanDto | null };
+    return { request: normalizeLatestAiPlanRequest(trip.latestAiPlanRequest) };
   }
 
   async generate(tripId: string, request: GenerateAiPlanDto): Promise<GenerateAiPlanResponseDto> {
-    const { style } = request;
+    const { density } = request;
     const generationId = randomUUID();
     const startedAt = performance.now();
     this.rateLimiter.assertAllowed(this.identity.getCurrentUserId());
@@ -118,7 +119,7 @@ export class AiPlanningService {
     if (planningPlaces.length > 100) throw new BadRequestException('AI planning supports at most 100 saved places');
     const days = applyDailyPlanningTargets(
       buildPlannerDays(enumerateTripDates(trip.startDate, trip.endDate), current.items, places, primaryLodging),
-      style,
+      density,
       trip.startPoint?.time ?? null,
       trip.endPoint?.time ?? null,
     );
@@ -129,7 +130,8 @@ export class AiPlanningService {
         tripId,
         dayCount: days.length,
         savedPlaceCount: planningPlaces.length,
-        style,
+        density,
+        themes: request.themes,
       });
       const plannerInput: AiPlannerInput = {
         task: AI_PLANNING_TASK,
@@ -143,13 +145,13 @@ export class AiPlanningService {
           startPoint: trip.startPoint ?? null,
           endPoint: trip.endPoint ?? null,
         },
-        style: TRAVEL_STYLE_POLICIES[style],
+        density: TRAVEL_DENSITY_POLICIES[density],
         travelerContext: {
           companions: request.companions?.trim() || null,
-          transportMode: request.transportMode ?? null,
+          transportModes: request.transportModes,
           budgetLevel: request.budgetLevel ?? null,
-          preferences: request.preferences?.trim() || null,
-          avoidances: request.avoidances?.trim() || null,
+          themes: request.themes,
+          additionalRequests: request.additionalRequests?.trim() || null,
         },
         places: planningPlaces.map((place) => ({
           id: place.id,
@@ -169,7 +171,7 @@ export class AiPlanningService {
       const allowedPlannerPlaceIds = new Set(planningPlaces.map((place) => place.id));
       for (let attempt = 1; attempt < MAX_PLANNER_ATTEMPTS; attempt += 1) {
         const outputContractIssues = assessRawOutputContract(allowedPlannerPlaceIds, output);
-        const coverageIssues = assessRawDayCoverage(days, output, style, allowedPlannerPlaceIds);
+        const coverageIssues = assessRawDayCoverage(days, output, density, allowedPlannerPlaceIds);
         if (outputContractIssues.length === 0 && coverageIssues.length === 0) break;
         writeStructuredLog('warn', 'ai.generation.draft_revision', {
           generationId,
@@ -198,7 +200,7 @@ export class AiPlanningService {
           ...(coverageIssues.length > 0
             ? [
               `The previous draft is still too short on: ${coverageIssues.join(', ')}.`,
-              `Required totals by date are: ${formatCoverageTargets(days, coverageIssues, style)}.`,
+              `Required totals by date are: ${formatCoverageTargets(days, coverageIssues, density)}.`,
               'Update the entire itinerary by adding nearby recommendations, meals, cafes, and activities so each listed date reaches that total without rushing.',
               'Keep previous recommendations that are still optimal, but add or replace places as needed. Return the complete revised itinerary, not only the added visits.',
             ]
@@ -236,7 +238,7 @@ export class AiPlanningService {
             days,
           ),
           [...places, ...materialized.created],
-          request.transportMode,
+          request.transportModes,
         );
         generated = applyEnrichedTravelEstimates(generated, routeCheckedPlacements);
         recommended = applyEnrichedTravelEstimates(materialized.placements, routeCheckedPlacements);
@@ -246,7 +248,7 @@ export class AiPlanningService {
         recommended = normalizedSchedule.filter((item) => !generatedIds.has(item.savedPlaceId));
         qualityIssues = assessPlanQuality({
           days,
-          style,
+          density,
           planningPlaces,
           generated,
           recommended,
@@ -278,7 +280,7 @@ export class AiPlanningService {
             materialized.rejected.length > 0
               ? `These recommendations could not be verified and must be replaced with different concrete places: ${materialized.rejected.map((item) => item.placeName).join(', ')}.`
               : '',
-            `Required totals by date are: ${formatCoverageTargets(days, days.map((day) => day.date), style)}.`,
+            `Required totals by date are: ${formatCoverageTargets(days, days.map((day) => day.date), density)}.`,
             'Return the complete corrected itinerary. Keep valid saved-place placements, replace unverifiable recommendations, and use chronological non-overlapping times.',
           ].filter(Boolean).join(' '),
         });
@@ -312,7 +314,7 @@ export class AiPlanningService {
       const placements = await this.enrichTravelEstimates(
         placementsWithLodging,
         [...places, ...materialized.created],
-        request.transportMode,
+        request.transportModes,
       );
       const result = await this.itineraries.replace(tripId, placements, ItinerarySource.Ai);
       let finalItinerary = result.itinerary;
@@ -340,7 +342,8 @@ export class AiPlanningService {
       });
       return {
         status: result.status === ItineraryUpdateStatus.Updated ? AiPlanGenerationStatus.Generated : AiPlanGenerationStatus.Conflict,
-        style,
+        density,
+        themes: request.themes,
         conflicts: result.conflicts,
         itinerary: finalItinerary,
         failureReason: null,
@@ -366,7 +369,8 @@ export class AiPlanningService {
       });
       return {
         status: AiPlanGenerationStatus.Unavailable,
-        style,
+        density,
+        themes: request.themes,
         conflicts: [],
         itinerary: await this.itineraries.get(tripId),
         failureReason: reason,
@@ -451,9 +455,9 @@ export class AiPlanningService {
   private async enrichTravelEstimates(
     placements: PlannedPlacement[],
     places: SavedPlaceEntity[],
-    transportMode?: AiTransportMode,
+    transportModes: AiTransportMode[] = [],
   ): Promise<PlannedPlacement[]> {
-    if (transportMode && ![AiTransportMode.PublicTransit, AiTransportMode.Mixed].includes(transportMode)) return placements;
+    if (!transportModes.includes(AiTransportMode.PublicTransit)) return placements;
     const byId = new Map(places.map((place) => [place.id, place]));
     const enriched = placements.map((placement) => ({ ...placement }));
     for (const date of new Set(enriched.map((placement) => placement.date))) {
@@ -689,7 +693,7 @@ function normalizeVisitSchedule(
 
 type QualityAssessmentInput = {
   days: AiPlannerDay[];
-  style: TravelStyle;
+  density: TravelDensity;
   planningPlaces: SavedPlaceEntity[];
   generated: PlannedPlacement[];
   recommended: PlannedPlacement[];
@@ -725,8 +729,8 @@ export function assessPlanQuality(input: QualityAssessmentInput): string[] {
       total + (visit.durationMinutes ?? 0) + (visit.travelDurationMinutes ?? 0), lockedVisitCount * 110);
     const visitCount = timedVisits.length + lockedVisitCount;
     if (
-      visitCount < minimumRequiredVisitCount(day, input.style)
-      || plannedMinutes < minimumAcceptablePlannedMinutes(day, input.style)
+      visitCount < minimumRequiredVisitCount(day, input.density)
+      || plannedMinutes < minimumAcceptablePlannedMinutes(day, input.density)
     ) issues.push(`underfilled_day:${day.date}`);
 
     let previousEnd: number | undefined;
@@ -775,7 +779,7 @@ function isRepairableQualityIssue(issue: string): boolean {
 export function assessRawDayCoverage(
   days: AiPlannerDay[],
   output: AiPlannerOutput,
-  style: TravelStyle,
+  density: TravelDensity,
   allowedPlaceIds?: Set<string>,
 ): string[] {
   return days.flatMap((day) => {
@@ -787,8 +791,8 @@ export function assessRawDayCoverage(
     ];
     const plannedMinutes = visits.reduce((total, visit) =>
       total + (visit.durationMinutes ?? 0) + (visit.travelDurationMinutes ?? 0), 0);
-    return visits.length < minimumRequiredVisitCount(day, style)
-      || plannedMinutes < minimumAcceptablePlannedMinutes(day, style)
+    return visits.length < minimumRequiredVisitCount(day, density)
+      || plannedMinutes < minimumAcceptablePlannedMinutes(day, density)
       ? [day.date]
       : [];
   });
@@ -825,43 +829,42 @@ function formatUnplacedSavedPlaces(output: AiPlannerOutput, places: SavedPlaceEn
     .join(', ');
 }
 
-function minimumPlannedMinutes(style: TravelStyle): number {
-  switch (style) {
-    case TravelStyle.Relaxed: return 420;
-    case TravelStyle.Highlights: return 480;
-    case TravelStyle.Balanced:
-    case TravelStyle.Food:
+function minimumPlannedMinutes(density: TravelDensity): number {
+  switch (density) {
+    case TravelDensity.Relaxed: return 420;
+    case TravelDensity.Busy: return 480;
+    case TravelDensity.Balanced:
     default: return 450;
   }
 }
 
-function targetPlannedMinutes(day: AiPlannerDay, style: TravelStyle): number {
-  return day.targetPlannedMinutes ?? minimumPlannedMinutes(style);
+function targetPlannedMinutes(day: AiPlannerDay, density: TravelDensity): number {
+  return day.targetPlannedMinutes ?? minimumPlannedMinutes(density);
 }
 
-function minimumRequiredVisitCount(day: AiPlannerDay, style: TravelStyle): number {
-  const target = targetPlannedMinutes(day, style);
+function minimumRequiredVisitCount(day: AiPlannerDay, density: TravelDensity): number {
+  const target = targetPlannedMinutes(day, density);
   if (target <= 0) return 0;
   if (target < 240) return 1;
   if (target < 360) return 2;
-  return style === TravelStyle.Relaxed ? 2 : 3;
+  return density === TravelDensity.Relaxed ? 2 : 3;
 }
 
-function minimumAcceptablePlannedMinutes(day: AiPlannerDay, style: TravelStyle): number {
-  return Math.min(targetPlannedMinutes(day, style), minimumRequiredVisitCount(day, style) * 90);
+function minimumAcceptablePlannedMinutes(day: AiPlannerDay, density: TravelDensity): number {
+  return Math.min(targetPlannedMinutes(day, density), minimumRequiredVisitCount(day, density) * 90);
 }
 
-function formatCoverageTargets(days: AiPlannerDay[], dates: string[], style: TravelStyle): string {
+function formatCoverageTargets(days: AiPlannerDay[], dates: string[], density: TravelDensity): string {
   const includedDates = new Set(dates);
   return days
     .filter((day) => includedDates.has(day.date))
-    .map((day) => `${day.date}=${targetPlannedMinutes(day, style)} minutes`)
+    .map((day) => `${day.date}=${targetPlannedMinutes(day, density)} minutes`)
     .join(', ');
 }
 
 export function applyDailyPlanningTargets(
   days: AiPlannerDay[],
-  style: TravelStyle,
+  density: TravelDensity,
   startPointTime: string | null,
   endPointTime: string | null,
 ): AiPlannerDay[] {
@@ -879,7 +882,7 @@ export function applyDailyPlanningTargets(
       ...day,
       availableStartTime: minutesToTime(availableStart),
       availableEndTime: minutesToTime(availableEnd),
-      targetPlannedMinutes: Math.min(minimumPlannedMinutes(style), realisticVisitMinutes),
+      targetPlannedMinutes: Math.min(minimumPlannedMinutes(density), realisticVisitMinutes),
     };
   });
 }
@@ -897,6 +900,41 @@ export function enumerateTripDates(startDate: string, endDate: string): string[]
 
 export function isAiRecommendedPlace(place: Pick<SavedPlaceEntity, 'note'>): boolean {
   return place.note?.startsWith('AI 추천 ·') ?? false;
+}
+
+function normalizeLatestAiPlanRequest(input: TripAiPlanRequest | null): GenerateAiPlanDto | null {
+  if (!input) return null;
+  const densityValues = new Set(Object.values(TravelDensity));
+  const themeValues = new Set(Object.values(TravelTheme));
+  const transportValues = new Set(Object.values(AiTransportMode));
+  const budgetValues = new Set(Object.values(AiBudgetLevel));
+  const legacyDensity = input.style === 'relaxed'
+    ? TravelDensity.Relaxed
+    : input.style === 'highlights' ? TravelDensity.Busy : TravelDensity.Balanced;
+  const density = densityValues.has(input.density as TravelDensity)
+    ? input.density as TravelDensity
+    : legacyDensity;
+  const themes = (input.themes ?? []).filter((theme): theme is TravelTheme => themeValues.has(theme as TravelTheme));
+  if (themes.length === 0) themes.push(input.style === 'food' ? TravelTheme.Food : TravelTheme.Highlights);
+  const transportModes = (input.transportModes ?? [])
+    .filter((mode): mode is AiTransportMode => transportValues.has(mode as AiTransportMode));
+  if (transportModes.length === 0) {
+    if (input.transportMode === 'mixed') transportModes.push(AiTransportMode.PublicTransit, AiTransportMode.Walking);
+    else if (transportValues.has(input.transportMode as AiTransportMode)) transportModes.push(input.transportMode as AiTransportMode);
+    else transportModes.push(AiTransportMode.PublicTransit);
+  }
+  const legacyRequests = [
+    input.preferences ? `좋아하는 것: ${input.preferences}` : '',
+    input.avoidances ? `피하고 싶은 것: ${input.avoidances}` : '',
+  ].filter(Boolean).join('\n');
+  return {
+    density,
+    themes,
+    transportModes,
+    ...(input.companions ? { companions: input.companions } : {}),
+    ...(budgetValues.has(input.budgetLevel as AiBudgetLevel) ? { budgetLevel: input.budgetLevel as AiBudgetLevel } : {}),
+    ...((input.additionalRequests || legacyRequests) ? { additionalRequests: input.additionalRequests || legacyRequests } : {}),
+  };
 }
 
 export function findReusableAiRecommendation<T extends Pick<SavedPlaceEntity, 'googlePlaceId' | 'name' | 'note'>>(

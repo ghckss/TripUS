@@ -6,7 +6,8 @@ import { trackEvent } from "@/shared/telemetry/telemetry";
 
 export type Itinerary = components["schemas"]["ItineraryResponseDto"];
 export type ItineraryItem = components["schemas"]["ItineraryItemResponseDto"];
-export type TravelStyle = components["schemas"]["TravelStyle"];
+export type TravelDensity = components["schemas"]["TravelDensity"];
+export type TravelTheme = components["schemas"]["TravelTheme"];
 export type AiPlanRequest = components["schemas"]["GenerateAiPlanDto"];
 export type AiTransportMode = components["schemas"]["AiTransportMode"];
 export type AiBudgetLevel = components["schemas"]["AiBudgetLevel"];
@@ -40,7 +41,7 @@ export async function generateAiPlan(tripId: string, request: AiPlanRequest): Pr
     }
     await writeCache(cacheKeys.itinerary(tripId), data.itinerary);
     await writeCache(cacheKeys.aiUndo(tripId), previous);
-    trackEvent("ai_plan.generated", { tripId, style: request.style, itemCount: data.itinerary.items.length });
+    trackEvent("ai_plan.generated", { tripId, density: request.density, themes: request.themes.join(","), itemCount: data.itinerary.items.length });
     return data.itinerary;
   }
   throw new Error("일정을 구성하는 데 시간이 더 필요해요. 잠시 후 자동으로 다시 시도해 주세요.");

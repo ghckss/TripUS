@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { Alert, StyleSheet, TextInput, View } from "react-native";
+import { Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -10,22 +10,29 @@ import { colors, radius, spacing } from "@/shared/design/tokens";
 import {
   type AiBudgetLevel,
   type AiTransportMode,
-  type TravelStyle,
+  type TravelDensity,
+  type TravelTheme,
 } from "../../api/itineraries.api";
 import { useAiPlan } from "./use-ai-plan";
 import { AiPlanLoadingScreen } from "./ai-plan-loading-screen";
 
-const stylesList: { label: string; value: TravelStyle; description: string }[] = [
-  { label: "균형 있게", value: "balanced", description: "명소와 휴식을 고르게 배치해요." },
-  { label: "느긋하게", value: "relaxed", description: "하루 두 곳 정도로 여유롭게 구성해요." },
-  { label: "핵심 명소", value: "highlights", description: "꼭 보고 싶은 장소를 먼저 배치해요." },
-  { label: "맛집 중심", value: "food", description: "먹고 싶은 장소를 중심으로 구성해요." },
+const densityOptions: { label: string; value: TravelDensity }[] = [
+  { label: "여유롭게", value: "relaxed" },
+  { label: "알차게", value: "balanced" },
+  { label: "꽉 채워서", value: "busy" },
+];
+const themeOptions: { label: string; value: TravelTheme }[] = [
+  { label: "맛집 탐방", value: "food" },
+  { label: "대표 명소", value: "highlights" },
+  { label: "카페·감성", value: "cafes" },
+  { label: "문화·전시", value: "culture" },
+  { label: "쇼핑", value: "shopping" },
+  { label: "자연·휴식", value: "nature" },
 ];
 const transportOptions: { label: string; value: AiTransportMode }[] = [
   { label: "대중교통", value: "public_transit" },
   { label: "도보 위주", value: "walking" },
   { label: "자동차", value: "car" },
-  { label: "혼합", value: "mixed" },
 ];
 const budgetOptions: { label: string; value: AiBudgetLevel }[] = [
   { label: "가성비", value: "budget" },
@@ -35,30 +42,40 @@ const budgetOptions: { label: string; value: AiBudgetLevel }[] = [
 
 export default function AiPlanScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const [selected, setSelected] = useState<TravelStyle>("relaxed");
+  const [density, setDensity] = useState<TravelDensity>("relaxed");
+  const [themes, setThemes] = useState<TravelTheme[]>(["highlights"]);
   const [companions, setCompanions] = useState("");
-  const [transportMode, setTransportMode] = useState<AiTransportMode>("public_transit");
+  const [transportModes, setTransportModes] = useState<AiTransportMode[]>(["public_transit"]);
   const [budgetLevel, setBudgetLevel] = useState<AiBudgetLevel>("standard");
-  const [preferences, setPreferences] = useState("");
-  const [avoidances, setAvoidances] = useState("");
+  const [additionalRequests, setAdditionalRequests] = useState("");
   const { entitlements, error, generate, latestRequest, loading, missingRegions } = useAiPlan(tripId);
-  const selectedStyle = stylesList.find((item) => item.value === selected)!;
   const loadLatestRequest = () => {
     if (!latestRequest) return;
-    setSelected(latestRequest.style);
+    setDensity(latestRequest.density);
+    setThemes(latestRequest.themes);
     setCompanions(latestRequest.companions ?? "");
-    setTransportMode(latestRequest.transportMode ?? "public_transit");
+    setTransportModes(latestRequest.transportModes);
     setBudgetLevel(latestRequest.budgetLevel ?? "standard");
-    setPreferences(latestRequest.preferences ?? "");
-    setAvoidances(latestRequest.avoidances ?? "");
+    setAdditionalRequests(latestRequest.additionalRequests ?? "");
   };
+  const confirmLoadLatestRequest = () => Alert.alert(
+    "최근 설정을 불러올까요?",
+    "현재 입력한 내용은 최근 요청 설정으로 바뀌어요.",
+    [{ text: "취소", style: "cancel" }, { text: "불러오기", onPress: loadLatestRequest }],
+  );
+  const toggleTheme = (value: TravelTheme) => setThemes((current) => current.includes(value)
+    ? current.length > 1 ? current.filter((item) => item !== value) : current
+    : [...current, value]);
+  const toggleTransportMode = (value: AiTransportMode) => setTransportModes((current) => current.includes(value)
+    ? current.length > 1 ? current.filter((item) => item !== value) : current
+    : [...current, value]);
   const createPlan = () => void generate({
-    style: selected,
+    density,
+    themes,
     companions: companions.trim() || undefined,
-    transportMode,
+    transportModes,
     budgetLevel,
-    preferences: preferences.trim() || undefined,
-    avoidances: avoidances.trim() || undefined,
+    additionalRequests: additionalRequests.trim() || undefined,
   }).then((created) => {
     if (created) router.replace(`/trips/${tripId}/itinerary`);
   });
@@ -73,16 +90,21 @@ export default function AiPlanScreen() {
   if (loading) return <AiPlanLoadingScreen />;
   return (
     <Screen>
-      <AppText variant="title">어떤 여행을 원하나요?</AppText>
+      <View style={styles.titleRow}>
+        <AppText variant="title">어떤 여행을 원하나요?</AppText>
+        {latestRequest && <Pressable
+          accessibilityLabel="최근 요청 불러오기"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={confirmLoadLatestRequest}
+          style={({ pressed }) => [styles.loadButton, pressed && styles.loadButtonPressed]}
+        ><AppText style={styles.loadIcon}>↻</AppText></Pressable>}
+      </View>
       <AppText color={colors.muted}>저장한 장소를 중심으로 동선, 시간과 식사까지 빈틈없이 구성해요.</AppText>
-      {latestRequest && <Card>
-        <AppText variant="heading">최근 요청을 다시 사용할까요?</AppText>
-        <AppText color={colors.muted}>이 여행에서 마지막으로 사용한 AI 일정 조건을 불러올 수 있어요.</AppText>
-        <Button label="최근 요청 불러오기" variant="ghost" onPress={loadLatestRequest} />
-      </Card>}
-      <AppText variant="label">여행 스타일</AppText>
-      <View style={styles.wrap}>{stylesList.map((item) => <Pill key={item.value} label={item.label} selected={selected === item.value} onPress={() => setSelected(item.value)} />)}</View>
-      <Card><AppText variant="heading">{selectedStyle.label} 둘러보는 일정</AppText><AppText color={colors.muted}>{selectedStyle.description}</AppText></Card>
+      <AppText variant="label">여행의 밀도</AppText>
+      <View style={styles.wrap}>{densityOptions.map((item) => <Pill key={item.value} label={item.label} selected={density === item.value} onPress={() => setDensity(item.value)} />)}</View>
+      <AppText variant="label">여행의 방식</AppText>
+      <View style={styles.wrap}>{themeOptions.map((item) => <Pill key={item.value} label={item.label} selected={themes.includes(item.value)} onPress={() => toggleTheme(item.value)} />)}</View>
       <View style={styles.field}>
         <AppText variant="label">동행자</AppText>
         <TextInput
@@ -96,36 +118,23 @@ export default function AiPlanScreen() {
       </View>
       <View style={styles.field}>
         <AppText variant="label">이동 수단</AppText>
-        <View style={styles.wrap}>{transportOptions.map((item) => <Pill key={item.value} label={item.label} selected={transportMode === item.value} onPress={() => setTransportMode(item.value)} />)}</View>
+        <View style={styles.wrap}>{transportOptions.map((item) => <Pill key={item.value} label={item.label} selected={transportModes.includes(item.value)} onPress={() => toggleTransportMode(item.value)} />)}</View>
       </View>
       <View style={styles.field}>
         <AppText variant="label">예산</AppText>
         <View style={styles.wrap}>{budgetOptions.map((item) => <Pill key={item.value} label={item.label} selected={budgetLevel === item.value} onPress={() => setBudgetLevel(item.value)} />)}</View>
       </View>
       <View style={styles.field}>
-        <AppText variant="label">좋아하는 것</AppText>
+        <AppText variant="label">추가 요청사항</AppText>
         <TextInput
-          accessibilityLabel="좋아하는 것"
+          accessibilityLabel="추가 요청사항"
           multiline
-          onChangeText={setPreferences}
-          placeholder="예: 전시, 현지 맛집, 조용한 카페"
+          onChangeText={setAdditionalRequests}
+          placeholder="예: 현지 맛집을 좋아하고, 긴 대기와 이른 아침 일정은 피하고 싶어요."
           placeholderTextColor={colors.muted}
           style={[styles.input, styles.multiline]}
           textAlignVertical="top"
-          value={preferences}
-        />
-      </View>
-      <View style={styles.field}>
-        <AppText variant="label">피하고 싶은 것</AppText>
-        <TextInput
-          accessibilityLabel="피하고 싶은 것"
-          multiline
-          onChangeText={setAvoidances}
-          placeholder="예: 하루 1만 보 이상, 긴 대기, 이른 아침"
-          placeholderTextColor={colors.muted}
-          style={[styles.input, styles.multiline]}
-          textAlignVertical="top"
-          value={avoidances}
+          value={additionalRequests}
         />
       </View>
       {missingRegions && <Card>
@@ -139,6 +148,10 @@ export default function AiPlanScreen() {
   );
 }
 const styles = StyleSheet.create({
+  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
+  loadButton: { width: 42, height: 42, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.line, borderRadius: radius.pill, backgroundColor: colors.surface },
+  loadButtonPressed: { backgroundColor: colors.primarySoft },
+  loadIcon: { fontSize: 25, lineHeight: 28, color: colors.primary },
   field: { gap: spacing.sm },
   input: { minHeight: 48, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, paddingHorizontal: spacing.md, color: colors.ink, fontSize: 16 },
   multiline: { minHeight: 88, paddingTop: spacing.md },

@@ -3,7 +3,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { PlaceTag } from '../../places/domain/entities/saved-place.entity';
 import { PlacePreference } from '../../places/domain/entities/saved-place.entity';
 import { ItineraryUpdateStatus } from '../../itineraries/application/dto/itinerary.dto';
-import { AI_PLANNING_TASK, TRAVEL_STYLE_POLICIES, TravelStyle } from '../domain/ai-planner.port';
+import {
+  AI_PLANNING_TASK,
+  TRAVEL_DENSITY_POLICIES,
+  TravelDensity,
+  TravelTheme,
+} from '../domain/ai-planner.port';
+import { AiTransportMode } from './dto/generate-ai-plan.dto';
 import {
   addLodgingEndpoints,
   applyDailyPlanningTargets,
@@ -34,7 +40,7 @@ describe('AI plan quality severity', () => {
         date: '2026-11-08', startLodging: null, endLodging: null,
         availableStartTime: '15:00', availableEndTime: '21:00', targetPlannedMinutes: 300,
       }],
-      style: TravelStyle.Balanced,
+      density: TravelDensity.Balanced,
       planningPlaces: [],
       generated: [],
       recommended: [{
@@ -61,7 +67,7 @@ describe('daily planning targets', () => {
   ];
 
   it('reduces the first and last day targets around arrival and departure times', () => {
-    expect(applyDailyPlanningTargets(days, TravelStyle.Balanced, '15:30', '12:00')).toEqual([
+    expect(applyDailyPlanningTargets(days, TravelDensity.Balanced, '15:30', '12:00')).toEqual([
       expect.objectContaining({
         date: '2026-11-08', availableStartTime: '15:30', availableEndTime: '21:00', targetPlannedMinutes: 270,
       }),
@@ -72,7 +78,7 @@ describe('daily planning targets', () => {
   });
 
   it('keeps the style target for full days', () => {
-    expect(applyDailyPlanningTargets(days, TravelStyle.Highlights, null, null)).toEqual([
+    expect(applyDailyPlanningTargets(days, TravelDensity.Busy, null, null)).toEqual([
       expect.objectContaining({ targetPlannedMinutes: 480 }),
       expect.objectContaining({ targetPlannedMinutes: 480 }),
     ]);
@@ -97,7 +103,7 @@ describe('raw AI output validation', () => {
     ]);
     expect(assessRawDayCoverage([{
       date: '2026-11-08', startLodging: null, endLodging: null,
-    }], output, TravelStyle.Relaxed, allowedPlaceIds)).toEqual(['2026-11-08']);
+    }], output, TravelDensity.Relaxed, allowedPlaceIds)).toEqual(['2026-11-08']);
   });
 
   it('requires every saved place to be scheduled rather than silently omitted or unplaced', () => {
@@ -264,9 +270,9 @@ describe('AiPlanningService', () => {
   it('loads the latest AI request only from the current user trip', async () => {
     const tripId = '10000000-0000-4000-8000-000000000020';
     const latestAiPlanRequest = {
-      style: TravelStyle.Food,
+      style: 'food',
       companions: '친구 2명',
-      transportMode: 'public_transit',
+      transportMode: 'mixed',
       budgetLevel: 'standard',
       preferences: '현지 맛집',
       avoidances: '긴 대기',
@@ -284,7 +290,14 @@ describe('AiPlanningService', () => {
       {} as never,
     );
 
-    await expect(service.getLatestRequest(tripId)).resolves.toEqual({ request: latestAiPlanRequest });
+    await expect(service.getLatestRequest(tripId)).resolves.toEqual({ request: {
+      density: TravelDensity.Balanced,
+      themes: [TravelTheme.Food],
+      companions: '친구 2명',
+      transportModes: [AiTransportMode.PublicTransit, AiTransportMode.Walking],
+      budgetLevel: 'standard',
+      additionalRequests: '좋아하는 것: 현지 맛집\n피하고 싶은 것: 긴 대기',
+    } });
     expect(findOneBy).toHaveBeenCalledWith({ id: tripId, ownerId: 'user-1', active: true });
   });
 
@@ -362,11 +375,16 @@ describe('AiPlanningService', () => {
       { transit: vi.fn().mockResolvedValue(null) },
     );
 
-    const result = await service.generate(tripId, { style: TravelStyle.Relaxed });
+    const request = {
+      density: TravelDensity.Relaxed,
+      themes: [TravelTheme.Highlights],
+      transportModes: [AiTransportMode.PublicTransit],
+    };
+    const result = await service.generate(tripId, request);
 
     expect(result.status).toBe('generated');
     expect(saveTrip).toHaveBeenCalledWith(expect.objectContaining({
-      latestAiPlanRequest: { style: TravelStyle.Relaxed },
+      latestAiPlanRequest: request,
     }));
     expect(planner.generate).toHaveBeenCalledWith(expect.objectContaining({
       places: [],
@@ -471,7 +489,11 @@ describe('AiPlanningService', () => {
       { transit: vi.fn() },
     );
 
-    await service.generate(tripId, { style: TravelStyle.Relaxed });
+    await service.generate(tripId, {
+      density: TravelDensity.Relaxed,
+      themes: [TravelTheme.Highlights],
+      transportModes: [AiTransportMode.PublicTransit],
+    });
 
     expect(planner.generate).toHaveBeenCalledWith({
       task: AI_PLANNING_TASK,
@@ -481,13 +503,13 @@ describe('AiPlanningService', () => {
         startDate: '2026-11-08', endDate: '2026-11-08',
         startPoint: null, endPoint: null,
       },
-      style: TRAVEL_STYLE_POLICIES[TravelStyle.Relaxed],
+      density: TRAVEL_DENSITY_POLICIES[TravelDensity.Relaxed],
       travelerContext: {
         companions: null,
-        transportMode: null,
+        transportModes: [AiTransportMode.PublicTransit],
         budgetLevel: null,
-        preferences: null,
-        avoidances: null,
+        themes: [TravelTheme.Highlights],
+        additionalRequests: null,
       },
       places: [{
         id: visit.id, name: visit.name, address: visit.address, latitude: visit.latitude, longitude: visit.longitude,

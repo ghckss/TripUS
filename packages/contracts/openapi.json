@@ -1257,13 +1257,23 @@
           "refreshToken"
         ]
       },
-      "TravelStyle": {
+      "TravelDensity": {
         "type": "string",
         "enum": [
           "balanced",
+          "busy",
+          "relaxed"
+        ]
+      },
+      "TravelTheme": {
+        "type": "string",
+        "enum": [
+          "cafes",
+          "culture",
           "food",
           "highlights",
-          "relaxed"
+          "nature",
+          "shopping"
         ]
       },
       "AiTransportMode": {
@@ -1271,8 +1281,7 @@
         "enum": [
           "public_transit",
           "walking",
-          "car",
-          "mixed"
+          "car"
         ]
       },
       "AiBudgetLevel": {
@@ -1286,24 +1295,29 @@
       "GenerateAiPlanDto": {
         "type": "object",
         "properties": {
-          "style": {
+          "density": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/TravelStyle"
+                "$ref": "#/components/schemas/TravelDensity"
               }
             ]
+          },
+          "themes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TravelTheme"
+            }
           },
           "companions": {
             "type": "string",
             "maxLength": 120,
             "example": "친구 2명"
           },
-          "transportMode": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/AiTransportMode"
-              }
-            ]
+          "transportModes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiTransportMode"
+            }
           },
           "budgetLevel": {
             "allOf": [
@@ -1312,19 +1326,16 @@
               }
             ]
           },
-          "preferences": {
+          "additionalRequests": {
             "type": "string",
-            "maxLength": 500,
-            "example": "현지 맛집과 전시를 좋아함"
-          },
-          "avoidances": {
-            "type": "string",
-            "maxLength": 500,
-            "example": "긴 대기와 하루 1만 보 이상 걷기"
+            "maxLength": 1000,
+            "example": "현지 맛집을 좋아하고 긴 대기와 이른 아침 일정은 피하고 싶어요."
           }
         },
         "required": [
-          "style"
+          "density",
+          "themes",
+          "transportModes"
         ]
       },
       "LatestAiPlanRequestResponseDto": {
@@ -1516,12 +1527,18 @@
               }
             ]
           },
-          "style": {
+          "density": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/TravelStyle"
+                "$ref": "#/components/schemas/TravelDensity"
               }
             ]
+          },
+          "themes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TravelTheme"
+            }
           },
           "conflicts": {
             "type": "array",
@@ -1539,7 +1556,8 @@
         },
         "required": [
           "status",
-          "style",
+          "density",
+          "themes",
           "conflicts",
           "itinerary"
         ]

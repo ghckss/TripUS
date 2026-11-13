@@ -1,33 +1,37 @@
 export const AI_PLANNER_PORT = Symbol('AI_PLANNER_PORT');
 
-export enum TravelStyle {
+export enum TravelDensity {
   Balanced = 'balanced',
-  Food = 'food',
-  Highlights = 'highlights',
+  Busy = 'busy',
   Relaxed = 'relaxed',
 }
 
-export interface AiPlannerTravelStyle {
-  id: TravelStyle;
+export enum TravelTheme {
+  Cafes = 'cafes',
+  Culture = 'culture',
+  Food = 'food',
+  Highlights = 'highlights',
+  Nature = 'nature',
+  Shopping = 'shopping',
+}
+
+export interface AiPlannerTravelDensity {
+  id: TravelDensity;
   guidance: string;
 }
 
-export const TRAVEL_STYLE_POLICIES: Record<TravelStyle, AiPlannerTravelStyle> = {
-  [TravelStyle.Balanced]: {
-    id: TravelStyle.Balanced,
+export const TRAVEL_DENSITY_POLICIES: Record<TravelDensity, AiPlannerTravelDensity> = {
+  [TravelDensity.Balanced]: {
+    id: TravelDensity.Balanced,
     guidance: 'Balance must-visit places, travel efficiency, meals, and rest while building a complete but realistic day. For each full trip date, plan at least 450 total minutes of visits and travel.',
   },
-  [TravelStyle.Relaxed]: {
-    id: TravelStyle.Relaxed,
+  [TravelDensity.Relaxed]: {
+    id: TravelDensity.Relaxed,
     guidance: 'Keep comfortable breaks and short travel legs, but still build a complete day instead of stopping after only one or two visits. For each full trip date, plan at least 420 total minutes of visits and travel.',
   },
-  [TravelStyle.Highlights]: {
-    id: TravelStyle.Highlights,
-    guidance: 'Prioritize must-visit highlights, then add nearby worthwhile places to form a complete route. For each full trip date, plan at least 480 total minutes of visits and travel.',
-  },
-  [TravelStyle.Food]: {
-    id: TravelStyle.Food,
-    guidance: 'Prioritize food and cafe places around sensible meal times while filling the day with nearby attractions and activities. For each full trip date, plan at least 450 total minutes of visits and travel.',
+  [TravelDensity.Busy]: {
+    id: TravelDensity.Busy,
+    guidance: 'Build a full, energetic route with more worthwhile stops while preserving realistic travel and meal times. For each full trip date, plan at least 480 total minutes of visits and travel.',
   },
 };
 
@@ -41,7 +45,7 @@ export const AI_PLANNING_TASK = {
     'availableStartTime과 availableEndTime 안에서 이동시간까지 포함해 겹치지 않는 시간표를 만든다.',
     'startLodging과 endLodging이 있으면 그 지점에서 시작하고 끝내며, 없으면 숙소를 만들지 않는다.',
     '가까운 장소를 한 권역으로 묶고 추천 장소 사이의 이동은 30분 이내가 되도록 한다.',
-    '선호, 기피 대상, 여행 스타일, 이동수단, 예산 및 lockedPlacements를 존중한다.',
+    '여행 밀도, 선택한 여행 방식들, 복수 이동수단, 예산, 추가 요청사항 및 lockedPlacements를 존중한다.',
     '추천은 검색 가능한 실제 관광지, 식당, 카페, 시장, 상점, 공원, 박물관 또는 문화시설만 사용한다.',
     '역, 공항, 숙소, 도시, 동네, 행정구역을 활동 장소로 추천하지 않는다.',
     '모든 사용자 노출 문구는 한국어로 작성한다.',
@@ -95,13 +99,13 @@ export interface AiPlannerInput {
     startPoint: AiPlannerBoundaryPoint | null;
     endPoint: AiPlannerBoundaryPoint | null;
   };
-  style: AiPlannerTravelStyle;
+  density: AiPlannerTravelDensity;
   travelerContext: {
     companions: string | null;
-    transportMode: string | null;
+    transportModes: string[];
     budgetLevel: string | null;
-    preferences: string | null;
-    avoidances: string | null;
+    themes: TravelTheme[];
+    additionalRequests: string | null;
   };
   places: AiPlannerPlace[];
   days: AiPlannerDay[];

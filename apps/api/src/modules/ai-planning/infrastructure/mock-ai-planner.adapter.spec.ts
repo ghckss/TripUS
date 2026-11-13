@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { AI_PLANNING_TASK, TRAVEL_STYLE_POLICIES, TravelStyle } from '../domain/ai-planner.port';
+import {
+  AI_PLANNING_TASK,
+  TRAVEL_DENSITY_POLICIES,
+  TravelDensity,
+  TravelTheme,
+} from '../domain/ai-planner.port';
 import { MockAiPlannerAdapter } from './mock-ai-planner.adapter';
 
 describe('MockAiPlannerAdapter', () => {
@@ -29,13 +34,13 @@ describe('MockAiPlannerAdapter', () => {
         startPoint: null,
         endPoint: null,
       },
-      style: TRAVEL_STYLE_POLICIES[TravelStyle.Relaxed],
+      density: TRAVEL_DENSITY_POLICIES[TravelDensity.Relaxed],
       travelerContext: {
         companions: null,
-        transportMode: null,
+        transportModes: ['public_transit'],
         budgetLevel: null,
-        preferences: null,
-        avoidances: null,
+        themes: [TravelTheme.Highlights],
+        additionalRequests: null,
       },
       places,
       days: [],

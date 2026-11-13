@@ -33,10 +33,15 @@ export interface TripBoundaryPoint {
 }
 
 export interface TripAiPlanRequest {
-  style: string;
+  density?: string;
+  themes?: string[];
   companions?: string;
-  transportMode?: string;
+  transportModes?: string[];
   budgetLevel?: string;
+  additionalRequests?: string;
+  /** Legacy fields retained so requests saved before the input redesign can be restored. */
+  style?: string;
+  transportMode?: string;
   preferences?: string;
   avoidances?: string;
 }

@@ -433,21 +433,22 @@ export interface components {
             refreshToken: string;
         };
         /** @enum {string} */
-        TravelStyle: "balanced" | "food" | "highlights" | "relaxed";
+        TravelDensity: "balanced" | "busy" | "relaxed";
         /** @enum {string} */
-        AiTransportMode: "public_transit" | "walking" | "car" | "mixed";
+        TravelTheme: "cafes" | "culture" | "food" | "highlights" | "nature" | "shopping";
+        /** @enum {string} */
+        AiTransportMode: "public_transit" | "walking" | "car";
         /** @enum {string} */
         AiBudgetLevel: "budget" | "standard" | "premium";
         GenerateAiPlanDto: {
-            style: components["schemas"]["TravelStyle"];
+            density: components["schemas"]["TravelDensity"];
+            themes: components["schemas"]["TravelTheme"][];
             /** @example 친구 2명 */
             companions?: string;
-            transportMode?: components["schemas"]["AiTransportMode"];
+            transportModes: components["schemas"]["AiTransportMode"][];
             budgetLevel?: components["schemas"]["AiBudgetLevel"];
-            /** @example 현지 맛집과 전시를 좋아함 */
-            preferences?: string;
-            /** @example 긴 대기와 하루 1만 보 이상 걷기 */
-            avoidances?: string;
+            /** @example 현지 맛집을 좋아하고 긴 대기와 이른 아침 일정은 피하고 싶어요. */
+            additionalRequests?: string;
         };
         LatestAiPlanRequestResponseDto: {
             request?: components["schemas"]["GenerateAiPlanDto"] | null;
@@ -495,7 +496,8 @@ export interface components {
         };
         GenerateAiPlanResponseDto: {
             status: components["schemas"]["AiPlanGenerationStatus"];
-            style: components["schemas"]["TravelStyle"];
+            density: components["schemas"]["TravelDensity"];
+            themes: components["schemas"]["TravelTheme"][];
             conflicts: string[];
             itinerary: components["schemas"]["ItineraryResponseDto"];
             failureReason?: string | null;
