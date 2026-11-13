@@ -77,9 +77,6 @@ describe("AiPlanScreen", () => {
 
     await fireEvent.press(screen.getByLabelText("최근 요청 불러오기"));
 
-    expect(alert).toHaveBeenCalledWith(
-      "불러올 최근 요청이 없어요",
-      "AI 일정을 한 번 만들면 다음 요청부터 최근 설정을 불러올 수 있어요.",
-    );
+    expect(alert).toHaveBeenCalledWith("불러올 최근 요청이 없어요");
   });
 });
