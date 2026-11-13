@@ -2,6 +2,7 @@ export type TripProgress = {
   phase: "before" | "countdown" | "during" | "after";
   badgeLabel: string;
   heading: string;
+  message: string | null;
 };
 
 export function resolveTripProgress(
@@ -14,15 +15,25 @@ export function resolveTripProgress(
   const daysUntilStart = dayNumber(startDate) - dayNumber(today);
 
   if (daysUntilStart > 5) {
-    return { phase: "before", badgeLabel: "여행 예정", heading: "준비가 한창이에요" };
+    return { phase: "before", badgeLabel: "여행 예정", heading: "준비가 한창이에요", message: null };
   }
   if (daysUntilStart > 0) {
-    return { phase: "countdown", badgeLabel: `D-${daysUntilStart}`, heading: `출발까지 ${daysUntilStart}일 남았어요` };
+    return {
+      phase: "countdown",
+      badgeLabel: `D-${daysUntilStart}`,
+      heading: `출발까지 ${daysUntilStart}일 남았어요!`,
+      message: "여행 준비는 잘 되고 있나요?",
+    };
   }
   if (today <= endDate) {
-    return { phase: "during", badgeLabel: "여행 중", heading: "지금 여행을 즐기고 있어요" };
+    return { phase: "during", badgeLabel: "여행 중", heading: "지금 여행을 즐기고 계신가요?", message: null };
   }
-  return { phase: "after", badgeLabel: "여행 완료", heading: "여행의 순간을 정리해 보세요" };
+  return {
+    phase: "after",
+    badgeLabel: "여행 완료",
+    heading: "여행은 즐거우셨나요?",
+    message: "여행의 순간을 정리해 보세요",
+  };
 }
 
 function dateInTimezone(date: Date, timezone: string): string {
