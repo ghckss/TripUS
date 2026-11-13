@@ -10,18 +10,22 @@ import { useTripDetail } from "./use-trip-detail";
 import { deleteTrip } from "@/domains/trips/api/trips.api";
 import { clearTripReminders } from "@/domains/trips/notifications/trip-reminders";
 import { useAppDialog } from "@/shared/ui/app-dialog";
+import { resolveTripProgress } from "./trip-progress";
 
 export default function TripHomeScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const { trip, error, placeCount, reload, scheduledCount } = useTripDetail(tripId);
   const path = `/trips/${tripId}` as const;
   const { showDialog } = useAppDialog();
+  const progress = trip
+    ? resolveTripProgress(trip.startDate, trip.endDate, trip.timezone)
+    : { badgeLabel: "여행 예정", heading: "준비가 한창이에요" };
   return (
     <Screen>
       {error && <Card><AppText variant="heading">여행을 불러오지 못했어요</AppText><AppText color={colors.muted}>{error}</AppText><Button label="다시 시도" variant="ghost" onPress={() => void reload()} /></Card>}
       {!trip && !error && <Card><AppText color={colors.muted}>여행을 불러오는 중이에요…</AppText></Card>}
-      {trip && <><View style={styles.row}><Pill label="여행 예정" selected /><AppText variant="caption" color={colors.muted}>{trip.timezone}</AppText></View><AppText variant="title">{trip.title}</AppText><AppText color={colors.muted}>{trip.startDate} – {trip.endDate} · {trip.regions?.length ? trip.regions.map((region) => region.name).join(" · ") : trip.destination}</AppText></>}
-      <Card style={styles.progress}><AppText variant="heading">준비가 한창이에요</AppText><AppText color={colors.muted}>장소 {placeCount}곳 저장 · 일정 {scheduledCount}곳 배치</AppText></Card>
+      {trip && <><View style={styles.row}><Pill label={progress.badgeLabel} selected /><AppText variant="caption" color={colors.muted}>{trip.timezone}</AppText></View><AppText variant="title">{trip.title}</AppText><AppText color={colors.muted}>{trip.startDate} – {trip.endDate} · {trip.regions?.length ? trip.regions.map((region) => region.name).join(" · ") : trip.destination}</AppText></>}
+      <Card style={styles.progress}><AppText variant="heading">{progress.heading}</AppText><AppText color={colors.muted}>장소 {placeCount}곳 저장 · 일정 {scheduledCount}곳 배치</AppText></Card>
       {trip && <Button label="여행 정보 수정" variant="ghost" onPress={() => router.push(`${path}/edit`)} />}
       <Button label="＋ 장소 추가" testID="trip-add-place" onPress={() => router.push(`${path}/places/new`)} />
       <Pressable testID="trip-open-places" onPress={() => router.push(`${path}/places`)}><Card><AppText variant="heading">📍 장소 보관함</AppText><AppText color={colors.muted}>저장한 모든 장소를 한 목록에서 확인해요.</AppText></Card></Pressable>
