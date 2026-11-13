@@ -224,6 +224,10 @@ export class AiPlanningService {
         );
         generated = applyEnrichedTravelEstimates(generated, routeCheckedPlacements);
         recommended = applyEnrichedTravelEstimates(materialized.placements, routeCheckedPlacements);
+        const generatedIds = new Set(generated.map((item) => item.savedPlaceId));
+        const normalizedSchedule = normalizeVisitSchedule([...generated, ...recommended], days);
+        generated = normalizedSchedule.filter((item) => generatedIds.has(item.savedPlaceId));
+        recommended = normalizedSchedule.filter((item) => !generatedIds.has(item.savedPlaceId));
         qualityIssues = assessPlanQuality({
           days,
           style,
@@ -634,6 +638,39 @@ function applyEnrichedTravelEstimates(
   });
 }
 
+function normalizeVisitSchedule(
+  placements: PlannedPlacement[],
+  days: AiPlannerDay[],
+): PlannedPlacement[] {
+  const normalized = placements.map((placement) => ({ ...placement }));
+  for (const day of days) {
+    const visits = normalized
+      .filter((item) => item.date === day.date)
+      .sort((left, right) => left.position - right.position);
+    if (visits.length === 0) continue;
+    const availableStart = day.availableStartTime ? timeToMinutes(day.availableStartTime) : DEFAULT_DAY_START_MINUTES;
+    const availableEnd = day.availableEndTime ? timeToMinutes(day.availableEndTime) : DEFAULT_DAY_END_MINUTES;
+    let cursor = availableStart;
+    for (const visit of visits) {
+      const travelMinutes = visit.travelDurationMinutes ?? 0;
+      const earliestStart = cursor + travelMinutes;
+      const requestedStart = visit.scheduledTime ? timeToMinutes(visit.scheduledTime) : earliestStart;
+      const start = Math.max(earliestStart, requestedStart);
+      visit.scheduledTime = minutesToTime(start);
+      cursor = start + (visit.durationMinutes ?? 0);
+    }
+    if (cursor <= availableEnd) continue;
+
+    cursor = availableStart;
+    for (const visit of visits) {
+      const start = cursor + (visit.travelDurationMinutes ?? 0);
+      visit.scheduledTime = minutesToTime(start);
+      cursor = start + (visit.durationMinutes ?? 0);
+    }
+  }
+  return normalized;
+}
+
 type QualityAssessmentInput = {
   days: AiPlannerDay[];
   style: TravelStyle;
@@ -670,7 +707,11 @@ export function assessPlanQuality(input: QualityAssessmentInput): string[] {
     const lockedVisitCount = input.locked.filter((item) => item.date === day.date).length;
     const plannedMinutes = timedVisits.reduce((total, visit) =>
       total + (visit.durationMinutes ?? 0) + (visit.travelDurationMinutes ?? 0), lockedVisitCount * 110);
-    if (plannedMinutes < targetPlannedMinutes(day, input.style)) issues.push(`underfilled_day:${day.date}`);
+    const visitCount = timedVisits.length + lockedVisitCount;
+    if (
+      visitCount < minimumRequiredVisitCount(day, input.style)
+      || plannedMinutes < minimumAcceptablePlannedMinutes(day, input.style)
+    ) issues.push(`underfilled_day:${day.date}`);
 
     let previousEnd: number | undefined;
     for (const visit of timedVisits) {
@@ -684,8 +725,6 @@ export function assessPlanQuality(input: QualityAssessmentInput): string[] {
         issues.push(`schedule_detail_missing:${day.date}`);
         continue;
       }
-      const isRecommendation = input.recommended.some((item) => item.savedPlaceId === visit.savedPlaceId);
-      if (isRecommendation && visit.travelDurationMinutes > 30) issues.push(`long_travel_leg:${day.date}`);
       const start = timeToMinutes(visit.scheduledTime);
       const end = start + visit.durationMinutes;
       if (day.availableStartTime && start - visit.travelDurationMinutes < timeToMinutes(day.availableStartTime)) {
@@ -711,7 +750,6 @@ function isRepairableQualityIssue(issue: string): boolean {
   if (issue === 'saved_places_missing' || issue === 'saved_places_unplaced' || issue === 'must_visit_missing') return true;
   return [
     'underfilled_day:',
-    'long_travel_leg:',
     'schedule_detail_missing:',
     'invalid_time_window:',
     'outside_available_window:',
@@ -733,7 +771,10 @@ export function assessRawDayCoverage(
     ];
     const plannedMinutes = visits.reduce((total, visit) =>
       total + (visit.durationMinutes ?? 0) + (visit.travelDurationMinutes ?? 0), 0);
-    return plannedMinutes < targetPlannedMinutes(day, style) ? [day.date] : [];
+    return visits.length < minimumRequiredVisitCount(day, style)
+      || plannedMinutes < minimumAcceptablePlannedMinutes(day, style)
+      ? [day.date]
+      : [];
   });
 }
 
@@ -780,6 +821,18 @@ function minimumPlannedMinutes(style: TravelStyle): number {
 
 function targetPlannedMinutes(day: AiPlannerDay, style: TravelStyle): number {
   return day.targetPlannedMinutes ?? minimumPlannedMinutes(style);
+}
+
+function minimumRequiredVisitCount(day: AiPlannerDay, style: TravelStyle): number {
+  const target = targetPlannedMinutes(day, style);
+  if (target <= 0) return 0;
+  if (target < 240) return 1;
+  if (target < 360) return 2;
+  return style === TravelStyle.Relaxed ? 2 : 3;
+}
+
+function minimumAcceptablePlannedMinutes(day: AiPlannerDay, style: TravelStyle): number {
+  return Math.min(targetPlannedMinutes(day, style), minimumRequiredVisitCount(day, style) * 90);
 }
 
 function formatCoverageTargets(days: AiPlannerDay[], dates: string[], style: TravelStyle): string {

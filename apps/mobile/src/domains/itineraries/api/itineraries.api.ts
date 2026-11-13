@@ -27,22 +27,23 @@ export async function getItinerary(tripId: string): Promise<Itinerary> {
 
 export async function generateAiPlan(tripId: string, request: AiPlanRequest): Promise<Itinerary> {
   const previous = await getItinerary(tripId);
-  const { data, error } = await tripUsApi.POST("/v1/trips/{tripId}/ai-plans", {
-    params: { path: { tripId } },
-    body: request,
-  });
-  if (error) throw new Error(apiErrorMessage(error));
-  if (data.status === "conflict") throw new Error("AI 일정에 충돌이 있어요. 일정 편집에서 다시 배치해 주세요.");
-  if (data.status === "unavailable") {
-    const message = data.failureReason === "invalid_output"
-      ? "동선이나 상세 정보가 충분하지 않아 일정을 적용하지 않았어요. 다시 생성해 주세요."
-      : "AI 일정을 만들지 못했어요. 잠시 후 다시 시도해 주세요.";
-    throw new Error(message);
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const { data, error } = await tripUsApi.POST("/v1/trips/{tripId}/ai-plans", {
+      params: { path: { tripId } },
+      body: request,
+    });
+    if (error) throw new Error(apiErrorMessage(error));
+    if (data.status === "conflict") throw new Error("AI 일정에 충돌이 있어요. 일정 편집에서 다시 배치해 주세요.");
+    if (data.status === "unavailable") {
+      trackEvent("ai_plan.internal_retry", { tripId, attempt, reason: data.failureReason ?? "unknown" });
+      continue;
+    }
+    await writeCache(cacheKeys.itinerary(tripId), data.itinerary);
+    await writeCache(cacheKeys.aiUndo(tripId), previous);
+    trackEvent("ai_plan.generated", { tripId, style: request.style, itemCount: data.itinerary.items.length });
+    return data.itinerary;
   }
-  await writeCache(cacheKeys.itinerary(tripId), data.itinerary);
-  await writeCache(cacheKeys.aiUndo(tripId), previous);
-  trackEvent("ai_plan.generated", { tripId, style: request.style, itemCount: data.itinerary.items.length });
-  return data.itinerary;
+  throw new Error("일정을 구성하는 데 시간이 더 필요해요. 잠시 후 자동으로 다시 시도해 주세요.");
 }
 
 export async function undoAiPlan(tripId: string): Promise<Itinerary | undefined> {

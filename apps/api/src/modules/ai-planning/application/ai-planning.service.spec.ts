@@ -48,7 +48,6 @@ describe('AI plan quality severity', () => {
 
     expect(issues).toEqual(expect.arrayContaining([
       'underfilled_day:2026-11-08',
-      'long_travel_leg:2026-11-08',
       'outside_available_window:2026-11-08',
     ]));
     expect(issues.every(isBlockingQualityIssue)).toBe(true);
@@ -382,13 +381,13 @@ describe('AiPlanningService', () => {
     const validPlannerOutput = {
       placements: [{
         savedPlaceId: visit.id, date: '2026-11-08', position: 0,
-        startTime: '10:00', durationMinutes: 240, activity: '서울숲 산책과 주요 구역 관람',
+        startTime: '09:00', durationMinutes: 240, activity: '서울숲 산책과 주요 구역 관람',
         travelMethod: '대중교통', travelDurationMinutes: 20,
       }],
       unplaced: [],
       recommendations: [{
         placeName: 'Gyeongbokgung', regionName: 'Seoul', suggestedDate: '2026-11-08', position: 1,
-        startTime: '14:30', durationMinutes: 240, activity: '경복궁 주요 전각 관람', reason: 'A central historic destination',
+        startTime: '13:00', durationMinutes: 240, activity: '경복궁 주요 전각 관람', reason: 'A central historic destination',
         travelMethod: '대중교통', travelDurationMinutes: 25,
       }],
     };
@@ -480,12 +479,12 @@ describe('AiPlanningService', () => {
     expect(replace).toHaveBeenCalledWith(tripId, [
       {
         savedPlaceId: visit.id, date: '2026-11-08', position: 0, locked: false,
-        scheduledTime: '10:00', durationMinutes: 240, activitySummary: '서울숲 산책과 주요 구역 관람',
+        scheduledTime: '09:20', durationMinutes: 240, activitySummary: '서울숲 산책과 주요 구역 관람',
         travelMethod: '대중교통', travelDurationMinutes: 20,
       },
       {
         savedPlaceId: recommendedId, date: '2026-11-08', position: 1, locked: false,
-        scheduledTime: '14:30', durationMinutes: 240, activitySummary: '경복궁 주요 전각 관람',
+        scheduledTime: '13:45', durationMinutes: 240, activitySummary: '경복궁 주요 전각 관람',
         travelMethod: '대중교통', travelDurationMinutes: 25,
       },
     ], 'ai');
