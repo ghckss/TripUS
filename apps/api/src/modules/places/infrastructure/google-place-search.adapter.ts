@@ -72,6 +72,19 @@ export class GooglePlaceSearchAdapter implements PlaceSearchPort {
     return latitude === undefined || longitude === undefined ? null : { latitude, longitude };
   }
 
+  async getPrimaryType(googlePlaceId: string): Promise<string | null> {
+    const response = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(googlePlaceId)}?languageCode=ko`, {
+      headers: {
+        'X-Goog-Api-Key': this.apiKey,
+        'X-Goog-FieldMask': 'primaryType',
+      },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) throw new ServiceUnavailableException(`Google Place Details request failed (${response.status})`);
+    const body = await response.json() as { primaryType?: string };
+    return body.primaryType ?? null;
+  }
+
   async getPhoto(googlePlaceId: string): Promise<PlacePhoto | null> {
     const detailsResponse = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(googlePlaceId)}?languageCode=ko`, {
       headers: {

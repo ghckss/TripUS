@@ -18,5 +18,6 @@ export interface PlacePhoto {
 export interface PlaceSearchPort {
   search(query: string, destination: string): Promise<PlaceSearchCandidate[]>;
   getCoordinates(googlePlaceId: string): Promise<{ latitude: number; longitude: number } | null>;
+  getPrimaryType?(googlePlaceId: string): Promise<string | null>;
   getPhoto(googlePlaceId: string): Promise<PlacePhoto | null>;
 }

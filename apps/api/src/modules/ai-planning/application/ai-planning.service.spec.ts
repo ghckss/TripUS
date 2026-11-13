@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { PlaceTag } from '../../places/domain/entities/saved-place.entity';
+import { PlaceTag, type SavedPlaceEntity } from '../../places/domain/entities/saved-place.entity';
 import { PlacePreference } from '../../places/domain/entities/saved-place.entity';
 import { ItineraryUpdateStatus } from '../../itineraries/application/dto/itinerary.dto';
 import {
@@ -27,16 +27,18 @@ import {
   isWithinSelectedRegions,
   normalizeGeneratedPlacements,
   optionalStopCategory,
+  requiredMealSlots,
   shouldRejectAiPlaceDuplicate,
 } from './ai-planning.service';
 
 describe('AI plan quality severity', () => {
-  it('blocks every unresolved quality issue from reaching the user', () => {
+  it('blocks structural quality issues while allowing server meal supplementation to degrade gracefully', () => {
     expect(isBlockingQualityIssue('underfilled_day:2026-11-08')).toBe(true);
     expect(isBlockingQualityIssue('long_travel_leg:2026-11-08')).toBe(true);
     expect(isBlockingQualityIssue('saved_places_missing')).toBe(true);
     expect(isBlockingQualityIssue('schedule_detail_missing:2026-11-08')).toBe(true);
     expect(isBlockingQualityIssue('outside_available_window:2026-11-08')).toBe(true);
+    expect(isBlockingQualityIssue('missing_meal:2026-11-08:lunch')).toBe(false);
   });
 
   it('rejects a sparse or out-of-window final plan instead of accepting it with warnings', () => {
@@ -65,7 +67,7 @@ describe('AI plan quality severity', () => {
     expect(issues.every(isBlockingQualityIssue)).toBe(true);
   });
 
-  it('requires breakfast, lunch, and dinner on a full day and does not count cafes as meals', () => {
+  it('does not count cafes as a required lunch', () => {
     const visits = [
       { savedPlaceId: 'breakfast', scheduledTime: '09:00' },
       { savedPlaceId: 'cafe', scheduledTime: '12:30' },
@@ -90,6 +92,20 @@ describe('AI plan quality severity', () => {
     expect(issues).toContain('missing_meal:2026-11-08:lunch');
     expect(issues).not.toContain('missing_meal:2026-11-08:breakfast');
     expect(issues).not.toContain('missing_meal:2026-11-08:dinner');
+  });
+
+  it('applies first-day, middle-day, and last-day meal rules', () => {
+    const fullDay = { date: '2026-11-08', startLodging: null, endLodging: null, availableStartTime: '09:00', availableEndTime: '21:00' };
+    expect(requiredMealSlots({ ...fullDay, isFirstDay: true, isLastDay: false }, 0, 3)).toEqual(['lunch', 'dinner']);
+    expect(requiredMealSlots({ ...fullDay, isFirstDay: false, isLastDay: false }, 1, 3)).toEqual(['breakfast', 'lunch', 'dinner']);
+    expect(requiredMealSlots({ ...fullDay, isFirstDay: false, isLastDay: true }, 2, 3)).toEqual(['breakfast', 'lunch']);
+    expect(requiredMealSlots({ ...fullDay, isFirstDay: true, isLastDay: true }, 0, 1)).toEqual(['lunch']);
+  });
+
+  it('skips lunch after a late first-day start or before an early last-day end', () => {
+    const day = { date: '2026-11-08', startLodging: null, endLodging: null };
+    expect(requiredMealSlots({ ...day, isFirstDay: true, availableStartTime: '14:01', availableEndTime: '21:00' }, 0, 2)).toEqual(['dinner']);
+    expect(requiredMealSlots({ ...day, isLastDay: true, availableStartTime: '09:00', availableEndTime: '11:59' }, 1, 2)).toEqual(['breakfast']);
   });
 });
 
@@ -428,6 +444,117 @@ describe('AiPlanningService', () => {
       additionalRequests: '좋아하는 것: 현지 맛집\n피하고 싶은 것: 긴 대기',
     } });
     expect(findOneBy).toHaveBeenCalledWith({ id: tripId, ownerId: 'user-1', active: true });
+  });
+
+  it('rechecks an other-tagged place and persists it as food when Google identifies a restaurant', async () => {
+    const place = {
+      id: '20000000-0000-4000-8000-000000000099',
+      googlePlaceId: 'google-restaurant',
+      tag: PlaceTag.Other,
+    } as SavedPlaceEntity;
+    const save = vi.fn().mockResolvedValue(place);
+    const getPrimaryType = vi.fn().mockResolvedValue('japanese_restaurant');
+    const service = new AiPlanningService(
+      {} as never,
+      { save } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      { search: vi.fn(), getCoordinates: vi.fn(), getPhoto: vi.fn(), getPrimaryType },
+      {} as never,
+    );
+
+    const tags = await (service as unknown as {
+      resolveActualPlaceTags(places: SavedPlaceEntity[], relevantIds: Set<string>): Promise<Map<string, PlaceTag>>;
+    }).resolveActualPlaceTags([place], new Set([place.id]));
+
+    expect(tags.get(place.id)).toBe(PlaceTag.Food);
+    expect(place.tag).toBe(PlaceTag.Food);
+    expect(getPrimaryType).toHaveBeenCalledWith('google-restaurant');
+    expect(save).toHaveBeenCalledWith(place);
+  });
+
+  it('supplements only a missing meal without regenerating the AI itinerary', async () => {
+    const tripId = '10000000-0000-4000-8000-000000000030';
+    const mealId = '30000000-0000-4000-8000-000000000030';
+    const visits = ['궁궐', '박물관', '야경 명소'].map((name, index) => ({
+      id: `20000000-0000-4000-8000-00000000003${index}`,
+      tripId,
+      googlePlaceId: `google-attraction-${index}`,
+      name,
+      address: '대한민국 서울',
+      latitude: 37.56,
+      longitude: 126.98,
+      tag: PlaceTag.Attraction,
+      preference: PlacePreference.WantToVisit,
+      note: null,
+      isPrimaryLodging: false,
+    }));
+    const trip = {
+      id: tripId, title: '서울 여행', destination: '대한민국', timezone: 'Asia/Seoul',
+      regions: [{ name: '서울', address: '대한민국', latitude: 37.56, longitude: 126.98 }],
+      startDate: '2026-11-22', endDate: '2026-11-22', startPoint: null, endPoint: null,
+    };
+    const planner = { generate: vi.fn().mockResolvedValue({
+      placements: visits.map((place, position) => ({
+        savedPlaceId: place.id,
+        date: '2026-11-22',
+        position,
+        startTime: ['09:00', '15:00', '18:00'][position],
+        durationMinutes: 180,
+        activity: `${place.name} 방문`,
+        travelMethod: '대중교통',
+        travelDurationMinutes: 0,
+      })),
+      unplaced: [],
+      recommendations: [],
+    }) };
+    const replace = vi.fn().mockResolvedValue({
+      status: ItineraryUpdateStatus.Updated,
+      conflicts: [],
+      itinerary: { items: [], unplaced: [] },
+    });
+    const search = vi.fn().mockResolvedValue([{
+      googlePlaceId: 'google-lunch', name: '서울 점심 식당', address: '대한민국 서울',
+      latitude: 37.56, longitude: 126.98, primaryType: 'korean_restaurant',
+    }]);
+    const service = new AiPlanningService(
+      { findOneBy: vi.fn().mockResolvedValue(trip), save: vi.fn() } as never,
+      {
+        find: vi.fn().mockResolvedValue(visits),
+        create: vi.fn((input: Record<string, unknown>) => input),
+        save: vi.fn((input: Record<string, unknown>) => Promise.resolve({ ...input, id: mealId })),
+        remove: vi.fn(),
+      } as never,
+      planner,
+      { get: vi.fn().mockResolvedValue({ items: [], unplaced: [] }), replace } as never,
+      { getCurrentUserId: vi.fn().mockReturnValue('user-1') },
+      { assertAllowed: vi.fn() } as never,
+      { assertCanGenerateAiPlan: vi.fn(), recordSuccessfulAiGeneration: vi.fn() } as never,
+      { search, getCoordinates: vi.fn(), getPhoto: vi.fn(), getPrimaryType: vi.fn() },
+      { transit: vi.fn().mockResolvedValue(null) },
+    );
+
+    const result = await service.generate(tripId, {
+      density: TravelDensity.Balanced,
+      themes: [TravelTheme.Highlights],
+      transportModes: [AiTransportMode.PublicTransit],
+    });
+
+    expect(result.status).toBe(AiPlanGenerationStatus.Generated);
+    expect(planner.generate).toHaveBeenCalledOnce();
+    expect(search).toHaveBeenCalledWith('점심 식사 식당', '대한민국 서울');
+    expect(replace).toHaveBeenCalledWith(tripId, expect.arrayContaining([
+      expect.objectContaining({
+        savedPlaceId: mealId,
+        date: '2026-11-22',
+        scheduledTime: '12:00',
+        durationMinutes: 60,
+        activitySummary: '점심 식사',
+      }),
+    ]), 'ai');
   });
 
   it('regenerates only the requested date using the latest settings', async () => {
@@ -774,6 +901,8 @@ describe('AiPlanningService', () => {
       }],
       days: [{
         date: '2026-11-08',
+        isFirstDay: true,
+        isLastDay: true,
         startLodging: null,
         endLodging: null,
         availableStartTime: '09:00',

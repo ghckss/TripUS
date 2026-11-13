@@ -43,4 +43,18 @@ describe('GooglePlaceSearchAdapter photos', () => {
     await expect(adapter.getPhoto('google-place-1')).resolves.toBeNull();
     expect(request).toHaveBeenCalledOnce();
   });
+
+  it('rechecks the current primary type for a saved place', async () => {
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      primaryType: 'japanese_restaurant',
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', request);
+    const adapter = new GooglePlaceSearchAdapter({
+      getOrThrow: vi.fn().mockReturnValue('server-api-key'),
+    } as unknown as ConfigService);
+
+    await expect(adapter.getPrimaryType('google-place-1')).resolves.toBe('japanese_restaurant');
+    const options = request.mock.calls[0]?.[1] as RequestInit;
+    expect((options.headers as Record<string, string>)['X-Goog-FieldMask']).toBe('primaryType');
+  });
 });

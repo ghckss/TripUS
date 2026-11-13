@@ -267,12 +267,56 @@ export class AiPlanningService {
         createdRecommendationEntities = materialized.created;
         const allowed = new Set([...planningPlaces.map((place) => place.id), ...materialized.placements.map((item) => item.savedPlaceId)]);
         generated = normalizeGeneratedPlacements(output.placements, allowed, validDates);
+        let allPlanningPlaces = [...places, ...materialized.created];
+        let placeTagsById = await this.resolveActualPlaceTags(
+          allPlanningPlaces,
+          new Set([...generated, ...materialized.placements, ...locked].map((item) => item.savedPlaceId)),
+        );
+        const missingMeals = assessMissingMeals(
+          days,
+          [...generated, ...materialized.placements],
+          locked,
+          placeTagsById,
+        );
+        if (missingMeals.length > 0) {
+          const supplement = await this.supplementMissingMeals({
+            tripId: trip.id,
+            destination: trip.destination,
+            selectedRegions: recommendationRegions,
+            days,
+            missingMeals,
+            placements: [...generated, ...materialized.placements],
+            locked,
+            places: allPlanningPlaces,
+            transportModes: request.transportModes,
+            additionalRequests: request.additionalRequests?.trim() ?? '',
+          });
+          materialized.created.push(...supplement.created);
+          materialized.placements.push(...supplement.placements);
+          if (supplement.placements.length > 0) {
+            writeStructuredLog('info', 'ai.generation.meals_supplemented', {
+              generationId,
+              tripId,
+              meals: supplement.placements.map((item) => ({
+                date: item.date,
+                scheduledTime: item.scheduledTime,
+                savedPlaceId: item.savedPlaceId,
+              })),
+            });
+          }
+          allPlanningPlaces = [...places, ...materialized.created];
+          placeTagsById = new Map(allPlanningPlaces.map((place) => [place.id, place.tag]));
+        }
+        const generatedIdsBeforeScheduling = new Set(generated.map((item) => item.savedPlaceId));
+        const scheduledPlacements = reindexPlacementsByTime([...generated, ...materialized.placements]);
+        generated = scheduledPlacements.filter((item) => generatedIdsBeforeScheduling.has(item.savedPlaceId));
+        materialized.placements = scheduledPlacements.filter((item) => !generatedIdsBeforeScheduling.has(item.savedPlaceId));
         const routeCheckedPlacements = await this.enrichTravelEstimates(
           addLodgingEndpoints(
             mergeLockedPlacements(locked, [...generated, ...materialized.placements]),
             days,
           ),
-          [...places, ...materialized.created],
+          allPlanningPlaces,
           request.transportModes,
         );
         generated = applyEnrichedTravelEstimates(generated, routeCheckedPlacements);
@@ -288,9 +332,7 @@ export class AiPlanningService {
           generated,
           recommended,
           locked,
-          placeTagsById: new Map(
-            [...places, ...materialized.created].map((place) => [place.id, place.tag]),
-          ),
+          placeTagsById,
           output,
         });
         const repairableIssues = qualityIssues.filter(isRepairableQualityIssue);
@@ -438,6 +480,112 @@ export class AiPlanningService {
         failureReason: reason,
       };
     }
+  }
+
+  private async resolveActualPlaceTags(
+    places: SavedPlaceEntity[],
+    relevantPlaceIds: Set<string>,
+  ): Promise<Map<string, PlaceTag>> {
+    const tags = new Map(places.map((place) => [place.id, place.tag]));
+    if (!this.placeSearch.getPrimaryType) return tags;
+    await Promise.all(places.map(async (place) => {
+      if (place.tag !== PlaceTag.Other || !place.googlePlaceId || !relevantPlaceIds.has(place.id)) return;
+      try {
+        const primaryType = await this.placeSearch.getPrimaryType!(place.googlePlaceId);
+        if (recommendationTag({ primaryType } as PlaceSearchCandidate) !== PlaceTag.Food) return;
+        tags.set(place.id, PlaceTag.Food);
+        place.tag = PlaceTag.Food;
+        await this.places.save(place);
+      } catch {
+        this.logger.warn(`Place type recheck unavailable placeId=${place.id}`);
+      }
+    }));
+    return tags;
+  }
+
+  private async supplementMissingMeals(input: {
+    tripId: string;
+    destination: string;
+    selectedRegions: Array<{ name: string; latitude?: number | null; longitude?: number | null }>;
+    days: AiPlannerDay[];
+    missingMeals: string[];
+    placements: PlannedPlacement[];
+    locked: Array<{ savedPlaceId: string; date: string | null; position: number | null; scheduledTime?: string | null }>;
+    places: SavedPlaceEntity[];
+    transportModes: AiTransportMode[];
+    additionalRequests: string;
+  }): Promise<{ created: SavedPlaceEntity[]; placements: PlannedPlacement[] }> {
+    const created: SavedPlaceEntity[] = [];
+    const placements: PlannedPlacement[] = [];
+    const placesById = new Map(input.places.map((place) => [place.id, place]));
+    const usedGoogleIds = new Set(input.places.flatMap((place) => place.googlePlaceId ? [place.googlePlaceId] : []));
+    const usedNames = new Set(input.places.map((place) => place.name.trim().toLocaleLowerCase()));
+
+    for (const issue of input.missingMeals) {
+      const parsed = parseMissingMealIssue(issue);
+      if (!parsed) continue;
+      const day = input.days.find((candidate) => candidate.date === parsed.date);
+      if (!day) continue;
+      const scheduledTime = suggestedMealTime(day, parsed.meal);
+      if (!scheduledTime) continue;
+      const dayAnchor = [...input.placements, ...input.locked]
+        .filter((item) => item.date === parsed.date)
+        .map((item) => placesById.get(item.savedPlaceId))
+        .find((place) => place?.address);
+      const regionContext = dayAnchor?.address ?? input.selectedRegions[0]?.name ?? input.destination;
+      try {
+        const candidates = await this.placeSearch.search(`${mealLabel(parsed.meal)} 식사 식당`, regionContext);
+        let selected: PlaceSearchCandidate | undefined;
+        for (const candidate of candidates) {
+          if (usedGoogleIds.has(candidate.googlePlaceId) || usedNames.has(candidate.name.trim().toLocaleLowerCase())) continue;
+          let verified = candidate;
+          if (recommendationTag(candidate) === PlaceTag.Other && this.placeSearch.getPrimaryType) {
+            const primaryType = await this.placeSearch.getPrimaryType(candidate.googlePlaceId);
+            verified = { ...candidate, primaryType };
+          }
+          if (
+            recommendationTag(verified) === PlaceTag.Food
+            && isRecommendableCandidate(verified, input.destination, input.additionalRequests)
+            && isWithinSelectedRegions(regionContext, verified, input.selectedRegions)
+          ) {
+            selected = verified;
+            break;
+          }
+        }
+        if (!selected) {
+          this.logger.warn(`Meal supplement unavailable date=${parsed.date} meal=${parsed.meal}`);
+          continue;
+        }
+        const entity = await this.places.save(this.places.create({
+          tripId: input.tripId,
+          googlePlaceId: selected.googlePlaceId,
+          name: selected.name,
+          address: selected.address,
+          latitude: selected.latitude,
+          longitude: selected.longitude,
+          tag: PlaceTag.Food,
+          preference: PlacePreference.IfTimeAllows,
+          note: `AI 추천 · ${mealLabel(parsed.meal)} 일정 보완`,
+          isPrimaryLodging: false,
+        }));
+        usedGoogleIds.add(selected.googlePlaceId);
+        usedNames.add(selected.name.trim().toLocaleLowerCase());
+        created.push(entity);
+        placements.push({
+          savedPlaceId: entity.id,
+          date: parsed.date,
+          position: 0,
+          scheduledTime,
+          durationMinutes: 60,
+          activitySummary: `${mealLabel(parsed.meal)} 식사`,
+          travelMethod: preferredTravelMethod(input.transportModes),
+          travelDurationMinutes: 0,
+        });
+      } catch {
+        this.logger.warn(`Meal supplement failed date=${parsed.date} meal=${parsed.meal}`);
+      }
+    }
+    return { created, placements };
   }
 
   private async materializeRecommendations(
@@ -928,6 +1076,8 @@ export function buildPlannerDays(
     const last = placesById.get(items.at(-1)?.savedPlaceId ?? '');
     return {
       date,
+      isFirstDay: index === 0,
+      isLastDay: index === dates.length - 1,
       startLodging: index === 0 ? null : toLodging(isLodging(first) ? first : primaryLodging),
       endLodging: index === dates.length - 1 ? null : toLodging(isLodging(last) ? last : primaryLodging),
     };
@@ -1049,18 +1199,6 @@ export function assessPlanQuality(input: QualityAssessmentInput): string[] {
       || plannedMinutes < minimumAcceptablePlannedMinutes(day, input.density)
     ) issues.push(`underfilled_day:${day.date}`);
 
-    const mealVisits = [
-      ...timedVisits.map((visit) => ({ savedPlaceId: visit.savedPlaceId, scheduledTime: visit.scheduledTime ?? null })),
-      ...input.locked
-        .filter((item) => item.date === day.date)
-        .map((item) => ({ savedPlaceId: item.savedPlaceId, scheduledTime: item.scheduledTime ?? null })),
-    ].filter((visit) => input.placeTagsById.get(visit.savedPlaceId) === PlaceTag.Food && visit.scheduledTime);
-    for (const meal of requiredMealSlots(day)) {
-      if (!mealVisits.some((visit) => mealSlot(visit.scheduledTime!) === meal)) {
-        issues.push(`missing_meal:${day.date}:${meal}`);
-      }
-    }
-
     let previousEnd: number | undefined;
     for (const visit of timedVisits) {
       if (
@@ -1087,11 +1225,12 @@ export function assessPlanQuality(input: QualityAssessmentInput): string[] {
       previousEnd = end;
     }
   }
+  issues.push(...assessMissingMeals(input.days, allPlacements, input.locked, input.placeTagsById));
   return [...new Set(issues)];
 }
 
 export function isBlockingQualityIssue(issue: string): boolean {
-  return issue.length > 0;
+  return issue.length > 0 && !issue.startsWith('missing_meal:');
 }
 
 function isRepairableQualityIssue(issue: string): boolean {
@@ -1101,19 +1240,20 @@ function isRepairableQualityIssue(issue: string): boolean {
     'schedule_detail_missing:',
     'invalid_time_window:',
     'outside_available_window:',
-    'missing_meal:',
   ].some((prefix) => issue.startsWith(prefix));
 }
 
 type MealSlot = 'breakfast' | 'lunch' | 'dinner';
 
-function requiredMealSlots(day: AiPlannerDay): MealSlot[] {
+export function requiredMealSlots(day: AiPlannerDay, dayIndex: number, dayCount: number): MealSlot[] {
   const start = timeToMinutes(day.availableStartTime ?? '09:00');
   const end = timeToMinutes(day.availableEndTime ?? '21:00');
+  const isFirstDay = day.isFirstDay ?? dayIndex === 0;
+  const isLastDay = day.isLastDay ?? dayIndex === dayCount - 1;
   return [
-    ...(start <= 10 * 60 + 30 && end >= 7 * 60 ? ['breakfast' as const] : []),
-    ...(start <= 14 * 60 && end >= 11 * 60 ? ['lunch' as const] : []),
-    ...(start <= 20 * 60 && end >= 17 * 60 ? ['dinner' as const] : []),
+    ...(!isFirstDay && start <= 10 * 60 + 30 && end >= 7 * 60 ? ['breakfast' as const] : []),
+    ...(start <= 14 * 60 && end >= 12 * 60 ? ['lunch' as const] : []),
+    ...(!isLastDay && start <= 20 * 60 && end >= 17 * 60 ? ['dinner' as const] : []),
   ];
 }
 
@@ -1123,6 +1263,61 @@ function mealSlot(time: string): MealSlot | null {
   if (minutes >= 11 * 60 && minutes < 15 * 60) return 'lunch';
   if (minutes >= 17 * 60 && minutes < 21 * 60) return 'dinner';
   return null;
+}
+
+export function assessMissingMeals(
+  days: AiPlannerDay[],
+  placements: Array<Pick<PlannedPlacement, 'savedPlaceId' | 'date' | 'scheduledTime'>>,
+  locked: Array<{ savedPlaceId: string; date: string | null; scheduledTime?: string | null }>,
+  placeTagsById: Map<string, string>,
+): string[] {
+  return days.flatMap((day, dayIndex) => {
+    const mealVisits = [
+      ...placements
+        .filter((item) => item.date === day.date)
+        .map((item) => ({ savedPlaceId: item.savedPlaceId, scheduledTime: item.scheduledTime ?? null })),
+      ...locked
+        .filter((item) => item.date === day.date)
+        .map((item) => ({ savedPlaceId: item.savedPlaceId, scheduledTime: item.scheduledTime ?? null })),
+    ].filter((visit) => placeTagsById.get(visit.savedPlaceId) === PlaceTag.Food && visit.scheduledTime);
+    return requiredMealSlots(day, dayIndex, days.length)
+      .filter((meal) => !mealVisits.some((visit) => mealSlot(visit.scheduledTime!) === meal))
+      .map((meal) => `missing_meal:${day.date}:${meal}`);
+  });
+}
+
+function parseMissingMealIssue(issue: string): { date: string; meal: MealSlot } | null {
+  const match = /^missing_meal:(\d{4}-\d{2}-\d{2}):(breakfast|lunch|dinner)$/u.exec(issue);
+  return match ? { date: match[1]!, meal: match[2] as MealSlot } : null;
+}
+
+function mealLabel(meal: MealSlot): string {
+  return { breakfast: '아침', lunch: '점심', dinner: '저녁' }[meal];
+}
+
+function suggestedMealTime(day: AiPlannerDay, meal: MealSlot): string | null {
+  const preferred = { breakfast: 9 * 60, lunch: 12 * 60, dinner: 18 * 60 }[meal];
+  const availableStart = timeToMinutes(day.availableStartTime ?? '09:00');
+  const availableEnd = timeToMinutes(day.availableEndTime ?? '21:00');
+  const start = Math.max(preferred, availableStart);
+  return start + 60 <= availableEnd ? minutesToTime(start) : null;
+}
+
+function preferredTravelMethod(modes: AiTransportMode[]): string {
+  if (modes.includes(AiTransportMode.PublicTransit)) return '대중교통';
+  if (modes.includes(AiTransportMode.Walking)) return '도보';
+  return '차량 이동';
+}
+
+function reindexPlacementsByTime(placements: PlannedPlacement[]): PlannedPlacement[] {
+  return [...placements]
+    .sort((left, right) => left.date.localeCompare(right.date)
+      || (left.scheduledTime ?? '23:59').localeCompare(right.scheduledTime ?? '23:59')
+      || left.position - right.position)
+    .map((placement, index, sorted) => ({
+      ...placement,
+      position: sorted.slice(0, index).filter((item) => item.date === placement.date).length,
+    }));
 }
 
 export function assessRawDayCoverage(
