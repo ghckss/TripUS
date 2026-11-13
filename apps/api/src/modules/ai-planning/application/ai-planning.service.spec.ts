@@ -261,6 +261,33 @@ describe('isWithinSelectedRegions', () => {
 });
 
 describe('AiPlanningService', () => {
+  it('loads the latest AI request only from the current user trip', async () => {
+    const tripId = '10000000-0000-4000-8000-000000000020';
+    const latestAiPlanRequest = {
+      style: TravelStyle.Food,
+      companions: '친구 2명',
+      transportMode: 'public_transit',
+      budgetLevel: 'standard',
+      preferences: '현지 맛집',
+      avoidances: '긴 대기',
+    };
+    const findOneBy = vi.fn().mockResolvedValue({ id: tripId, latestAiPlanRequest });
+    const service = new AiPlanningService(
+      { findOneBy } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      { getCurrentUserId: vi.fn().mockReturnValue('user-1') },
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.getLatestRequest(tripId)).resolves.toEqual({ request: latestAiPlanRequest });
+    expect(findOneBy).toHaveBeenCalledWith({ id: tripId, ownerId: 'user-1', active: true });
+  });
+
   it('creates a complete recommendation-only itinerary without saved places or lodging', async () => {
     const tripId = '10000000-0000-4000-8000-000000000010';
     const recommendationIds = [
@@ -306,13 +333,14 @@ describe('AiPlanningService', () => {
       itinerary: { items: [], unplaced: [] },
     });
     let savedIndex = 0;
+    const saveTrip = vi.fn((input: Record<string, unknown>) => Promise.resolve(input));
     const service = new AiPlanningService(
       { findOneBy: vi.fn().mockResolvedValue({
         id: tripId, title: '서울 자유 여행', destination: 'Korea', timezone: 'Asia/Seoul',
         regions: [{ name: 'Seoul', address: 'South Korea', latitude: 37.56, longitude: 126.98 }],
         startDate: '2026-11-08', endDate: '2026-11-08',
         startPoint: null, endPoint: null,
-      }) } as never,
+      }), save: saveTrip } as never,
       {
         find: vi.fn().mockResolvedValue([]),
         create: vi.fn((input: Record<string, unknown>) => input),
@@ -337,6 +365,9 @@ describe('AiPlanningService', () => {
     const result = await service.generate(tripId, { style: TravelStyle.Relaxed });
 
     expect(result.status).toBe('generated');
+    expect(saveTrip).toHaveBeenCalledWith(expect.objectContaining({
+      latestAiPlanRequest: { style: TravelStyle.Relaxed },
+    }));
     expect(planner.generate).toHaveBeenCalledWith(expect.objectContaining({
       places: [],
       days: [expect.objectContaining({ startLodging: null, endLodging: null, targetPlannedMinutes: 420 })],
@@ -411,7 +442,7 @@ describe('AiPlanningService', () => {
         regions: [{ name: 'Seoul', address: 'South Korea', latitude: 37.56, longitude: 126.98 }],
         startDate: '2026-11-08', endDate: '2026-11-08',
         startPoint: null, endPoint: null,
-      }) } as never,
+      }), save: vi.fn((input: Record<string, unknown>) => Promise.resolve(input)) } as never,
       {
         find: vi.fn().mockResolvedValue([primary, secondary, visit, previousAiRecommendation]),
         create: vi.fn((input: Record<string, unknown>) => input),

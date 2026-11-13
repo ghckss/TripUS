@@ -1,5 +1,6 @@
 export {
   generateAiPlan,
+  getLatestAiPlanRequest,
   getTransitRoute,
   getItinerary,
   replaceItinerary,

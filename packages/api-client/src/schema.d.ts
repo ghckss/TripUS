@@ -100,6 +100,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trips/{tripId}/ai-plans/latest-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AiPlanningController_getLatestRequest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trips/{tripId}/ai-plans": {
         parameters: {
             query?: never;
@@ -432,6 +448,9 @@ export interface components {
             preferences?: string;
             /** @example 긴 대기와 하루 1만 보 이상 걷기 */
             avoidances?: string;
+        };
+        LatestAiPlanRequestResponseDto: {
+            request?: components["schemas"]["GenerateAiPlanDto"] | null;
         };
         /** @enum {string} */
         AiPlanGenerationStatus: "generated" | "conflict" | "unavailable";
@@ -859,6 +878,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    AiPlanningController_getLatestRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LatestAiPlanRequestResponseDto"];
+                };
             };
         };
     };

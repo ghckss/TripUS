@@ -46,6 +46,14 @@ export async function generateAiPlan(tripId: string, request: AiPlanRequest): Pr
   throw new Error("일정을 구성하는 데 시간이 더 필요해요. 잠시 후 자동으로 다시 시도해 주세요.");
 }
 
+export async function getLatestAiPlanRequest(tripId: string): Promise<AiPlanRequest | null> {
+  const { data, error } = await tripUsApi.GET("/v1/trips/{tripId}/ai-plans/latest-request", {
+    params: { path: { tripId } },
+  });
+  if (error) throw new Error(apiErrorMessage(error));
+  return data.request ?? null;
+}
+
 export async function undoAiPlan(tripId: string): Promise<Itinerary | undefined> {
   const previous = await readCache<Itinerary>(cacheKeys.aiUndo(tripId));
   if (!previous) return undefined;

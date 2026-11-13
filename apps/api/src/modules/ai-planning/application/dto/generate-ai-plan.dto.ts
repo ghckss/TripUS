@@ -73,3 +73,8 @@ export class GenerateAiPlanResponseDto {
   @ApiPropertyOptional({ type: String, nullable: true })
   failureReason!: string | null;
 }
+
+export class LatestAiPlanRequestResponseDto {
+  @ApiPropertyOptional({ type: GenerateAiPlanDto, nullable: true })
+  request!: GenerateAiPlanDto | null;
+}

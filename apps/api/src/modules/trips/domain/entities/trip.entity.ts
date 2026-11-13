@@ -32,6 +32,15 @@ export interface TripBoundaryPoint {
   time: string | null;
 }
 
+export interface TripAiPlanRequest {
+  style: string;
+  companions?: string;
+  transportMode?: string;
+  budgetLevel?: string;
+  preferences?: string;
+  avoidances?: string;
+}
+
 @Entity({ name: 'trips' })
 @Index('idx_trips_owner_active', ['ownerId', 'active'])
 @Check('chk_trips_date_range', '"end_date" >= "start_date"')
@@ -69,6 +78,9 @@ export class TripEntity {
 
   @Column({ name: 'end_point', type: 'jsonb', nullable: true })
   endPoint!: TripBoundaryPoint | null;
+
+  @Column({ name: 'latest_ai_plan_request', type: 'jsonb', nullable: true })
+  latestAiPlanRequest!: TripAiPlanRequest | null;
 
   @Column({ type: 'boolean', default: true })
   active!: boolean;

@@ -22,7 +22,11 @@ import {
   TRAVEL_STYLE_POLICIES,
   TravelStyle,
 } from '../domain/ai-planner.port';
-import { AiPlanGenerationStatus, GenerateAiPlanResponseDto } from './dto/generate-ai-plan.dto';
+import {
+  AiPlanGenerationStatus,
+  GenerateAiPlanResponseDto,
+  LatestAiPlanRequestResponseDto,
+} from './dto/generate-ai-plan.dto';
 import { AiPlanningRateLimiter } from './ai-planning-rate-limiter';
 import { EntitlementsService } from '../../entitlements/application/entitlements.service';
 import { PlacePreference, PlaceTag } from '../../places/domain/entities/saved-place.entity';
@@ -64,6 +68,16 @@ export class AiPlanningService {
     @Inject(ROUTES_PORT) private readonly routes: RoutesPort,
   ) {}
 
+  async getLatestRequest(tripId: string): Promise<LatestAiPlanRequestResponseDto> {
+    const trip = await this.trips.findOneBy({
+      id: tripId,
+      ownerId: this.identity.getCurrentUserId(),
+      active: true,
+    });
+    if (!trip) throw new NotFoundException('Trip not found');
+    return { request: trip.latestAiPlanRequest as GenerateAiPlanDto | null };
+  }
+
   async generate(tripId: string, request: GenerateAiPlanDto): Promise<GenerateAiPlanResponseDto> {
     const { style } = request;
     const generationId = randomUUID();
@@ -72,6 +86,8 @@ export class AiPlanningService {
     await this.entitlements.assertCanGenerateAiPlan();
     const trip = await this.trips.findOneBy({ id: tripId, ownerId: this.identity.getCurrentUserId(), active: true });
     if (!trip) throw new NotFoundException('Trip not found');
+    trip.latestAiPlanRequest = { ...request };
+    await this.trips.save(trip);
     const places = await this.places.find({ where: { tripId }, order: { createdAt: 'ASC' } });
     const primaryLodging = places.find((place) => place.isPrimaryLodging);
     const current = await this.itineraries.get(tripId);

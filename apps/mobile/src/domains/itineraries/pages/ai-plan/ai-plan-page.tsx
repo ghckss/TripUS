@@ -41,8 +41,17 @@ export default function AiPlanScreen() {
   const [budgetLevel, setBudgetLevel] = useState<AiBudgetLevel>("standard");
   const [preferences, setPreferences] = useState("");
   const [avoidances, setAvoidances] = useState("");
-  const { entitlements, error, generate, loading, missingRegions } = useAiPlan(tripId);
+  const { entitlements, error, generate, latestRequest, loading, missingRegions } = useAiPlan(tripId);
   const selectedStyle = stylesList.find((item) => item.value === selected)!;
+  const loadLatestRequest = () => {
+    if (!latestRequest) return;
+    setSelected(latestRequest.style);
+    setCompanions(latestRequest.companions ?? "");
+    setTransportMode(latestRequest.transportMode ?? "public_transit");
+    setBudgetLevel(latestRequest.budgetLevel ?? "standard");
+    setPreferences(latestRequest.preferences ?? "");
+    setAvoidances(latestRequest.avoidances ?? "");
+  };
   const createPlan = () => void generate({
     style: selected,
     companions: companions.trim() || undefined,
@@ -66,6 +75,11 @@ export default function AiPlanScreen() {
     <Screen>
       <AppText variant="title">어떤 여행을 원하나요?</AppText>
       <AppText color={colors.muted}>저장한 장소를 중심으로 동선, 시간과 식사까지 빈틈없이 구성해요.</AppText>
+      {latestRequest && <Card>
+        <AppText variant="heading">최근 요청을 다시 사용할까요?</AppText>
+        <AppText color={colors.muted}>이 여행에서 마지막으로 사용한 AI 일정 조건을 불러올 수 있어요.</AppText>
+        <Button label="최근 요청 불러오기" variant="ghost" onPress={loadLatestRequest} />
+      </Card>}
       <AppText variant="label">여행 스타일</AppText>
       <View style={styles.wrap}>{stylesList.map((item) => <Pill key={item.value} label={item.label} selected={selected === item.value} onPress={() => setSelected(item.value)} />)}</View>
       <Card><AppText variant="heading">{selectedStyle.label} 둘러보는 일정</AppText><AppText color={colors.muted}>{selectedStyle.description}</AppText></Card>

@@ -150,6 +150,37 @@
         ]
       }
     },
+    "/v1/trips/{tripId}/ai-plans/latest-request": {
+      "get": {
+        "operationId": "AiPlanningController_getLatestRequest",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestAiPlanRequestResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ai-planning"
+        ]
+      }
+    },
     "/v1/trips/{tripId}/ai-plans": {
       "post": {
         "operationId": "AiPlanningController_generate",
@@ -1295,6 +1326,20 @@
         "required": [
           "style"
         ]
+      },
+      "LatestAiPlanRequestResponseDto": {
+        "type": "object",
+        "properties": {
+          "request": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GenerateAiPlanDto"
+              }
+            ]
+          }
+        }
       },
       "AiPlanGenerationStatus": {
         "type": "string",
