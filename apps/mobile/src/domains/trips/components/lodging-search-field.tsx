@@ -60,6 +60,7 @@ export function LodgingSearchField({ destination, value, onChange }: LodgingSear
         onChangeText={setQuery}
         onSubmitEditing={() => void search()}
         placeholder={`${destination} 숙소 검색`}
+        placeholderTextColor={colors.muted}
         returnKeyType="search"
         style={styles.input}
         testID="lodging-search-input"

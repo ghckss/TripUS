@@ -32,5 +32,5 @@ export async function confirmPhoto(tripId: string, photoId: string): Promise<Tri
 export async function listPhotos(tripId: string): Promise<TripPhoto[]> {
   const { data, error } = await tripUsApi.GET("/v1/trips/{tripId}/photos", { params: { path: { tripId } } });
   if (error) throw new Error(apiErrorMessage(error));
-  return data;
+  return data.filter((photo) => photo.status === "ready");
 }

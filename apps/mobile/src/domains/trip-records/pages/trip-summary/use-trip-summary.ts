@@ -13,12 +13,12 @@ export function useTripSummary(tripId: string) {
   const [accessToken, setAccessToken] = useState<string>();
   const [error, setError] = useState<string>();
   useEffect(() => {
-    void Promise.all([getTrip(tripId), getItinerary(tripId), listPhotos(tripId), getSession()])
-      .then(([nextTrip, nextItinerary, nextPhotos, session]) => {
+    void Promise.all([getTrip(tripId), getItinerary(tripId), getSession()])
+      .then(async ([nextTrip, nextItinerary, session]) => {
         setTrip(nextTrip);
         setItinerary(nextItinerary);
-        setPhotos(nextPhotos);
         setAccessToken(session?.accessToken);
+        setPhotos(await listPhotos(tripId).catch(() => []));
       })
       .catch((caught) => setError(apiErrorMessage(caught)));
   }, [tripId]);

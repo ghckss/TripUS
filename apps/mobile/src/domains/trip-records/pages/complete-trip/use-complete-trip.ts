@@ -16,9 +16,9 @@ export function useCompleteTrip(tripId: string) {
   const reload = useCallback(async () => {
     setError(undefined);
     try {
-      const [nextItinerary, nextPhotos] = await Promise.all([getItinerary(tripId), listPhotos(tripId)]);
+      const nextItinerary = await getItinerary(tripId);
       setItinerary(nextItinerary);
-      setPhotos(nextPhotos);
+      setPhotos(await listPhotos(tripId).catch(() => []));
     } catch (caught) { setError(apiErrorMessage(caught)); }
   }, [tripId]);
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));

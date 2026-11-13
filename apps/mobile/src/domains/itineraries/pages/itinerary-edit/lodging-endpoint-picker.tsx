@@ -117,6 +117,7 @@ export function LodgingEndpointPicker({ current, date, dayIndex, edge, places, t
               onChangeText={setQuery}
               onSubmitEditing={() => void search()}
               placeholder="숙소 이름 검색"
+              placeholderTextColor={colors.muted}
               returnKeyType="search"
               style={styles.input}
               testID="lodging-endpoint-search-input"

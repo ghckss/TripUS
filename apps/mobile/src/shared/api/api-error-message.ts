@@ -26,6 +26,7 @@ const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   PHOTO_CONTENT_TYPE_MISMATCH: "사진 파일 형식이 올바르지 않아요.",
   PHOTO_NOT_FOUND: "사진을 찾을 수 없어요.",
   PHOTO_PROCESSING_FAILED: "사진을 처리하지 못했어요. 다른 사진으로 다시 시도해 주세요.",
+  PHOTO_STORAGE_UNAVAILABLE: "사진 저장소에 잠시 연결할 수 없어요. 잠시 후 다시 시도해 주세요.",
   PHOTO_TOO_LARGE: "사진 한 장은 100MB보다 작아야 해요.",
   PHOTO_VARIANT_NOT_FOUND: "요청한 사진을 찾을 수 없어요.",
   PLACE_PROVIDER_UNAVAILABLE: "장소 검색 서비스에 잠시 연결할 수 없어요.",

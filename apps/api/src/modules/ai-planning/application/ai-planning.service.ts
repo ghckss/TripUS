@@ -322,7 +322,7 @@ export class AiPlanningService {
         generated = applyEnrichedTravelEstimates(generated, routeCheckedPlacements);
         recommended = applyEnrichedTravelEstimates(materialized.placements, routeCheckedPlacements);
         const generatedIds = new Set(generated.map((item) => item.savedPlaceId));
-        const normalizedSchedule = normalizeVisitSchedule([...generated, ...recommended], days);
+        const normalizedSchedule = normalizeVisitSchedule([...generated, ...recommended], days, generatedIds);
         generated = normalizedSchedule.filter((item) => generatedIds.has(item.savedPlaceId));
         recommended = normalizedSchedule.filter((item) => !generatedIds.has(item.savedPlaceId));
         qualityIssues = assessPlanQuality({
@@ -391,7 +391,7 @@ export class AiPlanningService {
           tripId,
           issues: blockingQualityIssues,
         });
-        throw new AiPlannerError('invalid_output');
+        throw new AiPlannerError('invalid_output', { issues: blockingQualityIssues });
       }
       const savedSuggestions = await this.materializeSavedRecommendations(
         trip.id,
@@ -1123,9 +1123,10 @@ function applyEnrichedTravelEstimates(
   });
 }
 
-function normalizeVisitSchedule(
+export function normalizeVisitSchedule(
   placements: PlannedPlacement[],
   days: AiPlannerDay[],
+  requiredPlaceIds: Set<string> = new Set(),
 ): PlannedPlacement[] {
   const normalized = placements.map((placement) => ({ ...placement }));
   for (const day of days) {
@@ -1135,22 +1136,36 @@ function normalizeVisitSchedule(
     if (visits.length === 0) continue;
     const availableStart = day.availableStartTime ? timeToMinutes(day.availableStartTime) : DEFAULT_DAY_START_MINUTES;
     const availableEnd = day.availableEndTime ? timeToMinutes(day.availableEndTime) : DEFAULT_DAY_END_MINUTES;
-    let cursor = availableStart;
-    for (const visit of visits) {
-      const travelMinutes = visit.travelDurationMinutes ?? 0;
-      const earliestStart = cursor + travelMinutes;
-      const requestedStart = visit.scheduledTime ? timeToMinutes(visit.scheduledTime) : earliestStart;
-      const start = Math.max(earliestStart, requestedStart);
-      visit.scheduledTime = minutesToTime(start);
-      cursor = start + (visit.durationMinutes ?? 0);
-    }
-    if (cursor <= availableEnd) continue;
+    const availableMinutes = Math.max(0, availableEnd - availableStart);
+    const totalMinutes = () => visits.reduce((total, visit) =>
+      total + (visit.travelDurationMinutes ?? 0) + (visit.durationMinutes ?? 15), 0);
 
-    cursor = availableStart;
+    let excess = totalMinutes() - availableMinutes;
+    while (excess > 0) {
+      const reducible = visits.filter((visit) => (visit.durationMinutes ?? 15) > 15);
+      if (reducible.length === 0) break;
+      for (const visit of reducible) {
+        if (excess <= 0) break;
+        const duration = visit.durationMinutes ?? 15;
+        const reduction = Math.min(duration - 15, Math.max(1, Math.ceil(excess / reducible.length)));
+        visit.durationMinutes = duration - reduction;
+        excess -= reduction;
+      }
+    }
+
+    while (totalMinutes() > availableMinutes) {
+      const optionalIndex = visits.findLastIndex((visit) => !requiredPlaceIds.has(visit.savedPlaceId));
+      if (optionalIndex < 0) break;
+      const [removed] = visits.splice(optionalIndex, 1);
+      const normalizedIndex = normalized.indexOf(removed!);
+      if (normalizedIndex >= 0) normalized.splice(normalizedIndex, 1);
+    }
+
+    let cursor = availableStart;
     for (const visit of visits) {
       const start = cursor + (visit.travelDurationMinutes ?? 0);
       visit.scheduledTime = minutesToTime(start);
-      cursor = start + (visit.durationMinutes ?? 0);
+      cursor = start + (visit.durationMinutes ?? 15);
     }
   }
   return normalized;
@@ -1230,7 +1245,9 @@ export function assessPlanQuality(input: QualityAssessmentInput): string[] {
 }
 
 export function isBlockingQualityIssue(issue: string): boolean {
-  return issue.length > 0 && !issue.startsWith('missing_meal:');
+  return issue.length > 0
+    && !issue.startsWith('missing_meal:')
+    && !issue.startsWith('underfilled_day:');
 }
 
 function isRepairableQualityIssue(issue: string): boolean {

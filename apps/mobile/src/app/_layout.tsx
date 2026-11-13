@@ -2,6 +2,7 @@ import { Href, router, Stack } from "expo-router";
 import { clearLastNotificationResponseAsync, useLastNotificationResponse } from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { Pressable } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -9,6 +10,7 @@ import { colors } from "@/shared/design/tokens";
 import "@/shared/notifications/configure-notifications";
 import { AppErrorBoundary } from "@/shared/errors/app-error-boundary";
 import { AppDialogProvider } from "@/shared/ui/app-dialog";
+import { AppText } from "@/shared/ui/app-text";
 
 export default function RootLayout() {
   const notificationResponse = useLastNotificationResponse();
@@ -48,7 +50,12 @@ export default function RootLayout() {
             <Stack.Screen name="trips/[tripId]/ai-plan" options={{ title: "여행 스타일" }} />
             <Stack.Screen name="trips/[tripId]/itinerary" options={{ title: "일정 편집" }} />
             <Stack.Screen name="trips/[tripId]/complete" options={{ title: "여행 완료 정리" }} />
-            <Stack.Screen name="trips/[tripId]/summary" options={{ title: "여행 기록" }} />
+            <Stack.Screen name="trips/[tripId]/summary" options={{
+              title: "여행 기록",
+              gestureEnabled: false,
+              headerBackVisible: false,
+              headerLeft: () => <Pressable accessibilityRole="button" hitSlop={8} onPress={() => router.replace("/(tabs)/completed")}><AppText color={colors.primary}>지난 여행</AppText></Pressable>,
+            }} />
             <Stack.Screen name="trips/[tripId]/recap" options={{ title: "여행 캐러셀" }} />
             <Stack.Screen name="trips/[tripId]/exceptions/schedule-conflict" options={{ title: "일정 충돌" }} />
             <Stack.Screen name="trips/[tripId]/exceptions/route-failure" options={{ title: "경로를 찾지 못했어요" }} />

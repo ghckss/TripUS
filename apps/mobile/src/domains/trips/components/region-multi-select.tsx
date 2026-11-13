@@ -160,6 +160,7 @@ export function RegionMultiSelect({ country, value, onChange }: RegionMultiSelec
             onChangeText={setQuery}
             onSubmitEditing={search}
             placeholder="도시 이름으로 목록 검색"
+            placeholderTextColor={colors.muted}
             returnKeyType="search"
             style={styles.input}
             testID="region-search-input"

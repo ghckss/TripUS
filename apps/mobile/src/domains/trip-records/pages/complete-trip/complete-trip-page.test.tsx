@@ -40,6 +40,10 @@ describe("CompleteTripScreen", () => {
     expect(screen.getAllByText("서울숲")).toHaveLength(1);
     await fireEvent.press(screen.getAllByLabelText("5점")[0]);
     await fireEvent.press(screen.getAllByText("미방문으로 설정")[1]);
+
+    expect(screen.getAllByLabelText("5점")).toHaveLength(1);
+    expect(screen.getAllByPlaceholderText("이 장소의 기억을 남겨 보세요")).toHaveLength(1);
+    expect(screen.getAllByText("사진 추가")).toHaveLength(1);
     await fireEvent.press(screen.getByTestId("complete-trip-submit"));
 
     await waitFor(() => expect(mockComplete).toHaveBeenCalledWith([

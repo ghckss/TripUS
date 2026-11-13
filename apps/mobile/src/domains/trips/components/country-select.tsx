@@ -50,6 +50,7 @@ export function CountrySelect({ value, onChange, testID }: CountrySelectProps) {
           autoFocus
           onChangeText={setQuery}
           placeholder="국가명 검색 (예: 일본, Japan)"
+          placeholderTextColor={colors.muted}
           style={styles.searchInput}
           testID="country-search-input"
           value={query}

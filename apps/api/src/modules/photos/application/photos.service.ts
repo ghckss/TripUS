@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -16,6 +16,8 @@ export type PhotoVariant = 'original' | 'optimized' | 'thumbnail';
 
 @Injectable()
 export class PhotosService {
+  private readonly logger = new Logger(PhotosService.name);
+
   constructor(
     @InjectRepository(PhotoEntity) private readonly photos: Repository<PhotoEntity>,
     @InjectRepository(TripEntity) private readonly trips: Repository<TripEntity>,
@@ -46,12 +48,18 @@ export class PhotosService {
       originalFilename: input.filename,
       status: PhotoStatus.Pending,
     }));
-    const target = await this.storage.createUploadTarget({
-      key: originalKey,
-      mimeType: input.mimeType,
-      fallbackPath: `/v1/trips/${tripId}/photos/${id}/content`,
-    });
-    return PhotoUploadTargetDto.from(id, target);
+    try {
+      const target = await this.storage.createUploadTarget({
+        key: originalKey,
+        mimeType: input.mimeType,
+        fallbackPath: `/v1/trips/${tripId}/photos/${id}/content`,
+      });
+      return PhotoUploadTargetDto.from(id, target);
+    } catch (error) {
+      await this.photos.delete({ id });
+      this.logger.error(`Photo upload target unavailable tripId=${tripId}`, error instanceof Error ? error.stack : undefined);
+      throw new ServiceUnavailableException('PHOTO_STORAGE_UNAVAILABLE', { cause: error });
+    }
   }
 
   async uploadContent(tripId: string, photoId: string, body: Uint8Array, contentType?: string): Promise<void> {
@@ -102,11 +110,20 @@ export class PhotosService {
   private async toResponse(photo: PhotoEntity): Promise<PhotoResponseDto> {
     const path = (variant: PhotoVariant) => `/v1/trips/${photo.tripId}/photos/${photo.id}/files/${variant}`;
     const [originalUrl, optimizedUrl, thumbnailUrl] = await Promise.all([
-      this.storage.createDownloadUrl({ key: photo.originalKey, fallbackPath: path('original') }),
-      photo.optimizedKey ? this.storage.createDownloadUrl({ key: photo.optimizedKey, fallbackPath: path('optimized') }) : null,
-      photo.thumbnailKey ? this.storage.createDownloadUrl({ key: photo.thumbnailKey, fallbackPath: path('thumbnail') }) : null,
+      this.safeDownloadUrl(photo.originalKey, path('original')),
+      photo.optimizedKey ? this.safeDownloadUrl(photo.optimizedKey, path('optimized')) : null,
+      photo.thumbnailKey ? this.safeDownloadUrl(photo.thumbnailKey, path('thumbnail')) : null,
     ]);
     return { ...PhotoResponseDto.base(photo), originalUrl, optimizedUrl, thumbnailUrl };
+  }
+
+  private async safeDownloadUrl(key: string, fallbackPath: string): Promise<string | null> {
+    try {
+      return await this.storage.createDownloadUrl({ key, fallbackPath });
+    } catch (error) {
+      this.logger.warn(`Photo download URL unavailable key=${key} reason=${error instanceof Error ? error.name : 'unknown'}`);
+      return null;
+    }
   }
 
   private async getOwnedPhoto(tripId: string, photoId: string): Promise<PhotoEntity> {

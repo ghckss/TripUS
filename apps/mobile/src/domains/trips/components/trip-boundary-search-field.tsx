@@ -102,6 +102,7 @@ export function TripBoundarySearchField({ destination, kind, value, onChange }: 
         onChangeText={setQuery}
         onSubmitEditing={() => void search()}
         placeholder={isStart ? "공항·역·집·출발 장소 검색" : "공항·역·도착 장소 검색"}
+        placeholderTextColor={colors.muted}
         returnKeyType="search"
         style={styles.searchInput}
         testID={`trip-${kind}-point-search-input`}

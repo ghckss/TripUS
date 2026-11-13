@@ -26,14 +26,15 @@ import {
   isBlockingQualityIssue,
   isWithinSelectedRegions,
   normalizeGeneratedPlacements,
+  normalizeVisitSchedule,
   optionalStopCategory,
   requiredMealSlots,
   shouldRejectAiPlaceDuplicate,
 } from './ai-planning.service';
 
 describe('AI plan quality severity', () => {
-  it('blocks structural quality issues while allowing server meal supplementation to degrade gracefully', () => {
-    expect(isBlockingQualityIssue('underfilled_day:2026-11-08')).toBe(true);
+  it('blocks structural quality issues while allowing recoverable gaps to degrade gracefully', () => {
+    expect(isBlockingQualityIssue('underfilled_day:2026-11-08')).toBe(false);
     expect(isBlockingQualityIssue('long_travel_leg:2026-11-08')).toBe(true);
     expect(isBlockingQualityIssue('saved_places_missing')).toBe(true);
     expect(isBlockingQualityIssue('schedule_detail_missing:2026-11-08')).toBe(true);
@@ -41,7 +42,7 @@ describe('AI plan quality severity', () => {
     expect(isBlockingQualityIssue('missing_meal:2026-11-08:lunch')).toBe(false);
   });
 
-  it('rejects a sparse or out-of-window final plan instead of accepting it with warnings', () => {
+  it('keeps invalid time windows blocking while allowing a usable sparse plan', () => {
     const issues = assessPlanQuality({
       days: [{
         date: '2026-11-08', startLodging: null, endLodging: null,
@@ -64,7 +65,7 @@ describe('AI plan quality severity', () => {
       'underfilled_day:2026-11-08',
       'outside_available_window:2026-11-08',
     ]));
-    expect(issues.every(isBlockingQualityIssue)).toBe(true);
+    expect(issues.filter(isBlockingQualityIssue)).toEqual(['outside_available_window:2026-11-08']);
   });
 
   it('does not count cafes as a required lunch', () => {
@@ -131,6 +132,20 @@ describe('daily planning targets', () => {
       expect.objectContaining({ targetPlannedMinutes: 480 }),
       expect.objectContaining({ targetPlannedMinutes: 480 }),
     ]);
+  });
+
+  it('compacts generated visit durations so the final schedule stays inside the available window', () => {
+    const normalized = normalizeVisitSchedule([
+      { savedPlaceId: 'place-1', date: '2026-11-08', position: 0, scheduledTime: '16:00', durationMinutes: 300, travelDurationMinutes: 30 },
+      { savedPlaceId: 'place-2', date: '2026-11-08', position: 1, scheduledTime: '20:00', durationMinutes: 300, travelDurationMinutes: 30 },
+    ], [{
+      date: '2026-11-08', startLodging: null, endLodging: null,
+      availableStartTime: '15:00', availableEndTime: '21:00',
+    }], new Set(['place-1', 'place-2']));
+
+    expect(normalized[0]?.scheduledTime).toBe('15:30');
+    const last = normalized[1]!;
+    expect(Number(last.scheduledTime!.slice(0, 2)) * 60 + Number(last.scheduledTime!.slice(3)) + last.durationMinutes!).toBeLessThanOrEqual(21 * 60);
   });
 });
 

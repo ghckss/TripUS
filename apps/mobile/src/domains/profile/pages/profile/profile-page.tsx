@@ -8,8 +8,8 @@ import { logout } from "@/domains/auth/api/auth.api";
 import { useProfile } from "./use-profile";
 
 export default function ProfileScreen() {
-  const { entitlements, user } = useProfile();
-  const tierLabel = entitlements?.tier === "plus" ? "Plus" : "Free";
+  const { entitlements, loading, user } = useProfile();
+  const tierLabel = entitlements?.tier === "plus" ? "Plus" : entitlements?.tier === "free" ? "Free" : undefined;
   return <Screen contentStyle={{ paddingTop: 64 }}>
     <AppText variant="title">프로필</AppText>
     <Card>
@@ -18,7 +18,7 @@ export default function ProfileScreen() {
       <AppText color={colors.muted}>인증 토큰은 기기의 보안 저장소에만 보관합니다.</AppText>
     </Card>
     <Card>
-      <AppText variant="heading">{tierLabel} 플랜</AppText>
+      <AppText variant="heading">{loading || !tierLabel ? "플랜 확인 중…" : `${tierLabel} 플랜`}</AppText>
       {entitlements && <>
         <AppText color={colors.muted}>여행 {entitlements.tripCount}{entitlements.tripLimit === null ? "개" : `/${entitlements.tripLimit}개`}</AppText>
         <AppText color={colors.muted}>AI 일정 생성 {entitlements.aiGenerationsUsed}{entitlements.aiGenerationLimit === null ? "회" : `/${entitlements.aiGenerationLimit}회`}</AppText>

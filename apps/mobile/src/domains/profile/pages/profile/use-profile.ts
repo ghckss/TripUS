@@ -7,11 +7,15 @@ import { getEntitlements, type Entitlements } from "@/domains/entitlements/api/e
 export function useProfile() {
   const [user, setUser] = useState<AuthSession["user"]>();
   const [entitlements, setEntitlements] = useState<Entitlements>();
+  const [loading, setLoading] = useState(true);
   useFocusEffect(useCallback(() => {
-    void Promise.all([getSession(), getEntitlements()]).then(([session, nextEntitlements]) => {
-      setUser(session?.user);
-      setEntitlements(nextEntitlements);
-    });
+    setLoading(true);
+    void Promise.all([getSession(), getEntitlements()])
+      .then(([session, nextEntitlements]) => {
+        setUser(session?.user);
+        setEntitlements(nextEntitlements);
+      })
+      .finally(() => setLoading(false));
   }, []));
-  return { entitlements, user };
+  return { entitlements, loading, user };
 }

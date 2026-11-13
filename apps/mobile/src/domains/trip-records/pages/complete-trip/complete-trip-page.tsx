@@ -28,7 +28,10 @@ export default function CompleteTripScreen() {
   const { addPhoto, complete, error, itinerary, photos, reload, saving, uploadingItemId } = useCompleteTrip(tripId);
   const placeGroups = groupPlaces(itinerary?.items ?? []);
   const setRating = (id: string, rating: number) => setReviews((current) => ({ ...current, [id]: { ...current[id], rating, unvisited: false } }));
-  const toggleUnvisited = (id: string) => setReviews((current) => ({ ...current, [id]: { ...current[id], rating: undefined, unvisited: !current[id]?.unvisited } }));
+  const toggleUnvisited = (id: string) => setReviews((current) => {
+    const unvisited = !current[id]?.unvisited;
+    return { ...current, [id]: { ...current[id], rating: undefined, review: unvisited ? undefined : current[id]?.review, unvisited } };
+  });
   const setReview = (id: string, review: string) => setReviews((current) => ({ ...current, [id]: { ...current[id], review } }));
   const submitReviews = () => {
     const items = placeGroups.flatMap((group) => {
@@ -55,11 +58,13 @@ export default function CompleteTripScreen() {
         const photoCount = photos.filter((photo) => photo.itineraryItemId && itemIds.has(photo.itineraryItemId)).length;
         const uploading = uploadingItemId ? itemIds.has(uploadingItemId) : false;
         return <Card key={place.savedPlaceId}>
-          <View style={styles.row}><AppText variant="heading">{place.placeName}</AppText>{review?.unvisited && <Pill label="미방문" selected />}</View>
-          <View style={styles.stars}>{[1, 2, 3, 4, 5].map((rating) => <Pressable key={rating} disabled={review?.unvisited} accessibilityLabel={`${rating}점`} testID={`complete-rating-${place.id}-${rating}`} onPress={() => setRating(place.savedPlaceId, rating)}><AppText variant="title" color={!review?.unvisited && (review?.rating ?? 0) >= rating ? colors.primary : colors.line}>★</AppText></Pressable>)}</View>
-          <TextInput value={review?.review ?? ""} onChangeText={(value) => setReview(place.savedPlaceId, value)} multiline placeholder="이 장소의 기억을 남겨 보세요" placeholderTextColor={colors.muted} style={styles.input} />
-          <Button label={uploading ? "사진 처리 중…" : `사진 추가${photoCount ? ` · ${photoCount}장` : ""}`} disabled={Boolean(uploadingItemId)} variant="secondary" onPress={() => void addPhoto(place.id)} />
-          <Button label={review?.unvisited ? "미방문 취소" : "미방문으로 설정"} variant="ghost" onPress={() => toggleUnvisited(place.savedPlaceId)} />
+          <View style={styles.row}><AppText variant="heading" style={styles.placeName}>{place.placeName}</AppText>{review?.unvisited && <View style={styles.unvisitedChip}><Pill label="미방문" selected /></View>}</View>
+          {!review?.unvisited && <>
+            <View style={styles.stars}>{[1, 2, 3, 4, 5].map((rating) => <Pressable key={rating} accessibilityLabel={`${rating}점`} testID={`complete-rating-${place.id}-${rating}`} onPress={() => setRating(place.savedPlaceId, rating)}><AppText variant="title" color={(review?.rating ?? 0) >= rating ? colors.primary : colors.line}>★</AppText></Pressable>)}</View>
+            <TextInput value={review?.review ?? ""} onChangeText={(value) => setReview(place.savedPlaceId, value)} multiline placeholder="이 장소의 기억을 남겨 보세요" placeholderTextColor={colors.muted} style={styles.input} />
+            <Button label={uploading ? "사진 처리 중…" : `사진 추가${photoCount ? ` · ${photoCount}장` : ""}`} disabled={Boolean(uploadingItemId)} variant="secondary" onPress={() => void addPhoto(place.id)} />
+          </>}
+          <Button label={review?.unvisited ? "미방문 취소" : "미방문으로 설정"} disabled={Boolean(uploadingItemId)} variant="ghost" onPress={() => toggleUnvisited(place.savedPlaceId)} />
           {!review?.rating && !review?.unvisited && <AppText variant="caption" color={colors.muted}>별점 없이 정리하면 미평가로 보관돼요.</AppText>}
         </Card>;
       })}
@@ -68,4 +73,4 @@ export default function CompleteTripScreen() {
     </Screen>
   );
 }
-const styles = StyleSheet.create({ row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm }, stars: { flexDirection: "row", gap: spacing.sm, paddingVertical: spacing.sm }, input: { minHeight: 88, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, padding: spacing.md, color: colors.ink, textAlignVertical: "top" } });
+const styles = StyleSheet.create({ row: { flexDirection: "row", alignItems: "center", gap: spacing.sm }, placeName: { flex: 1, flexShrink: 1 }, unvisitedChip: { flexShrink: 0 }, stars: { flexDirection: "row", gap: spacing.sm, paddingVertical: spacing.sm }, input: { minHeight: 88, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, padding: spacing.md, color: colors.ink, textAlignVertical: "top" } });
