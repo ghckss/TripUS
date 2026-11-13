@@ -44,6 +44,7 @@ describe('MockAiPlannerAdapter', () => {
       },
       places,
       days: [],
+      referenceItinerary: [],
       lockedPlacements: [],
       priorRecommendations: [],
     });

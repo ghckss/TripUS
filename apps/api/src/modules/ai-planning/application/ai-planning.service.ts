@@ -187,6 +187,9 @@ export class AiPlanningService {
           note: place.note,
         })),
         days,
+        referenceItinerary: targetDate
+          ? buildReferenceItinerary(current.items, placesById, targetDate)
+          : [],
         lockedPlacements: locked.map((item) => ({ savedPlaceId: item.savedPlaceId, date: item.date!, position: item.position! })),
         priorRecommendations: previousAiRecommendations.map((place) => place.name),
       };
@@ -508,6 +511,42 @@ export class AiPlanningService {
     }
     return enriched;
   }
+}
+
+function buildReferenceItinerary(
+  items: Array<{
+    savedPlaceId: string;
+    date: string | null;
+    position: number | null;
+    scheduledTime?: string | null;
+    boundaryType?: string | null;
+  }>,
+  placesById: Map<string, SavedPlaceEntity>,
+  targetDate: string,
+): AiPlannerInput['referenceItinerary'] {
+  const visitsByDate = new Map<string, AiPlannerInput['referenceItinerary'][number]['visits']>();
+  const sortedItems = [...items].sort((left, right) =>
+    (left.date ?? '').localeCompare(right.date ?? '')
+    || (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER),
+  );
+
+  for (const item of sortedItems) {
+    if (!item.date || item.date === targetDate || item.position === null || item.boundaryType) continue;
+    const place = placesById.get(item.savedPlaceId);
+    if (!place) continue;
+    const visits = visitsByDate.get(item.date) ?? [];
+    visits.push({
+      placeName: place.name,
+      address: place.address,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      tag: place.tag,
+      scheduledTime: item.scheduledTime?.slice(0, 5) ?? null,
+    });
+    visitsByDate.set(item.date, visits);
+  }
+
+  return [...visitsByDate].map(([date, visits]) => ({ date, visits }));
 }
 
 export function isWithinSelectedRegions(

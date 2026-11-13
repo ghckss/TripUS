@@ -394,9 +394,20 @@ describe('AiPlanningService', () => {
     const plannerInput = planner.generate.mock.calls[0]?.[0] as unknown as {
       places: Array<{ id: string }>;
       days: Array<{ date: string }>;
+      referenceItinerary: Array<{
+        date: string;
+        visits: Array<{ placeName: string; address: string | null; scheduledTime: string | null }>;
+      }>;
     };
     expect(plannerInput.places.map((place) => place.id)).toEqual([target.id, target2.id, target3.id]);
     expect(plannerInput.days.map((day) => day.date)).toEqual(['2026-11-08']);
+    expect(plannerInput.referenceItinerary).toEqual([{
+      date: '2026-11-09',
+      visits: [
+        expect.objectContaining({ placeName: '서울숲', address: '서울 성동구', scheduledTime: null }),
+        expect.objectContaining({ placeName: 'AI 추천 카페', address: '서울 종로구', scheduledTime: null }),
+      ],
+    }]);
     expect(replaceDay).toHaveBeenCalledWith(tripId, '2026-11-08', expect.arrayContaining([
       expect.objectContaining({ savedPlaceId: target.id, date: '2026-11-08' }),
       expect.objectContaining({ savedPlaceId: target2.id, date: '2026-11-08' }),
@@ -629,6 +640,7 @@ describe('AiPlanningService', () => {
         availableEndTime: '21:00',
         targetPlannedMinutes: 420,
       }],
+      referenceItinerary: [],
       lockedPlacements: [],
       priorRecommendations: [previousAiRecommendation.name],
     });
