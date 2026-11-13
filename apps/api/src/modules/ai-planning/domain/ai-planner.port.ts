@@ -33,21 +33,18 @@ export const TRAVEL_STYLE_POLICIES: Record<TravelStyle, AiPlannerTravelStyle> = 
 
 export const AI_PLANNING_TASK = {
   type: 'create_travel_itinerary' as const,
-  goal: 'Create a complete practical day-by-day itinerary. Center it on traveler-saved places when supplied, or build the entire itinerary from suitable recommendations when none are supplied.',
+  goal: '저장 장소를 중심으로 하되 부족한 구간은 실제 장소 추천으로 채워, 사용자가 수정 없이 바로 사용할 수 있는 완전하고 현실적인 일자별 여행 일정을 만든다.',
   rules: [
-    'Start each day from startLodging and finish at endLodging when provided.',
-    'Group geographically nearby places into a coherent area route and normally keep each travel leg within 30 minutes.',
-    'Respect the travel-style guidance, preferences, and locked placements.',
-    'Every traveler-saved place is an explicit user choice and must be scheduled exactly once. Do not replace, omit, or return it as unplaced merely to add recommendations.',
-    'When no traveler-saved places are supplied, create the full itinerary from concrete recommendations inside the selected regions.',
-    'Lodging is optional. When a day has no startLodging or endLodging, plan directly from the first visit to the last visit without inventing a lodging place.',
-    'Return places that cannot be scheduled realistically in unplaced with a reason.',
-    'Treat selected regions as the boundary for AI-originated recommendations, except for nearby route-supporting recommendations around an out-of-region traveler-saved place. Always schedule the saved place as an explicit route anchor.',
-    'When an out-of-region saved place requires a day trip, group it with other saved places in the same area and only add nearby recommendations needed to make that route practical.',
-    'After scheduling saved places, add enough useful recommendations to form a complete day without rushing. Never stop after only one or two short visits when the route can reasonably include more.',
-    'Recommendations must be visitable attractions, restaurants, cafes, shops, parks, or cultural venues. Never recommend a station, airport, lodging, or administrative area as an activity.',
-    'Treat priorRecommendations as optional previous AI suggestions, not traveler-required places. Reuse one when it is still the best fit, or replace it when a better route or place exists.',
-    'Write all user-facing text in Korean.',
+    '모든 저장 장소를 정확히 한 번 배치하고 unplaced는 비워 둔다.',
+    'targetPlannedMinutes가 0보다 큰 모든 날짜를 목표 시간 이상으로 채운다.',
+    '저장 장소만으로 시간이 부족하면 선택 지역 또는 해당 저장 장소 주변의 구체적인 방문 장소를 필요한 만큼 recommendations에 추가한다.',
+    'availableStartTime과 availableEndTime 안에서 이동시간까지 포함해 겹치지 않는 시간표를 만든다.',
+    'startLodging과 endLodging이 있으면 그 지점에서 시작하고 끝내며, 없으면 숙소를 만들지 않는다.',
+    '가까운 장소를 한 권역으로 묶고 추천 장소 사이의 이동은 30분 이내가 되도록 한다.',
+    '선호, 기피 대상, 여행 스타일, 이동수단, 예산 및 lockedPlacements를 존중한다.',
+    '추천은 검색 가능한 실제 관광지, 식당, 카페, 시장, 상점, 공원, 박물관 또는 문화시설만 사용한다.',
+    '역, 공항, 숙소, 도시, 동네, 행정구역을 활동 장소로 추천하지 않는다.',
+    '모든 사용자 노출 문구는 한국어로 작성한다.',
   ],
 };
 
@@ -74,6 +71,9 @@ export interface AiPlannerDay {
   date: string;
   startLodging: AiPlannerLodging | null;
   endLodging: AiPlannerLodging | null;
+  /** Earliest and latest usable itinerary times after applying trip boundaries. */
+  availableStartTime?: string;
+  availableEndTime?: string;
   /** Visit and travel minutes that can realistically fit in this date's available window. */
   targetPlannedMinutes?: number;
 }

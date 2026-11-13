@@ -200,6 +200,7 @@ export class AiPlanningService {
       const validDates = new Set(days.map((day) => day.date));
       let materialized: Awaited<ReturnType<AiPlanningService['materializeRecommendations']>>;
       let generated: PlannedPlacement[];
+      let recommended: PlannedPlacement[];
       let qualityIssues: string[];
       for (let materializationAttempt = 1; ; materializationAttempt += 1) {
         materialized = await this.materializeRecommendations(
@@ -213,12 +214,22 @@ export class AiPlanningService {
         createdRecommendationEntities = materialized.created;
         const allowed = new Set([...planningPlaces.map((place) => place.id), ...materialized.placements.map((item) => item.savedPlaceId)]);
         generated = normalizeGeneratedPlacements(output.placements, allowed, validDates);
+        const routeCheckedPlacements = await this.enrichTravelEstimates(
+          addLodgingEndpoints(
+            mergeLockedPlacements(locked, [...generated, ...materialized.placements]),
+            days,
+          ),
+          [...places, ...materialized.created],
+          request.transportMode,
+        );
+        generated = applyEnrichedTravelEstimates(generated, routeCheckedPlacements);
+        recommended = applyEnrichedTravelEstimates(materialized.placements, routeCheckedPlacements);
         qualityIssues = assessPlanQuality({
           days,
           style,
           planningPlaces,
           generated,
-          recommended: materialized.placements,
+          recommended,
           locked,
           output,
         });
@@ -252,7 +263,6 @@ export class AiPlanningService {
           ].filter(Boolean).join(' '),
         });
       }
-      const recommended = materialized.placements;
       const reusedRecommendationIds = new Set(recommended.map((item) => item.savedPlaceId));
       const staleAiRecommendations = previousAiRecommendations.filter((place) =>
         !lockedIds.has(place.id) && !reusedRecommendationIds.has(place.id),
@@ -265,14 +275,6 @@ export class AiPlanningService {
         rejected: materialized.rejected,
       });
       const blockingQualityIssues = qualityIssues.filter(isBlockingQualityIssue);
-      const qualityWarnings = qualityIssues.filter((issue) => !isBlockingQualityIssue(issue));
-      if (qualityWarnings.length > 0) {
-        writeStructuredLog('warn', 'ai.generation.accepted_with_warnings', {
-          generationId,
-          tripId,
-          warnings: qualityWarnings,
-        });
-      }
       if (blockingQualityIssues.length > 0) {
         if (createdRecommendationEntities.length > 0) await this.places.remove(createdRecommendationEntities);
         createdRecommendationEntities = [];
@@ -616,6 +618,22 @@ export function normalizeGeneratedPlacements(
   });
 }
 
+function applyEnrichedTravelEstimates(
+  placements: PlannedPlacement[],
+  enriched: PlannedPlacement[],
+): PlannedPlacement[] {
+  const enrichedByVisit = new Map(enriched.map((item) => [`${item.date}:${item.savedPlaceId}`, item]));
+  return placements.map((placement) => {
+    const match = enrichedByVisit.get(`${placement.date}:${placement.savedPlaceId}`);
+    if (!match) return placement;
+    return {
+      ...placement,
+      travelMethod: match.travelMethod,
+      travelDurationMinutes: match.travelDurationMinutes,
+    };
+  });
+}
+
 type QualityAssessmentInput = {
   days: AiPlannerDay[];
   style: TravelStyle;
@@ -666,10 +684,17 @@ export function assessPlanQuality(input: QualityAssessmentInput): string[] {
         issues.push(`schedule_detail_missing:${day.date}`);
         continue;
       }
-      if (visit.travelDurationMinutes > 30) issues.push(`long_travel_leg:${day.date}`);
+      const isRecommendation = input.recommended.some((item) => item.savedPlaceId === visit.savedPlaceId);
+      if (isRecommendation && visit.travelDurationMinutes > 30) issues.push(`long_travel_leg:${day.date}`);
       const start = timeToMinutes(visit.scheduledTime);
       const end = start + visit.durationMinutes;
-      if (previousEnd !== undefined && start < previousEnd) {
+      if (day.availableStartTime && start - visit.travelDurationMinutes < timeToMinutes(day.availableStartTime)) {
+        issues.push(`outside_available_window:${day.date}`);
+      }
+      if (day.availableEndTime && end > timeToMinutes(day.availableEndTime)) {
+        issues.push(`outside_available_window:${day.date}`);
+      }
+      if (previousEnd !== undefined && start < previousEnd + visit.travelDurationMinutes) {
         issues.push(`invalid_time_window:${day.date}`);
       }
       previousEnd = end;
@@ -679,18 +704,17 @@ export function assessPlanQuality(input: QualityAssessmentInput): string[] {
 }
 
 export function isBlockingQualityIssue(issue: string): boolean {
-  return ![
-    'long_travel_leg:',
-    'underfilled_day:',
-  ].some((warningPrefix) => issue.startsWith(warningPrefix));
+  return issue.length > 0;
 }
 
 function isRepairableQualityIssue(issue: string): boolean {
   if (issue === 'saved_places_missing' || issue === 'saved_places_unplaced' || issue === 'must_visit_missing') return true;
   return [
     'underfilled_day:',
+    'long_travel_leg:',
     'schedule_detail_missing:',
     'invalid_time_window:',
+    'outside_available_window:',
   ].some((prefix) => issue.startsWith(prefix));
 }
 
@@ -784,6 +808,8 @@ export function applyDailyPlanningTargets(
     const realisticVisitMinutes = Math.max(0, availableMinutes - BOUNDARY_TRANSITION_BUFFER_MINUTES);
     return {
       ...day,
+      availableStartTime: minutesToTime(availableStart),
+      availableEndTime: minutesToTime(availableEnd),
       targetPlannedMinutes: Math.min(minimumPlannedMinutes(style), realisticVisitMinutes),
     };
   });
@@ -818,6 +844,12 @@ export function findReusableAiRecommendation<T extends Pick<SavedPlaceEntity, 'g
 function timeToMinutes(value: string): number {
   const [hours = 0, minutes = 0] = value.split(':').map(Number);
   return hours * 60 + minutes;
+}
+
+function minutesToTime(value: number): string {
+  const hours = Math.floor(value / 60).toString().padStart(2, '0');
+  const minutes = (value % 60).toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
 }
 
 function isLodging(

@@ -7,6 +7,7 @@ import { AI_PLANNING_TASK, TRAVEL_STYLE_POLICIES, TravelStyle } from '../domain/
 import {
   addLodgingEndpoints,
   applyDailyPlanningTargets,
+  assessPlanQuality,
   assessRawOutputContract,
   assessRawDayCoverage,
   AiPlanningService,
@@ -19,11 +20,38 @@ import {
 } from './ai-planning.service';
 
 describe('AI plan quality severity', () => {
-  it('keeps optional detail gaps as warnings while blocking broken core schedules', () => {
-    expect(isBlockingQualityIssue('underfilled_day:2026-11-08')).toBe(false);
-    expect(isBlockingQualityIssue('long_travel_leg:2026-11-08')).toBe(false);
+  it('blocks every unresolved quality issue from reaching the user', () => {
+    expect(isBlockingQualityIssue('underfilled_day:2026-11-08')).toBe(true);
+    expect(isBlockingQualityIssue('long_travel_leg:2026-11-08')).toBe(true);
     expect(isBlockingQualityIssue('saved_places_missing')).toBe(true);
     expect(isBlockingQualityIssue('schedule_detail_missing:2026-11-08')).toBe(true);
+    expect(isBlockingQualityIssue('outside_available_window:2026-11-08')).toBe(true);
+  });
+
+  it('rejects a sparse or out-of-window final plan instead of accepting it with warnings', () => {
+    const issues = assessPlanQuality({
+      days: [{
+        date: '2026-11-08', startLodging: null, endLodging: null,
+        availableStartTime: '15:00', availableEndTime: '21:00', targetPlannedMinutes: 300,
+      }],
+      style: TravelStyle.Balanced,
+      planningPlaces: [],
+      generated: [],
+      recommended: [{
+        savedPlaceId: 'recommended-1', date: '2026-11-08', position: 0,
+        scheduledTime: '14:30', durationMinutes: 90, activitySummary: '식사',
+        travelMethod: '대중교통', travelDurationMinutes: 45,
+      }],
+      locked: [],
+      output: { placements: [], unplaced: [], recommendations: [] },
+    });
+
+    expect(issues).toEqual(expect.arrayContaining([
+      'underfilled_day:2026-11-08',
+      'long_travel_leg:2026-11-08',
+      'outside_available_window:2026-11-08',
+    ]));
+    expect(issues.every(isBlockingQualityIssue)).toBe(true);
   });
 });
 
@@ -35,8 +63,12 @@ describe('daily planning targets', () => {
 
   it('reduces the first and last day targets around arrival and departure times', () => {
     expect(applyDailyPlanningTargets(days, TravelStyle.Balanced, '15:30', '12:00')).toEqual([
-      expect.objectContaining({ date: '2026-11-08', targetPlannedMinutes: 270 }),
-      expect.objectContaining({ date: '2026-11-09', targetPlannedMinutes: 120 }),
+      expect.objectContaining({
+        date: '2026-11-08', availableStartTime: '15:30', availableEndTime: '21:00', targetPlannedMinutes: 270,
+      }),
+      expect.objectContaining({
+        date: '2026-11-09', availableStartTime: '09:00', availableEndTime: '12:00', targetPlannedMinutes: 120,
+      }),
     ]);
   });
 
@@ -356,7 +388,7 @@ describe('AiPlanningService', () => {
       unplaced: [],
       recommendations: [{
         placeName: 'Gyeongbokgung', regionName: 'Seoul', suggestedDate: '2026-11-08', position: 1,
-        startTime: '14:00', durationMinutes: 240, activity: '경복궁 주요 전각 관람', reason: 'A central historic destination',
+        startTime: '14:30', durationMinutes: 240, activity: '경복궁 주요 전각 관람', reason: 'A central historic destination',
         travelMethod: '대중교통', travelDurationMinutes: 25,
       }],
     };
@@ -435,6 +467,8 @@ describe('AiPlanningService', () => {
         date: '2026-11-08',
         startLodging: null,
         endLodging: null,
+        availableStartTime: '09:00',
+        availableEndTime: '21:00',
         targetPlannedMinutes: 420,
       }],
       lockedPlacements: [],
@@ -451,7 +485,7 @@ describe('AiPlanningService', () => {
       },
       {
         savedPlaceId: recommendedId, date: '2026-11-08', position: 1, locked: false,
-        scheduledTime: '14:00', durationMinutes: 240, activitySummary: '경복궁 주요 전각 관람',
+        scheduledTime: '14:30', durationMinutes: 240, activitySummary: '경복궁 주요 전각 관람',
         travelMethod: '대중교통', travelDurationMinutes: 25,
       },
     ], 'ai');
