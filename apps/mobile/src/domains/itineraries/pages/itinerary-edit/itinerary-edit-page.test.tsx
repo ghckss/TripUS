@@ -1,7 +1,7 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
-import { Alert } from "react-native";
 
 import ItineraryScreen from "./itinerary-edit-page";
+import { AppDialogProvider } from "@/shared/ui/app-dialog";
 
 const mockSetPlacesForDate = jest.fn();
 const mockRemoveFromItinerary = jest.fn();
@@ -47,6 +47,8 @@ jest.mock("./use-itinerary-edit", () => ({
   }),
 }));
 
+const renderItineraryScreen = () => render(<AppDialogProvider><ItineraryScreen /></AppDialogProvider>);
+
 describe("ItineraryScreen day editing", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -58,7 +60,7 @@ describe("ItineraryScreen day editing", () => {
   });
 
   it("selects travel places from an individual day", async () => {
-    const screen = await render(<ItineraryScreen />);
+    const screen = await renderItineraryScreen();
 
     expect(screen.queryByText("미배치 장소")).not.toBeOnTheScreen();
     await fireEvent.press(screen.getByTestId("itinerary-add-places-2026-11-08"));
@@ -79,7 +81,7 @@ describe("ItineraryScreen day editing", () => {
       { id: "place-1", name: "감천문화마을", address: "부산 사하구", tag: "attraction" },
       { id: "place-2", name: "흰여울문화마을", address: "부산 영도구", tag: "attraction" },
     ];
-    const screen = await render(<ItineraryScreen />);
+    const screen = await renderItineraryScreen();
 
     expect(screen.queryByText("배치되지 않은 장소")).not.toBeOnTheScreen();
     expect(screen.queryByText("• 흰여울문화마을")).not.toBeOnTheScreen();
@@ -98,7 +100,7 @@ describe("ItineraryScreen day editing", () => {
   it("does not show a separate AI-generated confirmation area", async () => {
     mockSearchParams = { aiGenerated: "1", tripId: "trip-1" };
 
-    const screen = await render(<ItineraryScreen />);
+    const screen = await renderItineraryScreen();
 
     expect(screen.queryByText("AI 일정이 생성됐어요")).not.toBeOnTheScreen();
   });
@@ -106,7 +108,7 @@ describe("ItineraryScreen day editing", () => {
   it("shows the no-undo message directly below the undo button", async () => {
     mockUndoMessage = "되돌릴 AI 변경이 없어요.";
 
-    const screen = await render(<ItineraryScreen />);
+    const screen = await renderItineraryScreen();
 
     const undoButton = screen.getByText("최근 AI 변경 한 번 되돌리기");
     const message = screen.getByText("되돌릴 AI 변경이 없어요.");
@@ -127,7 +129,7 @@ describe("ItineraryScreen day editing", () => {
       status: "created",
       place: { id: "place-new-1", tripId: "trip-1", googlePlaceId: "google-new-1", name: "부산 타워", address: "부산 중구", tag: "attraction", preference: "want_to_visit", note: null, isPrimaryLodging: false },
     });
-    const screen = await render(<ItineraryScreen />);
+    const screen = await renderItineraryScreen();
 
     await fireEvent.press(screen.getByTestId("itinerary-add-places-2026-11-08"));
     await fireEvent.press(screen.getByTestId("itinerary-new-place-toggle"));
@@ -154,7 +156,7 @@ describe("ItineraryScreen day editing", () => {
       ],
       unplaced: [],
     };
-    const screen = await render(<ItineraryScreen />);
+    const screen = await renderItineraryScreen();
 
     expect(screen.getByText("감천문화마을")).toBeOnTheScreen();
     expect(screen.queryByText("흰여울문화마을")).not.toBeOnTheScreen();
@@ -175,7 +177,7 @@ describe("ItineraryScreen day editing", () => {
       unplaced: [],
     };
 
-    const screen = await render(<ItineraryScreen />);
+    const screen = await renderItineraryScreen();
 
     expect(screen.getByText("감천문화마을")).toBeOnTheScreen();
     expect(screen.getByText("도착 10:30")).toBeOnTheScreen();
@@ -185,18 +187,13 @@ describe("ItineraryScreen day editing", () => {
   });
 
   it("updates only the selected day after confirmation", async () => {
-    const alert = jest.spyOn(Alert, "alert").mockImplementation((_title, _message, buttons) => {
-      buttons?.find((button) => button.text === "업데이트")?.onPress?.();
-    });
-    const screen = await render(<ItineraryScreen />);
+    const screen = await renderItineraryScreen();
 
     await fireEvent.press(screen.getByTestId("itinerary-ai-update-2026-11-08"));
 
-    expect(alert).toHaveBeenCalledWith(
-      "Day 1 일정을 업데이트할까요?",
-      expect.stringContaining("다른 날짜 일정은 변경하지 않아요"),
-      expect.any(Array),
-    );
+    expect(screen.getByText("Day 1 일정을 업데이트할까요?")).toBeOnTheScreen();
+    expect(screen.getByText(/다른 날짜 일정은 변경하지 않아요/)).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText("업데이트"));
     expect(mockUpdateDayWithAi).toHaveBeenCalledWith("2026-11-08");
   });
 
@@ -209,7 +206,7 @@ describe("ItineraryScreen day editing", () => {
       unplaced: [],
     };
 
-    const screen = await render(<ItineraryScreen />);
+    const screen = await renderItineraryScreen();
 
     expect(screen.getByText("이동 약 18분")).toBeOnTheScreen();
     expect(screen.getByLabelText("이동 시간 약 18분")).toBeOnTheScreen();
@@ -224,7 +221,7 @@ describe("ItineraryScreen day editing", () => {
       unplaced: [],
     };
 
-    const screen = await render(<ItineraryScreen />);
+    const screen = await renderItineraryScreen();
 
     expect(screen.queryByText("다음 장소까지 대중교통")).not.toBeOnTheScreen();
     expect(screen.queryByText("Google Maps에서 길 찾기")).not.toBeOnTheScreen();
@@ -245,7 +242,7 @@ describe("ItineraryScreen day editing", () => {
       ],
       unplaced: [],
     };
-    const screen = await render(<ItineraryScreen />);
+    const screen = await renderItineraryScreen();
 
     await fireEvent.press(screen.getByTestId("itinerary-date-tab-2026-11-09"));
     await fireEvent.press(screen.getByLabelText("기본 호텔 시작 숙소 수정"));
@@ -269,7 +266,7 @@ describe("ItineraryScreen day editing", () => {
       ],
       unplaced: [],
     };
-    const screen = await render(<ItineraryScreen />);
+    const screen = await renderItineraryScreen();
     const item = screen.getByTestId("sortable-item-item-1");
 
     await act(() => item.props.onDragStart("item-1", 0));

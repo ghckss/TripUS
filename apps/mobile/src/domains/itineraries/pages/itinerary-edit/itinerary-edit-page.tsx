@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
 import { Sortable, SortableItem, type SortableRenderItemProps } from "react-native-reanimated-dnd";
 
 import { colors, radius, spacing } from "@/shared/design/tokens";
@@ -17,6 +17,7 @@ import { DraggableItineraryItem } from "./draggable-itinerary-item";
 import { isLodgingPlace, type LodgingEdge } from "./itinerary-lodging-endpoints";
 import { LodgingEndpointPicker } from "./lodging-endpoint-picker";
 import { useItineraryEdit } from "./use-itinerary-edit";
+import { useAppDialog } from "@/shared/ui/app-dialog";
 
 function dayLabel(date: string, index: number) {
   const parsed = new Date(`${date}T12:00:00`);
@@ -35,6 +36,7 @@ export default function ItineraryScreen() {
     removeFromItinerary, reorderWithinDay, replaceDayLodging, save, saving, setPlacesForDate,
     undoAiChange, undoing, undoMessage, updateDayWithAi, updatingDate,
   } = useItineraryEdit(tripId);
+  const { showDialog } = useAppDialog();
   const screenRef = useRef<ScrollViewInstance>(null);
   const reorderCommitTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [activeDate, setActiveDate] = useState<string>();
@@ -99,14 +101,14 @@ export default function ItineraryScreen() {
     }, 310);
   };
 
-  const confirmDayUpdate = () => Alert.alert(
-    `Day ${dayIndex + 1} 일정을 업데이트할까요?`,
-    "사용자가 추가한 장소를 포함해 이 날짜만 다시 구성하고, 다른 날짜 일정은 변경하지 않아요.",
-    [
-      { text: "취소", style: "cancel" },
-      { text: "업데이트", onPress: () => void updateDayWithAi(selectedDate) },
+  const confirmDayUpdate = () => showDialog({
+    title: `Day ${dayIndex + 1} 일정을 업데이트할까요?`,
+    message: "사용자가 추가한 장소를 포함해 이 날짜만 다시 구성하고, 다른 날짜 일정은 변경하지 않아요.",
+    actions: [
+      { label: "취소", variant: "ghost" },
+      { label: "업데이트", onPress: () => void updateDayWithAi(selectedDate) },
     ],
-  );
+  });
 
   return <Screen
     ref={screenRef}

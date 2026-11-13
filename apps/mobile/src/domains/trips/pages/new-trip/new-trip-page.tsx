@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { router, useFocusEffect } from "expo-router";
-import { Alert, StyleSheet, TextInput } from "react-native";
+import { StyleSheet, TextInput } from "react-native";
 
 import { getEntitlements, type Entitlements } from "@/domains/entitlements/api/entitlements.api";
 import { savePrimaryLodging } from "@/domains/places/api/lodgings.api";
@@ -13,6 +13,7 @@ import { RegionMultiSelect, type SelectedRegion } from "@/domains/trips/componen
 import { isBoundaryPointValid, TripBoundarySearchField, type SelectedBoundaryPoint } from "@/domains/trips/components/trip-boundary-search-field";
 import { safeErrorMessage } from "@/shared/api/trip-us-api";
 import { colors, radius, spacing } from "@/shared/design/tokens";
+import { useAppDialog } from "@/shared/ui/app-dialog";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -28,6 +29,7 @@ function initialDate(offset: number): string {
 }
 
 export default function NewTripScreen() {
+  const { showDialog } = useAppDialog();
   const [title, setTitle] = useState("");
   const [country, setCountry] = useState<TravelCountry>(defaultTravelCountry);
   const [regions, setRegions] = useState<SelectedRegion[]>([]);
@@ -80,7 +82,7 @@ export default function NewTripScreen() {
               : {}),
           });
         } catch {
-          Alert.alert("숙소 저장 실패", "여행은 생성됐지만 숙소를 저장하지 못했어요. 여행 정보에서 다시 선택해 주세요.");
+          showDialog({ title: "숙소 저장 실패", message: "여행은 생성됐지만 숙소를 저장하지 못했어요. 여행 정보에서 다시 선택해 주세요." });
           router.replace(`/trips/${trip.id}/edit`);
           return;
         }

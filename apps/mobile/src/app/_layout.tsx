@@ -8,6 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { colors } from "@/shared/design/tokens";
 import "@/shared/notifications/configure-notifications";
 import { AppErrorBoundary } from "@/shared/errors/app-error-boundary";
+import { AppDialogProvider } from "@/shared/ui/app-dialog";
 
 export default function RootLayout() {
   const notificationResponse = useLastNotificationResponse();
@@ -23,8 +24,9 @@ export default function RootLayout() {
     <AppErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <StatusBar style="dark" />
-          <Stack
+          <AppDialogProvider>
+            <StatusBar style="dark" />
+            <Stack
             screenOptions={{
               headerBackButtonDisplayMode: "minimal",
               headerShadowVisible: false,
@@ -50,7 +52,8 @@ export default function RootLayout() {
             <Stack.Screen name="trips/[tripId]/recap" options={{ title: "여행 캐러셀" }} />
             <Stack.Screen name="trips/[tripId]/exceptions/schedule-conflict" options={{ title: "일정 충돌" }} />
             <Stack.Screen name="trips/[tripId]/exceptions/route-failure" options={{ title: "경로를 찾지 못했어요" }} />
-          </Stack>
+            </Stack>
+          </AppDialogProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </AppErrorBoundary>

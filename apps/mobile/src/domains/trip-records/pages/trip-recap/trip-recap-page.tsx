@@ -3,7 +3,7 @@ import * as MediaLibrary from "expo-media-library";
 import { useLocalSearchParams } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useMemo, useRef, useState } from "react";
-import { Alert, Platform, ScrollView, StyleSheet, View, useWindowDimensions, type ImageStyle, type StyleProp } from "react-native";
+import { Platform, ScrollView, StyleSheet, View, useWindowDimensions, type ImageStyle, type StyleProp } from "react-native";
 import ViewShot, { type ViewShotRef } from "react-native-view-shot";
 
 import { safeErrorMessage, tripUsApiBaseUrl } from "@/shared/api/trip-us-api";
@@ -12,6 +12,7 @@ import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { Screen } from "@/shared/ui/screen";
+import { useAppDialog } from "@/shared/ui/app-dialog";
 import { buildRecapSlides, recapModeLabel, recommendedRecapMode, type RecapMode, type RecapPhoto, type RecapSlide } from "./recap-model";
 import { useTripRecap } from "./use-trip-recap";
 
@@ -84,6 +85,7 @@ function Slide({ slide, accessToken }: { slide: RecapSlide; accessToken?: string
 }
 
 export default function TripRecapPage() {
+  const { showDialog } = useAppDialog();
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const { width: windowWidth } = useWindowDimensions();
   const { accessToken, addPhotos, error, itinerary, loading, photos, reload, trip, uploading } = useTripRecap(tripId);
@@ -109,19 +111,19 @@ export default function TripRecapPage() {
   };
 
   const shareCurrent = async () => {
-    if (Platform.OS === "web") return Alert.alert("모바일에서 사용할 수 있어요", "캐러셀 공유는 iOS 또는 Android 앱에서 이용해 주세요.");
+    if (Platform.OS === "web") return showDialog({ title: "모바일에서 사용할 수 있어요", message: "캐러셀 공유는 iOS 또는 Android 앱에서 이용해 주세요." });
     setExporting(true);
     try {
       if (!await Sharing.isAvailableAsync()) throw new Error("이 기기에서는 공유 기능을 사용할 수 없어요.");
       const uri = await captureSlide(activeIndex);
       await Sharing.shareAsync(uri, { mimeType: "image/png", UTI: "public.png", dialogTitle: `${activeIndex + 1}번째 여행 이미지 공유` });
     } catch (caught) {
-      Alert.alert("공유하지 못했어요", safeErrorMessage(caught, "잠시 후 다시 시도해 주세요."));
+      showDialog({ title: "공유하지 못했어요", message: safeErrorMessage(caught, "잠시 후 다시 시도해 주세요.") });
     } finally { setExporting(false); }
   };
 
   const saveAll = async () => {
-    if (Platform.OS === "web") return Alert.alert("모바일에서 사용할 수 있어요", "전체 저장은 iOS 또는 Android 앱에서 이용해 주세요.");
+    if (Platform.OS === "web") return showDialog({ title: "모바일에서 사용할 수 있어요", message: "전체 저장은 iOS 또는 Android 앱에서 이용해 주세요." });
     setExporting(true);
     try {
       const permission = await MediaLibrary.requestPermissionsAsync(true);
@@ -129,9 +131,9 @@ export default function TripRecapPage() {
       for (let index = 0; index < slides.length; index += 1) {
         await MediaLibrary.Asset.create(await captureSlide(index));
       }
-      Alert.alert("캐러셀을 저장했어요", `${slides.length}장을 순서대로 사진 앱에 저장했어요. 인스타그램에서 여러 장을 선택해 게시해 보세요.`);
+      showDialog({ title: "캐러셀을 저장했어요", message: `${slides.length}장을 순서대로 사진 앱에 저장했어요. 인스타그램에서 여러 장을 선택해 게시해 보세요.` });
     } catch (caught) {
-      Alert.alert("저장하지 못했어요", safeErrorMessage(caught, "잠시 후 다시 시도해 주세요."));
+      showDialog({ title: "저장하지 못했어요", message: safeErrorMessage(caught, "잠시 후 다시 시도해 주세요.") });
     } finally { setExporting(false); }
   };
 

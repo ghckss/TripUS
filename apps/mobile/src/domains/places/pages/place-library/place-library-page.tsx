@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -7,6 +7,7 @@ import { Pill } from "@/shared/ui/pill";
 import { Screen } from "@/shared/ui/screen";
 import { colors, spacing } from "@/shared/design/tokens";
 import { usePlaceLibrary } from "./use-place-library";
+import { useAppDialog } from "@/shared/ui/app-dialog";
 
 export default function PlacesScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
@@ -14,28 +15,25 @@ export default function PlacesScreen() {
     clearSelection, editPlace, places, loading, saving, message, reload,
     removePlaces, selectAll, selectedIds, toggleSelection,
   } = usePlaceLibrary(tripId);
+  const { showDialog } = useAppDialog();
   const selectedCount = selectedIds.size;
 
-  const confirmSelectedRemoval = () => Alert.alert(
-    `선택한 ${selectedCount}개 장소를 삭제할까요?`,
-    "일정에 배치된 장소도 함께 제거돼요.",
-    [
-      { text: "취소", style: "cancel" },
-      { text: "삭제", style: "destructive", onPress: () => void removePlaces([...selectedIds]) },
+  const confirmSelectedRemoval = () => showDialog({
+    title: `선택한 ${selectedCount}개 장소를 삭제할까요?`,
+    message: "일정에 배치된 장소도 함께 제거돼요.",
+    actions: [
+      { label: "취소", variant: "ghost" },
+      { label: "삭제", variant: "danger", onPress: () => void removePlaces([...selectedIds]) },
     ],
-  );
-  const confirmAllRemoval = () => Alert.alert(
-    "저장 장소를 모두 삭제할까요?",
-    `현재 목록의 ${places.length}개 장소와 일정 배치가 함께 제거돼요. 이 작업은 되돌릴 수 없어요.`,
-    [
-      { text: "취소", style: "cancel" },
-      {
-        text: "전체 삭제",
-        style: "destructive",
-        onPress: () => void removePlaces(places.map((place) => place.id)),
-      },
+  });
+  const confirmAllRemoval = () => showDialog({
+    title: "저장 장소를 모두 삭제할까요?",
+    message: `현재 목록의 ${places.length}개 장소와 일정 배치가 함께 제거돼요. 이 작업은 되돌릴 수 없어요.`,
+    actions: [
+      { label: "취소", variant: "ghost" },
+      { label: "전체 삭제", variant: "danger", onPress: () => void removePlaces(places.map((place) => place.id)) },
     ],
-  );
+  });
   return (
     <Screen>
       <AppText variant="title">저장한 모든 장소</AppText>

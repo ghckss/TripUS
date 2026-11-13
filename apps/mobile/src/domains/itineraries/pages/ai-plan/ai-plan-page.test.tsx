@@ -1,8 +1,8 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import { router } from "expo-router";
-import { Alert } from "react-native";
 
 import AiPlanScreen from "./ai-plan-page";
+import { AppDialogProvider } from "@/shared/ui/app-dialog";
 
 const mockGenerate = jest.fn().mockResolvedValue(true);
 let mockLatestRequest: {
@@ -43,17 +43,11 @@ describe("AiPlanScreen", () => {
   });
 
   it("loads and reuses the latest request saved for the trip", async () => {
-    const alert = jest.spyOn(Alert, "alert").mockImplementation((_title, _message, buttons) => {
-      buttons?.find((button) => button.text === "불러오기")?.onPress?.();
-    });
-    const screen = await render(<AiPlanScreen />);
+    const screen = await render(<AppDialogProvider><AiPlanScreen /></AppDialogProvider>);
 
     await fireEvent.press(screen.getByLabelText("최근 요청 불러오기"));
-    expect(alert).toHaveBeenCalledWith(
-      "최근 설정을 불러올까요?",
-      expect.any(String),
-      expect.any(Array),
-    );
+    expect(screen.getByText("최근 설정을 불러올까요?")).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText("불러오기"));
     expect(screen.getByLabelText("동행자").props.value).toBe("친구 2명");
     expect(screen.getByLabelText("추가 요청사항").props.value).toBe("현지 맛집과 카페를 좋아하고 긴 대기는 피하고 싶어요.");
 
@@ -72,23 +66,23 @@ describe("AiPlanScreen", () => {
 
   it("explains when there is no latest request to load", async () => {
     mockLatestRequest = null;
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
-    const screen = await render(<AiPlanScreen />);
+    const screen = await render(<AppDialogProvider><AiPlanScreen /></AppDialogProvider>);
 
     await fireEvent.press(screen.getByLabelText("최근 요청 불러오기"));
 
-    expect(alert).toHaveBeenCalledWith("불러올 최근 요청이 없어요");
+    expect(screen.getByText("불러올 최근 요청이 없어요")).toBeOnTheScreen();
   });
 
   it("explains the density, travel method, and budget choices", async () => {
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
-    const screen = await render(<AiPlanScreen />);
+    const screen = await render(<AppDialogProvider><AiPlanScreen /></AppDialogProvider>);
 
     await fireEvent.press(screen.getByLabelText("여행의 밀도 선택지 설명"));
-    expect(alert).toHaveBeenLastCalledWith("여행의 밀도", expect.stringContaining("꽉 채워서"));
+    expect(screen.getByText(/꽉 채워서: 하루를 길게/)).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText("확인"));
     await fireEvent.press(screen.getByLabelText("여행의 방식 선택지 설명"));
-    expect(alert).toHaveBeenLastCalledWith("여행의 방식", expect.stringContaining("자연·휴식"));
+    expect(screen.getByText(/자연·휴식: 공원과 자연/)).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText("확인"));
     await fireEvent.press(screen.getByLabelText("예산 선택지 설명"));
-    expect(alert).toHaveBeenLastCalledWith("예산", expect.stringContaining("가성비"));
+    expect(screen.getByText(/가성비: 비용 부담이 적은/)).toBeOnTheScreen();
   });
 });

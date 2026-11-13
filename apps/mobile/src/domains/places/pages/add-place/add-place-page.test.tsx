@@ -1,7 +1,7 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
-import { Alert } from "react-native";
 
 import AddPlacePage from "./add-place-page";
+import { AppDialogProvider } from "@/shared/ui/app-dialog";
 
 const mockSavePlace = jest.fn();
 const mockSearchPlaces = jest.fn();
@@ -21,7 +21,6 @@ describe("AddPlacePage", () => {
   });
 
   it("searches for a place and adds it to the current trip", async () => {
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
     mockSearchPlaces.mockResolvedValue([
       {
         address: "서울특별시 성동구 뚝섬로 273",
@@ -31,7 +30,7 @@ describe("AddPlacePage", () => {
       },
     ]);
     mockSavePlace.mockResolvedValue({ status: "created" });
-    const screen = await render(<AddPlacePage />);
+    const screen = await render(<AppDialogProvider><AddPlacePage /></AppDialogProvider>);
 
     await fireEvent.changeText(screen.getByTestId("add-place-query"), "서울숲");
     await fireEvent.press(screen.getByTestId("add-place-search"));
@@ -48,7 +47,8 @@ describe("AddPlacePage", () => {
       preference: "want_to_visit",
       tag: "activity",
     }));
-    await waitFor(() => expect(alert).toHaveBeenCalledWith("장소 추가 완료", "서울숲을(를) 추가했어요."));
+    expect(await screen.findByText("장소 추가 완료")).toBeOnTheScreen();
+    expect(screen.getByText("서울숲을(를) 추가했어요.")).toBeOnTheScreen();
     expect(screen.getByTestId("add-place-query")).toHaveProp("value", "");
     expect(screen.queryByText("서울숲")).toBeNull();
   });

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -15,6 +15,7 @@ import {
 } from "../../api/itineraries.api";
 import { useAiPlan } from "./use-ai-plan";
 import { AiPlanLoadingScreen } from "./ai-plan-loading-screen";
+import { useAppDialog } from "@/shared/ui/app-dialog";
 
 const densityOptions: { label: string; value: TravelDensity }[] = [
   { label: "여유롭게", value: "relaxed" },
@@ -47,13 +48,14 @@ const settingDescriptions = {
 };
 
 function SettingLabel({ label, description }: { label: string; description: string }) {
+  const { showDialog } = useAppDialog();
   return <View style={styles.settingLabel}>
     <AppText variant="label">{label}</AppText>
     <Pressable
       accessibilityLabel={`${label} 선택지 설명`}
       accessibilityRole="button"
       hitSlop={8}
-      onPress={() => Alert.alert(label, description)}
+      onPress={() => showDialog({ title: label, message: description })}
       style={styles.infoButton}
     ><AppText color={colors.muted}>ⓘ</AppText></Pressable>
   </View>;
@@ -67,6 +69,7 @@ export default function AiPlanScreen() {
   const [transportModes, setTransportModes] = useState<AiTransportMode[]>(["public_transit"]);
   const [budgetLevel, setBudgetLevel] = useState<AiBudgetLevel>("standard");
   const [additionalRequests, setAdditionalRequests] = useState("");
+  const { showDialog } = useAppDialog();
   const { entitlements, error, generate, latestRequest, loading, missingRegions } = useAiPlan(tripId);
   const loadLatestRequest = () => {
     if (!latestRequest) return;
@@ -79,14 +82,17 @@ export default function AiPlanScreen() {
   };
   const confirmLoadLatestRequest = () => {
     if (!latestRequest) {
-      Alert.alert("불러올 최근 요청이 없어요");
+      showDialog({ title: "불러올 최근 요청이 없어요" });
       return;
     }
-    Alert.alert(
-      "최근 설정을 불러올까요?",
-      "현재 입력한 내용은 최근 요청 설정으로 바뀌어요.",
-      [{ text: "취소", style: "cancel" }, { text: "불러오기", onPress: loadLatestRequest }],
-    );
+    showDialog({
+      title: "최근 설정을 불러올까요?",
+      message: "현재 입력한 내용은 최근 요청 설정으로 바뀌어요.",
+      actions: [
+        { label: "취소", variant: "ghost" },
+        { label: "불러오기", onPress: loadLatestRequest },
+      ],
+    });
   };
   const toggleTheme = (value: TravelTheme) => setThemes((current) => current.includes(value)
     ? current.length > 1 ? current.filter((item) => item !== value) : current
@@ -107,10 +113,14 @@ export default function AiPlanScreen() {
   const confirmPlan = () => {
     const freeAttempt = entitlements?.tier === "free" && entitlements.aiGenerationsUsed === 0;
     if (!freeAttempt) { createPlan(); return; }
-    Alert.alert("무료 AI 생성 1회를 사용할까요?", "성공한 일정 생성에만 횟수가 차감되며, 오류가 나면 차감하지 않아요.", [
-      { text: "취소", style: "cancel" },
-      { text: "일정 만들기", onPress: createPlan },
-    ]);
+    showDialog({
+      title: "무료 AI 생성 1회를 사용할까요?",
+      message: "성공한 일정 생성에만 횟수가 차감되며, 오류가 나면 차감하지 않아요.",
+      actions: [
+        { label: "취소", variant: "ghost" },
+        { label: "일정 만들기", onPress: createPlan },
+      ],
+    });
   };
   if (loading) return <AiPlanLoadingScreen />;
   return (

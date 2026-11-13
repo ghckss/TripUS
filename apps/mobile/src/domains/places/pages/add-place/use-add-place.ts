@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
 
 import { savePlace, searchPlaces, type PlaceSearchCandidate } from "@/domains/places/api/places.api";
 import { inferPlaceTag } from "@/domains/places/model/infer-place-tag";
 import { safeErrorMessage } from "@/shared/api/trip-us-api";
+import { useAppDialog } from "@/shared/ui/app-dialog";
 
 export function useAddPlace(tripId: string, initialQuery = "") {
+  const { showDialog } = useAppDialog();
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<PlaceSearchCandidate[]>([]);
   const [searching, setSearching] = useState(false);
@@ -51,16 +52,16 @@ export function useAddPlace(tripId: string, initialQuery = "") {
       setSavedIds((current) => new Set(current).add(candidate.googlePlaceId));
       setQuery("");
       setResults([]);
-      Alert.alert(
-        result.status === "created" ? "장소 추가 완료" : "이미 추가된 장소",
-        result.status === "created" ? `${candidate.name}을(를) 추가했어요.` : "이미 추가한 장소예요.",
-      );
+      showDialog({
+        title: result.status === "created" ? "장소 추가 완료" : "이미 추가된 장소",
+        message: result.status === "created" ? `${candidate.name}을(를) 추가했어요.` : "이미 추가한 장소예요.",
+      });
     } catch (caught) {
       setMessage(safeErrorMessage(caught, "장소를 추가하지 못했어요."));
     } finally {
       setSavingId(undefined);
     }
-  }, [tripId]);
+  }, [showDialog, tripId]);
 
   useEffect(() => {
     if (!initialQuery || searchedInitialQuery.current) return;
