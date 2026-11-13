@@ -34,6 +34,7 @@ export function TripBoundarySearchField({ destination, kind, value, onChange }: 
   const [results, setResults] = useState<PlaceSearchCandidate[]>([]);
   const [searching, setSearching] = useState(false);
   const [message, setMessage] = useState<string>();
+  const [editing, setEditing] = useState(false);
   const isStart = kind === "start";
   const title = isStart ? "여행 시작 지점" : "여행 종료 지점";
 
@@ -66,6 +67,16 @@ export function TripBoundarySearchField({ destination, kind, value, onChange }: 
     });
     setResults([]);
     setQuery("");
+    setEditing(false);
+  };
+
+  const toggleEditing = () => {
+    if (editing) {
+      setQuery("");
+      setResults([]);
+      setMessage(undefined);
+    }
+    setEditing((current) => !current);
   };
 
   return <View style={styles.container}>
@@ -75,9 +86,8 @@ export function TripBoundarySearchField({ destination, kind, value, onChange }: 
       <View style={styles.selectedHeader}>
         <View style={styles.selectedText}>
           <AppText variant="label">{value.name}</AppText>
-          {value.address && <AppText variant="caption" color={colors.muted}>{value.address}</AppText>}
         </View>
-        <Button label="해제" variant="ghost" onPress={() => onChange(undefined)} />
+        <Button label={editing ? "취소" : "수정"} variant="ghost" testID={`trip-${kind}-point-edit`} onPress={toggleEditing} />
       </View>
       <TimeField
         label={isStart ? "일정 시작 가능 시각" : "이 지점에 도착해야 하는 시각"}
@@ -86,7 +96,7 @@ export function TripBoundarySearchField({ destination, kind, value, onChange }: 
         testID={`trip-${kind}-point-time`}
       />
     </Card>}
-    <View style={styles.searchRow}>
+    {(!value || editing) && <><View style={styles.searchRow}>
       <TextInput
         autoCorrect={false}
         onChangeText={setQuery}
@@ -111,10 +121,9 @@ export function TripBoundarySearchField({ destination, kind, value, onChange }: 
       <AppText>📍</AppText>
       <View style={styles.resultText}>
         <AppText variant="label">{candidate.name}</AppText>
-        {candidate.address && <AppText variant="caption" color={colors.muted}>{candidate.address}</AppText>}
       </View>
       <AppText color={colors.primary}>선택</AppText>
-    </Pressable>)}
+    </Pressable>)}</>}
   </View>;
 }
 

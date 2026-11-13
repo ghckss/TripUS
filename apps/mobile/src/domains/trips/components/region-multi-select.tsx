@@ -28,6 +28,7 @@ const CITY_TYPES = new Set(["locality", "administrative_area_level_1", "administ
 
 export function RegionMultiSelect({ country, value, onChange }: RegionMultiSelectProps) {
   const [open, setOpen] = useState(false);
+  const [draftRegions, setDraftRegions] = useState<SelectedRegion[]>([]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PlaceSearchCandidate[]>([]);
   const [searching, setSearching] = useState(false);
@@ -40,10 +41,7 @@ export function RegionMultiSelect({ country, value, onChange }: RegionMultiSelec
     try {
       const candidates = await searchCities(country.name, country.code, searchQuery);
       const options = candidates.filter((candidate) => !candidate.primaryType || CITY_TYPES.has(candidate.primaryType));
-      setResults(options.filter((candidate) => !value.some((region) =>
-        region.googlePlaceId === candidate.googlePlaceId
-        || region.name.toLocaleLowerCase() === candidate.name.toLocaleLowerCase(),
-      )));
+      setResults(options);
       if (options.length === 0) setMessage("선택할 도시가 없어요. 도시 이름으로 다시 검색해 주세요.");
     } catch (caught) {
       setMessage(safeErrorMessage(caught, "도시 목록을 불러오지 못했어요."));
@@ -53,6 +51,7 @@ export function RegionMultiSelect({ country, value, onChange }: RegionMultiSelec
   };
 
   const showDropdown = () => {
+    setDraftRegions(value);
     setOpen(true);
     setQuery("");
     void loadCities();
@@ -61,15 +60,17 @@ export function RegionMultiSelect({ country, value, onChange }: RegionMultiSelec
   const search = () => void loadCities(query.trim() || "주요 도시");
 
   const select = async (candidate: PlaceSearchCandidate) => {
-    if (value.length >= MAX_REGIONS) {
-      setMessage(`도시는 최대 ${MAX_REGIONS}개까지 선택할 수 있어요.`);
-      return;
-    }
-    if (value.some((region) =>
+    const selected = draftRegions.find((region) =>
       region.googlePlaceId === candidate.googlePlaceId
       || region.name.toLocaleLowerCase() === candidate.name.toLocaleLowerCase(),
-    )) {
-      setMessage("이미 선택한 도시예요.");
+    );
+    if (selected) {
+      setDraftRegions((current) => current.filter((region) => region !== selected));
+      setMessage(undefined);
+      return;
+    }
+    if (draftRegions.length >= MAX_REGIONS) {
+      setMessage(`도시는 최대 ${MAX_REGIONS}개까지 선택할 수 있어요.`);
       return;
     }
     setResolving(true);
@@ -80,7 +81,7 @@ export function RegionMultiSelect({ country, value, onChange }: RegionMultiSelec
     } catch {
       // The catalog selection remains usable even if Google detail enrichment is temporarily unavailable.
     }
-    onChange([...value, {
+    setDraftRegions((current) => [...current, {
       googlePlaceId: resolved.googlePlaceId.startsWith("catalog:") ? null : resolved.googlePlaceId,
       name: resolved.name,
       address: resolved.address ?? candidate.address ?? null,
@@ -88,10 +89,19 @@ export function RegionMultiSelect({ country, value, onChange }: RegionMultiSelec
       longitude: resolved.longitude ?? null,
     }]);
     setResolving(false);
+    setMessage(undefined);
+  };
+
+  const close = () => {
     setOpen(false);
     setQuery("");
     setResults([]);
     setMessage(undefined);
+  };
+
+  const apply = () => {
+    onChange(draftRegions);
+    close();
   };
 
   return <View style={styles.container}>
@@ -126,15 +136,24 @@ export function RegionMultiSelect({ country, value, onChange }: RegionMultiSelec
       <AppText color={colors.muted}>⌄</AppText>
     </Pressable>
 
-    <Modal animationType="slide" presentationStyle="pageSheet" visible={open} onRequestClose={() => setOpen(false)}>
+    <Modal animationType="slide" presentationStyle="pageSheet" visible={open} onRequestClose={close}>
       <SafeAreaView style={styles.modal}>
         <View style={styles.header}>
-          <View>
-            <AppText variant="title">{country.flag} {country.name} 도시 선택</AppText>
-            <AppText color={colors.muted}>인구 기준 주요 도시 20개 중에서 골라 주세요.</AppText>
-          </View>
-          <Button label="닫기" variant="ghost" onPress={() => setOpen(false)} />
+          <AppText variant="title" style={styles.headerTitle}>{country.flag} {country.name} 도시 선택</AppText>
+          <Button label="닫기" variant="ghost" onPress={close} />
         </View>
+        <AppText color={colors.muted}>여러 도시를 선택한 뒤 한 번에 적용할 수 있어요.</AppText>
+        {draftRegions.length > 0 && <View style={styles.draftRegions}>
+          {draftRegions.map((region) => <Pressable
+            accessibilityLabel={`${region.name} 선택 해제`}
+            accessibilityRole="button"
+            key={region.googlePlaceId ?? `${region.name}-${region.address}`}
+            onPress={() => setDraftRegions((current) => current.filter((item) => item !== region))}
+            style={styles.draftRegion}
+          >
+            <AppText variant="label" color={colors.primary}>{region.name} ×</AppText>
+          </Pressable>)}
+        </View>}
         <View style={styles.searchRow}>
           <TextInput
             autoCorrect={false}
@@ -154,12 +173,18 @@ export function RegionMultiSelect({ country, value, onChange }: RegionMultiSelec
           keyboardShouldPersistTaps="handled"
           keyExtractor={(item) => item.googlePlaceId}
           ListEmptyComponent={!searching ? <AppText color={colors.muted}>표시할 도시가 없어요.</AppText> : undefined}
-          renderItem={({ item }) => <Pressable
+          renderItem={({ item }) => {
+            const selected = draftRegions.some((region) =>
+              region.googlePlaceId === item.googlePlaceId
+              || region.name.toLocaleLowerCase() === item.name.toLocaleLowerCase(),
+            );
+            return <Pressable
             accessibilityLabel={`${item.name} 도시 선택`}
             accessibilityRole="button"
+            accessibilityState={{ selected }}
             disabled={resolving}
             onPress={() => void select(item)}
-            style={styles.result}
+            style={[styles.result, selected && styles.selectedResult]}
             testID={`region-result-${item.googlePlaceId}`}
           >
             <AppText>📍</AppText>
@@ -167,10 +192,11 @@ export function RegionMultiSelect({ country, value, onChange }: RegionMultiSelec
               <AppText variant="label">{item.name}</AppText>
               {item.address && <AppText variant="caption" color={colors.muted}>{item.address}</AppText>}
             </View>
-            <AppText color={colors.primary}>{resolving ? "확인 중…" : "선택"}</AppText>
-          </Pressable>}
+            <AppText color={selected ? colors.danger : colors.primary}>{resolving ? "확인 중…" : selected ? "해제" : "선택"}</AppText>
+          </Pressable>}}
           ListFooterComponent={<AppText variant="caption" color={colors.muted} style={styles.attribution}>도시 데이터: GeoNames (CC BY 4.0)</AppText>}
         />
+        <Button label={`${draftRegions.length}개 도시 적용`} disabled={resolving} testID="region-selection-apply" onPress={apply} />
       </SafeAreaView>
     </Modal>
   </View>;
@@ -184,9 +210,13 @@ const styles = StyleSheet.create({
   dropdown: { minHeight: 54, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.canvas, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   modal: { flex: 1, backgroundColor: colors.canvas, padding: spacing.lg, gap: spacing.md },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
+  headerTitle: { flex: 1, flexShrink: 1 },
+  draftRegions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  draftRegion: { backgroundColor: colors.primarySoft, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   searchRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   input: { flex: 1, minHeight: 52, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, paddingHorizontal: spacing.md, fontSize: 16, color: colors.ink },
   result: { minHeight: 68, borderBottomWidth: 1, borderBottomColor: colors.line, padding: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   resultText: { flex: 1, gap: spacing.xs },
+  selectedResult: { backgroundColor: colors.primarySoft, borderRadius: radius.sm },
   attribution: { padding: spacing.md, textAlign: "center" },
 });

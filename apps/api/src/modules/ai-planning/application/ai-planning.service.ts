@@ -89,9 +89,16 @@ export class AiPlanningService {
     const planningPlaces = places.filter((place) =>
       place.tag !== PlaceTag.Lodging
       && !lockedIds.has(place.id)
-      && !isAiRecommendedPlace(place)
-      && isSavedPlaceWithinSelectedRegions(place, selectedRegions),
+      && !isAiRecommendedPlace(place),
     );
+    const recommendationRegions = [
+      ...selectedRegions,
+      ...planningPlaces.map((place) => ({
+        name: place.address ?? place.name,
+        latitude: place.latitude,
+        longitude: place.longitude,
+      })),
+    ];
     if (planningPlaces.length > 100) throw new BadRequestException('AI planning supports at most 100 saved places');
     const days = applyDailyPlanningTargets(
       buildPlannerDays(enumerateTripDates(trip.startDate, trip.endDate), current.items, places, primaryLodging),
@@ -163,6 +170,15 @@ export class AiPlanningService {
           ...(outputContractIssues.includes('recommendations_required')
             ? ['The places array is empty. Return placements as [] and put every concrete itinerary visit in recommendations.']
             : []),
+          ...(outputContractIssues.includes('saved_places_missing')
+            ? ['One or more traveler-saved places were omitted. Place every ID from places exactly once in placements.']
+            : []),
+          ...(outputContractIssues.includes('saved_places_unplaced')
+            ? [
+              `Do not return traveler-saved places in unplaced. Rebuild the route so these explicit user choices are scheduled: ${formatUnplacedSavedPlaces(output, planningPlaces)}.`,
+              'A saved place outside trip.regions is an explicit traveler-approved exception and must still be scheduled.',
+            ]
+            : []),
           ...(coverageIssues.length > 0
             ? [
               `The previous draft is still too short on: ${coverageIssues.join(', ')}.`,
@@ -189,7 +205,7 @@ export class AiPlanningService {
         materialized = await this.materializeRecommendations(
           trip.id,
           trip.destination,
-          selectedRegions,
+          recommendationRegions,
           output.recommendations,
           places,
           validDates,
@@ -222,6 +238,12 @@ export class AiPlanningService {
           ...plannerInput,
           revisionGuidance: [
             `The verified itinerary still has these issues: ${repairableIssues.join(', ')}.`,
+            ...(repairableIssues.includes('saved_places_unplaced')
+              ? [
+                `Schedule these traveler-saved places instead of returning them in unplaced: ${formatUnplacedSavedPlaces(output, planningPlaces)}.`,
+                'Traveler-saved places outside the selected regions are intentional route anchors, not invalid locations.',
+              ]
+              : []),
             materialized.rejected.length > 0
               ? `These recommendations could not be verified and must be replaced with different concrete places: ${materialized.rejected.map((item) => item.placeName).join(', ')}.`
               : '',
@@ -485,15 +507,6 @@ function toRecommendedPlacement(
   };
 }
 
-export function isSavedPlaceWithinSelectedRegions(
-  place: Pick<SavedPlaceEntity, 'name' | 'address'>,
-  selectedRegions: Array<{ name: string }>,
-): boolean {
-  if (selectedRegions.length === 0) return true;
-  const placeLocation = normalizeRegionName(`${place.name} ${place.address ?? ''}`);
-  return selectedRegions.some(({ name }) => placeLocation.includes(normalizeRegionName(name)));
-}
-
 function normalizeRegionName(value: string): string {
   return value
     .trim()
@@ -620,6 +633,9 @@ export function assessPlanQuality(input: QualityAssessmentInput): string[] {
     ...input.locked.map((item) => item.savedPlaceId),
   ]);
   const unplacedIds = new Set(input.output.unplaced.map((item) => item.savedPlaceId));
+  if (input.planningPlaces.some((place) => unplacedIds.has(place.id))) {
+    issues.push('saved_places_unplaced');
+  }
   const missingSavedPlaces = input.planningPlaces.filter((place) =>
     !scheduledIds.has(place.id) && !unplacedIds.has(place.id),
   );
@@ -670,7 +686,7 @@ export function isBlockingQualityIssue(issue: string): boolean {
 }
 
 function isRepairableQualityIssue(issue: string): boolean {
-  if (issue === 'saved_places_missing' || issue === 'must_visit_missing') return true;
+  if (issue === 'saved_places_missing' || issue === 'saved_places_unplaced' || issue === 'must_visit_missing') return true;
   return [
     'underfilled_day:',
     'schedule_detail_missing:',
@@ -708,7 +724,24 @@ export function assessRawOutputContract(
   if (allowedPlaceIds.size === 0 && output.recommendations.length === 0) {
     issues.push('recommendations_required');
   }
+  const returnedPlaceIds = new Set([
+    ...output.placements.map((item) => item.savedPlaceId),
+    ...output.unplaced.map((item) => item.savedPlaceId),
+  ]);
+  if ([...allowedPlaceIds].some((id) => !returnedPlaceIds.has(id))) {
+    issues.push('saved_places_missing');
+  }
+  if (output.unplaced.some((item) => allowedPlaceIds.has(item.savedPlaceId))) {
+    issues.push('saved_places_unplaced');
+  }
   return issues;
+}
+
+function formatUnplacedSavedPlaces(output: AiPlannerOutput, places: SavedPlaceEntity[]): string {
+  const namesById = new Map(places.map((place) => [place.id, place.name]));
+  return output.unplaced
+    .map((item) => `${item.savedPlaceId} (${namesById.get(item.savedPlaceId) ?? 'unknown place'})`)
+    .join(', ');
 }
 
 function minimumPlannedMinutes(style: TravelStyle): number {

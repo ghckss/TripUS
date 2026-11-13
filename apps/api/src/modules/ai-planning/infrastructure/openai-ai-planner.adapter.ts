@@ -13,8 +13,9 @@ export const AI_PLANNER_SYSTEM_PROMPT = [
   'Use only IDs from places in placements, include each place at most once, and keep every placement within the supplied trip dates.',
   'Treat startLodging and endLodging as route anchors only; never return lodging IDs in placements.',
   'Use addresses and coordinates to group nearby places, minimize unnecessary travel, and avoid putting geographically impractical places on the same day.',
-  'The supplied regions are hard geographic limits. Schedule and recommend places only within those regions, and never expand the itinerary into an unselected region.',
-  'Your primary objective is to place the traveler-saved places into the itinerary. Recommendations are supplementary and must not replace or deprioritize saved places.',
+  'The supplied regions are hard geographic limits for recommendations, except for nearby route-supporting recommendations around a traveler-saved place outside those regions. Saved places in places are explicit exceptions even when their address or coordinates are outside the selected regions.',
+  'Place every traveler-saved place exactly once in placements. Never omit it, replace it with a recommendation, or return it in unplaced merely because it is outside the selected regions.',
+  'Treat an out-of-region saved place as an intentional route anchor. Group nearby saved places on the same practical day and add only route-supporting recommendations near that anchor when needed.',
   'If the places array is empty, recommendations are the complete itinerary: choose and schedule all necessary attractions, meals, cafes, shops, or activities inside the selected regions.',
   'Lodging is optional. If startLodging or endLodging is null, begin with the first visit or finish with the last visit and never invent a lodging.',
   'When trip.startPoint is provided, begin the first date from that fixed place and do not schedule a visit before its time. When trip.endPoint is provided, finish the final date at that fixed place by its time. Include travel between each boundary point and the nearest visit in the route reasoning.',
@@ -28,7 +29,7 @@ export const AI_PLANNER_SYSTEM_PROMPT = [
   'Follow the supplied travel-style guidance, prioritize must_visit places, and plan around lockedPlacements without returning them.',
   'The minimum daily duration in the travel-style guidance is the sum of durationMinutes and travelDurationMinutes for that date; it is not a required start or end time.',
   'Each day.targetPlannedMinutes overrides the full-day minimum in the travel-style guidance. It already accounts for a late arrival or early departure and must be respected instead of forcing a full-day schedule.',
-  'When a place cannot be scheduled realistically, return it in unplaced with a concise reason instead of forcing it into the itinerary.',
+  'Use unplaced only for a genuinely impossible traveler-saved place after considering every trip date, boundary time, and route grouping. A different city or a longer day trip is not by itself a valid reason.',
   'Do not invent place IDs, locations, dates, or opening hours.',
 ].join(' ');
 

@@ -41,7 +41,6 @@ export default function AddPlacePage() {
       const saving = savingId === candidate.googlePlaceId;
       return <Card key={candidate.googlePlaceId}>
         <AppText variant="heading">{candidate.name}</AppText>
-        <AppText color={colors.muted}>{candidate.address ?? "주소 정보 없음"}</AppText>
         <Button
           label={saved ? "추가됨" : saving ? "추가 중…" : "이 여행에 추가"}
           disabled={Boolean(savingId) || saved}

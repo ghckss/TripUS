@@ -69,6 +69,7 @@ describe("NewTripScreen", () => {
     await fireEvent.changeText(screen.getByTestId("region-search-input"), "도쿄");
     await fireEvent.press(screen.getByTestId("region-search-button"));
     await fireEvent.press(await screen.findByTestId("region-result-region-tokyo"));
+    await fireEvent.press(screen.getByTestId("region-selection-apply"));
     await fireEvent.press(screen.getByTestId("new-trip-submit"));
 
     expect(mockSearchCities).toHaveBeenCalledWith("일본", "JP", expect.any(String));
@@ -109,10 +110,10 @@ describe("NewTripScreen", () => {
     await fireEvent.changeText(screen.getByTestId("region-search-input"), "서울");
     await fireEvent.press(screen.getByTestId("region-search-button"));
     await fireEvent.press(await screen.findByTestId("region-result-region-seoul"));
-    await fireEvent.press(screen.getByTestId("region-dropdown-open"));
     await fireEvent.changeText(screen.getByTestId("region-search-input"), "인제");
     await fireEvent.press(screen.getByTestId("region-search-button"));
     await fireEvent.press(await screen.findByTestId("region-result-region-inje"));
+    await fireEvent.press(screen.getByTestId("region-selection-apply"));
     await fireEvent.press(screen.getByTestId("new-trip-submit"));
 
     await waitFor(() => expect(mockCreateTrip).toHaveBeenCalledWith(expect.objectContaining({
@@ -143,10 +144,17 @@ describe("NewTripScreen", () => {
     await fireEvent.changeText(screen.getByTestId("region-search-input"), "서울");
     await fireEvent.press(screen.getByTestId("region-search-button"));
     await fireEvent.press(await screen.findByTestId("region-result-region-seoul"));
+    await fireEvent.press(screen.getByTestId("region-selection-apply"));
 
     await fireEvent.changeText(screen.getByTestId("trip-start-point-search-input"), "김포공항");
     await fireEvent.press(screen.getByTestId("trip-start-point-search-button"));
     await fireEvent.press(await screen.findByTestId("trip-start-point-result-airport-gimpo"));
+    expect(screen.queryByText("서울 강서구")).toBeNull();
+    expect(screen.queryByTestId("trip-start-point-search-input")).toBeNull();
+    await fireEvent.press(screen.getByTestId("trip-start-point-edit"));
+    expect(screen.getByTestId("trip-start-point-search-input")).toBeTruthy();
+    await fireEvent.press(screen.getByTestId("trip-start-point-edit"));
+    expect(screen.queryByTestId("trip-start-point-search-input")).toBeNull();
     await selectTime(screen, "trip-start-point-time", 10, 30);
 
     await fireEvent.changeText(screen.getByTestId("trip-end-point-search-input"), "서울역");
@@ -174,6 +182,7 @@ describe("NewTripScreen", () => {
     await fireEvent.changeText(screen.getByTestId("region-search-input"), "서울");
     await fireEvent.press(screen.getByTestId("region-search-button"));
     await fireEvent.press(await screen.findByTestId("region-result-region-seoul"));
+    await fireEvent.press(screen.getByTestId("region-selection-apply"));
     await fireEvent.changeText(screen.getByTestId("lodging-search-input"), "지도 호텔");
     await fireEvent.press(screen.getByTestId("lodging-search-button"));
     await fireEvent.press(await screen.findByLabelText("서울 지도 호텔 숙소 선택"));
@@ -199,6 +208,7 @@ describe("NewTripScreen", () => {
     await fireEvent.changeText(screen.getByTestId("region-search-input"), "서울");
     await fireEvent.press(screen.getByTestId("region-search-button"));
     await fireEvent.press(await screen.findByTestId("region-result-region-seoul"));
+    await fireEvent.press(screen.getByTestId("region-selection-apply"));
     await fireEvent.press(screen.getByTestId("new-trip-submit"));
 
     expect(await screen.findByText("서버에 연결하지 못했어요.")).toBeOnTheScreen();

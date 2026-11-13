@@ -14,7 +14,6 @@ import {
   enumerateTripDates,
   findReusableAiRecommendation,
   isBlockingQualityIssue,
-  isSavedPlaceWithinSelectedRegions,
   isWithinSelectedRegions,
   normalizeGeneratedPlacements,
 } from './ai-planning.service';
@@ -68,6 +67,21 @@ describe('raw AI output validation', () => {
     expect(assessRawDayCoverage([{
       date: '2026-11-08', startLodging: null, endLodging: null,
     }], output, TravelStyle.Relaxed, allowedPlaceIds)).toEqual(['2026-11-08']);
+  });
+
+  it('requires every saved place to be scheduled rather than silently omitted or unplaced', () => {
+    const allowedPlaceIds = new Set(['place-1', 'place-2']);
+
+    expect(assessRawOutputContract(allowedPlaceIds, {
+      placements: [{ savedPlaceId: 'place-1', date: '2026-11-08', position: 0 }],
+      unplaced: [],
+      recommendations: [],
+    })).toContain('saved_places_missing');
+    expect(assessRawOutputContract(allowedPlaceIds, {
+      placements: [{ savedPlaceId: 'place-1', date: '2026-11-08', position: 0 }],
+      unplaced: [{ savedPlaceId: 'place-2', reason: '다른 도시' }],
+      recommendations: [],
+    })).toContain('saved_places_unplaced');
   });
 });
 
@@ -215,20 +229,6 @@ describe('isWithinSelectedRegions', () => {
   });
 });
 
-describe('selected-region planning scope', () => {
-  it('excludes saved places outside selected cities', () => {
-    expect(isSavedPlaceWithinSelectedRegions(
-      { name: '원대리 자작나무숲', address: '강원특별자치도 인제군' },
-      [{ name: '서울특별시' }],
-    )).toBe(false);
-    expect(isSavedPlaceWithinSelectedRegions(
-      { name: '당산역', address: '서울특별시 영등포구' },
-      [{ name: '서울특별시' }],
-    )).toBe(true);
-  });
-
-});
-
 describe('AiPlanningService', () => {
   it('creates a complete recommendation-only itinerary without saved places or lodging', async () => {
     const tripId = '10000000-0000-4000-8000-000000000010';
@@ -336,7 +336,7 @@ describe('AiPlanningService', () => {
       note: null, isPrimaryLodging: false,
     };
     const visit = {
-      id: '30000000-0000-4000-8000-000000000001', name: 'Seoul Forest', address: 'Seoul Seongdong-gu',
+      id: '30000000-0000-4000-8000-000000000001', name: '원대리 자작나무숲', address: '강원특별자치도 인제군',
       latitude: 38.2, longitude: 128.24, tag: PlaceTag.Activity, preference: PlacePreference.MustVisit,
       note: 'Morning visit', isPrimaryLodging: false,
     };
@@ -347,20 +347,27 @@ describe('AiPlanningService', () => {
     };
     const recommendedId = '30000000-0000-4000-8000-000000000002';
     const remove = vi.fn().mockResolvedValue([]);
+    const validPlannerOutput = {
+      placements: [{
+        savedPlaceId: visit.id, date: '2026-11-08', position: 0,
+        startTime: '10:00', durationMinutes: 240, activity: '서울숲 산책과 주요 구역 관람',
+        travelMethod: '대중교통', travelDurationMinutes: 20,
+      }],
+      unplaced: [],
+      recommendations: [{
+        placeName: 'Gyeongbokgung', regionName: 'Seoul', suggestedDate: '2026-11-08', position: 1,
+        startTime: '14:00', durationMinutes: 240, activity: '경복궁 주요 전각 관람', reason: 'A central historic destination',
+        travelMethod: '대중교통', travelDurationMinutes: 25,
+      }],
+    };
     const planner = {
-      generate: vi.fn().mockResolvedValue({
-        placements: [{
-          savedPlaceId: visit.id, date: '2026-11-08', position: 0,
-          startTime: '10:00', durationMinutes: 240, activity: '서울숲 산책과 주요 구역 관람',
-          travelMethod: '대중교통', travelDurationMinutes: 20,
-        }],
-        unplaced: [],
-        recommendations: [{
-          placeName: 'Gyeongbokgung', regionName: 'Seoul', suggestedDate: '2026-11-08', position: 1,
-          startTime: '14:00', durationMinutes: 240, activity: '경복궁 주요 전각 관람', reason: 'A central historic destination',
-          travelMethod: '대중교통', travelDurationMinutes: 25,
-        }],
-      }),
+      generate: vi.fn()
+        .mockResolvedValueOnce({
+          placements: [],
+          unplaced: [{ savedPlaceId: visit.id, reason: '선택 도시 밖 장소' }],
+          recommendations: [],
+        })
+        .mockResolvedValue(validPlannerOutput),
     };
     const replace = vi.fn().mockResolvedValue({
       status: ItineraryUpdateStatus.Updated,
@@ -433,6 +440,9 @@ describe('AiPlanningService', () => {
       lockedPlacements: [],
       priorRecommendations: [previousAiRecommendation.name],
     });
+    const retryInput = planner.generate.mock.calls[1]?.[0] as unknown as { revisionGuidance: string };
+    expect(retryInput.revisionGuidance).toContain('explicit traveler-approved exception');
+    expect(retryInput.revisionGuidance).toContain(visit.name);
     expect(replace).toHaveBeenCalledWith(tripId, [
       {
         savedPlaceId: visit.id, date: '2026-11-08', position: 0, locked: false,
