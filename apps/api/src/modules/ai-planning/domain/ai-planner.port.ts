@@ -43,6 +43,7 @@ export const AI_PLANNING_TASK = {
     'targetPlannedMinutes가 0보다 큰 모든 날짜를 목표 시간 이상으로 채운다.',
     '저장 장소만으로 시간이 부족하면 선택 지역 또는 해당 저장 장소 주변의 구체적인 방문 장소를 필요한 만큼 recommendations에 추가한다.',
     'availableStartTime과 availableEndTime 안에서 이동시간까지 포함해 겹치지 않는 시간표를 만든다.',
+    '사용 가능한 시간대에 포함되는 아침, 점심, 저녁마다 실제 식사 장소를 정확한 식사 시간에 배치한다. 카페나 디저트로 식사를 대체하지 않는다.',
     'startLodging과 endLodging이 있으면 그 지점에서 시작하고 끝내며, 없으면 숙소를 만들지 않는다.',
     '가까운 장소를 한 권역으로 묶고 추천 장소 사이의 이동은 30분 이내가 되도록 한다.',
     '여행 밀도, 선택한 여행 방식들, 복수 이동수단, 예산, 추가 요청사항 및 lockedPlacements를 존중한다.',

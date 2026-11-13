@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 
-import { deletePlaces, listTravelPlaces, updatePlace, type SavedPlace, type UpdateSavedPlaceInput } from "@/domains/places/api/places.api";
+import { deletePlaces, listTravelPlaces, type SavedPlace } from "@/domains/places/api/places.api";
 import { safeErrorMessage } from "@/shared/api/trip-us-api";
 
 export function togglePlaceSelection(current: Set<string>, placeId: string): Set<string> {
@@ -36,19 +36,12 @@ export function usePlaceLibrary(tripId: string) {
     }
   }, [tripId]);
 
-  const editPlace = useCallback(async (placeId: string, input: UpdateSavedPlaceInput) => {
-    setSaving(true); setMessage(undefined);
-    try { await updatePlace(tripId, placeId, input); setMessage("장소 정보를 변경했어요."); await reload(); }
-    catch (caught) { setMessage(safeErrorMessage(caught, "장소를 변경하지 못했어요.")); }
-    finally { setSaving(false); }
-  }, [reload, tripId]);
-
   const toggleSelection = useCallback((placeId: string) => {
     setSelectedIds((current) => togglePlaceSelection(current, placeId));
   }, []);
 
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
-  const selectAll = useCallback(() => setSelectedIds(allPlaceIds(places)), [places]);
+  const selectPlaces = useCallback((placeIds: string[]) => setSelectedIds(new Set(placeIds)), []);
 
   const removePlaces = useCallback(async (placeIds: string[]) => {
     if (placeIds.length === 0) return false;
@@ -74,14 +67,13 @@ export function usePlaceLibrary(tripId: string) {
 
   return {
     clearSelection,
-    editPlace,
     places,
     loading,
     message,
     reload,
     removePlaces,
     saving,
-    selectAll,
+    selectPlaces,
     selectedIds,
     toggleSelection,
   };

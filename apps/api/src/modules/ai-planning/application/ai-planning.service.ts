@@ -288,6 +288,9 @@ export class AiPlanningService {
           generated,
           recommended,
           locked,
+          placeTagsById: new Map(
+            [...places, ...materialized.created].map((place) => [place.id, place.tag]),
+          ),
           output,
         });
         const repairableIssues = qualityIssues.filter(isRepairableQualityIssue);
@@ -314,6 +317,9 @@ export class AiPlanningService {
               : []),
             materialized.rejected.length > 0
               ? `These recommendations could not be verified and must be replaced with different concrete places: ${materialized.rejected.map((item) => item.placeName).join(', ')}.`
+              : '',
+            repairableIssues.some((issue) => issue.startsWith('missing_meal:'))
+              ? 'Add a real restaurant for every missing breakfast, lunch, or dinner slot. Cafes and dessert shops do not count as meals.'
               : '',
             `Required totals by date are: ${formatCoverageTargets(days, days.map((day) => day.date), density)}.`,
             'Return the complete corrected itinerary. Keep valid saved-place placements, replace unverifiable recommendations, and use chronological non-overlapping times.',
@@ -1006,7 +1012,8 @@ type QualityAssessmentInput = {
   planningPlaces: SavedPlaceEntity[];
   generated: PlannedPlacement[];
   recommended: PlannedPlacement[];
-  locked: Array<{ savedPlaceId: string; date: string | null; position: number | null }>;
+  locked: Array<{ savedPlaceId: string; date: string | null; position: number | null; scheduledTime?: string | null }>;
+  placeTagsById: Map<string, string>;
   output: AiPlannerOutput;
 };
 
@@ -1041,6 +1048,18 @@ export function assessPlanQuality(input: QualityAssessmentInput): string[] {
       visitCount < minimumRequiredVisitCount(day, input.density)
       || plannedMinutes < minimumAcceptablePlannedMinutes(day, input.density)
     ) issues.push(`underfilled_day:${day.date}`);
+
+    const mealVisits = [
+      ...timedVisits.map((visit) => ({ savedPlaceId: visit.savedPlaceId, scheduledTime: visit.scheduledTime ?? null })),
+      ...input.locked
+        .filter((item) => item.date === day.date)
+        .map((item) => ({ savedPlaceId: item.savedPlaceId, scheduledTime: item.scheduledTime ?? null })),
+    ].filter((visit) => input.placeTagsById.get(visit.savedPlaceId) === PlaceTag.Food && visit.scheduledTime);
+    for (const meal of requiredMealSlots(day)) {
+      if (!mealVisits.some((visit) => mealSlot(visit.scheduledTime!) === meal)) {
+        issues.push(`missing_meal:${day.date}:${meal}`);
+      }
+    }
 
     let previousEnd: number | undefined;
     for (const visit of timedVisits) {
@@ -1082,7 +1101,28 @@ function isRepairableQualityIssue(issue: string): boolean {
     'schedule_detail_missing:',
     'invalid_time_window:',
     'outside_available_window:',
+    'missing_meal:',
   ].some((prefix) => issue.startsWith(prefix));
+}
+
+type MealSlot = 'breakfast' | 'lunch' | 'dinner';
+
+function requiredMealSlots(day: AiPlannerDay): MealSlot[] {
+  const start = timeToMinutes(day.availableStartTime ?? '09:00');
+  const end = timeToMinutes(day.availableEndTime ?? '21:00');
+  return [
+    ...(start <= 10 * 60 + 30 && end >= 7 * 60 ? ['breakfast' as const] : []),
+    ...(start <= 14 * 60 && end >= 11 * 60 ? ['lunch' as const] : []),
+    ...(start <= 20 * 60 && end >= 17 * 60 ? ['dinner' as const] : []),
+  ];
+}
+
+function mealSlot(time: string): MealSlot | null {
+  const minutes = timeToMinutes(time);
+  if (minutes >= 7 * 60 && minutes < 11 * 60) return 'breakfast';
+  if (minutes >= 11 * 60 && minutes < 15 * 60) return 'lunch';
+  if (minutes >= 17 * 60 && minutes < 21 * 60) return 'dinner';
+  return null;
 }
 
 export function assessRawDayCoverage(

@@ -33,6 +33,34 @@ describe('trip boundary itinerary items', () => {
 });
 
 describe('ItinerariesService', () => {
+  it('recalculates travel time between user-reordered or newly added places', async () => {
+    const tripId = '10000000-0000-4000-8000-000000000001';
+    const makeVisit = (id: string, position: number, googlePlaceId: string) => ({
+      id, tripId, savedPlaceId: `place-${id}`, date: '2026-11-08', position,
+      scheduledTime: null, durationMinutes: null, activitySummary: null,
+      travelMethod: null, travelDurationMinutes: position === 1 ? 99 : null,
+      locked: false, source: 'manual', visitStatus: null, rating: null, review: null,
+      savedPlace: { name: id, address: null, latitude: null, longitude: null, googlePlaceId },
+    });
+    const items = { find: vi.fn().mockResolvedValue([
+      makeVisit('first', 0, 'google-first'), makeVisit('second', 1, 'google-second'),
+    ]) };
+    const service = new ItinerariesService(
+      items as unknown as Repository<ItineraryItemEntity>,
+      { find: vi.fn().mockResolvedValue([]) } as unknown as Repository<SavedPlaceEntity>,
+      { findOneBy: vi.fn().mockResolvedValue({
+        id: tripId, active: true, startDate: '2026-11-08', endDate: '2026-11-08', startPoint: null, endPoint: null,
+      }) } as unknown as Repository<TripEntity>,
+      {} as DataSource,
+      { getCurrentUserId: vi.fn().mockReturnValue('user-1') },
+      { transit: vi.fn().mockResolvedValue({ durationMinutes: 23, distanceMeters: 5_000 }) },
+    );
+
+    const result = await service.get(tripId);
+
+    expect(result.items[1]).toMatchObject({ placeName: 'second', travelMethod: '대중교통', travelDurationMinutes: 23 });
+  });
+
   it('calculates travel time from the final visit to the configured end point', async () => {
     const tripId = '10000000-0000-4000-8000-000000000001';
     const visit = {

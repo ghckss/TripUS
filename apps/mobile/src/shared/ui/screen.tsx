@@ -10,9 +10,11 @@ type ScreenProps = PropsWithChildren<Omit<ScrollViewProps, "contentContainerStyl
   gesture?: NativeGesture;
 }>;
 
-export const Screen = forwardRef<ScrollViewInstance, ScreenProps>(function Screen({ children, contentStyle, gesture, scrollEnabled = true, testID, ...scrollProps }, ref) {
+export const Screen = forwardRef<ScrollViewInstance, ScreenProps>(function Screen({ children, contentStyle, gesture, scrollEnabled = true, stickyHeaderIndices, testID, ...scrollProps }, ref) {
   const network = useNetInfo();
-  const scrollView = <ScrollView {...scrollProps} ref={ref} testID={testID} style={[styles.screen, scrollProps.style]} contentContainerStyle={[styles.content, contentStyle]} keyboardShouldPersistTaps="handled" scrollEnabled={scrollEnabled}>
+  const stickyOffset = network.isConnected === false ? 1 : 0;
+  const resolvedStickyHeaders = stickyHeaderIndices?.map((index) => index + stickyOffset);
+  const scrollView = <ScrollView {...scrollProps} ref={ref} stickyHeaderIndices={resolvedStickyHeaders} testID={testID} style={[styles.screen, scrollProps.style]} contentContainerStyle={[styles.content, contentStyle]} keyboardShouldPersistTaps="handled" scrollEnabled={scrollEnabled}>
     {network.isConnected === false && <View accessibilityLiveRegion="polite" style={styles.offlineBanner}>
       <AppText variant="caption" color={colors.warning}>오프라인 상태예요. 마지막으로 저장된 정보를 보여드려요.</AppText>
     </View>}

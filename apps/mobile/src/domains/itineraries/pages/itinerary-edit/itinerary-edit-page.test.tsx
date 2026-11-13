@@ -14,7 +14,6 @@ let mockDates = ["2026-11-08"];
 let mockItinerary = { items: [] as Record<string, unknown>[], unplaced: [] as Record<string, unknown>[] };
 let mockPlaces: { id: string; name: string; address: string; tag: string; isPrimaryLodging?: boolean }[] = [{ id: "place-1", name: "감천문화마을", address: "부산 사하구", tag: "attraction" }];
 let mockSearchParams: { aiGenerated?: string; tripId: string } = { tripId: "trip-1" };
-let mockUndoMessage: string | undefined;
 let mockUpdatingDate: string | undefined;
 
 jest.mock("expo-router", () => ({
@@ -40,9 +39,6 @@ jest.mock("./use-itinerary-edit", () => ({
     save: jest.fn(),
     saving: false,
     setPlacesForDate: mockSetPlacesForDate,
-    undoAiChange: jest.fn(),
-    undoing: false,
-    undoMessage: mockUndoMessage,
     updateDayWithAi: mockUpdateDayWithAi,
     updatingDate: mockUpdatingDate,
   }),
@@ -57,7 +53,6 @@ describe("ItineraryScreen day editing", () => {
     mockItinerary = { items: [], unplaced: [] };
     mockPlaces = [{ id: "place-1", name: "감천문화마을", address: "부산 사하구", tag: "attraction" }];
     mockSearchParams = { tripId: "trip-1" };
-    mockUndoMessage = undefined;
     mockUpdatingDate = undefined;
   });
 
@@ -107,15 +102,11 @@ describe("ItineraryScreen day editing", () => {
     expect(screen.queryByText("AI 일정이 생성됐어요")).not.toBeOnTheScreen();
   });
 
-  it("shows the no-undo message directly below the undo button", async () => {
-    mockUndoMessage = "되돌릴 AI 변경이 없어요.";
-
+  it("does not show the recent AI undo action", async () => {
     const screen = await renderItineraryScreen();
 
-    const undoButton = screen.getByText("최근 AI 변경 한 번 되돌리기");
-    const message = screen.getByText("되돌릴 AI 변경이 없어요.");
-    expect(undoButton).toBeOnTheScreen();
-    expect(message).toBeOnTheScreen();
+    expect(screen.queryByText("최근 AI 변경 한 번 되돌리기")).not.toBeOnTheScreen();
+    expect(screen.queryByText("되돌릴 AI 변경이 없어요.")).not.toBeOnTheScreen();
   });
 
   it("searches, saves, and selects a place that was not registered", async () => {

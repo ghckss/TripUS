@@ -4,7 +4,7 @@ import { useFocusEffect } from "expo-router";
 import { apiErrorMessage } from "@/shared/api/trip-us-api";
 import { getTrip } from "@/domains/trips";
 import { listPlaces, type SavedPlace } from "@/domains/places/api/places.api";
-import { generateAiPlanDay, getItinerary, isItineraryBoundary, replaceItinerary, undoAiPlan, type Itinerary } from "../../api/itineraries.api";
+import { generateAiPlanDay, getItinerary, isItineraryBoundary, replaceItinerary, type Itinerary } from "../../api/itineraries.api";
 import { ensureLodgingEndpoints, isLodgingPlace, replaceLodgingBoundary, type LodgingEdge } from "./itinerary-lodging-endpoints";
 import { reorderItineraryWithinDay } from "./itinerary-reorder";
 
@@ -50,8 +50,6 @@ export function useItineraryEdit(tripId: string) {
   const [saving, setSaving] = useState(false);
   const [dates, setDates] = useState<string[]>([]);
   const [places, setPlaces] = useState<SavedPlace[]>([]);
-  const [undoing, setUndoing] = useState(false);
-  const [undoMessage, setUndoMessage] = useState<string>();
   const [updatingDate, setUpdatingDate] = useState<string>();
 
   const reload = useCallback(async () => {
@@ -170,17 +168,7 @@ export function useItineraryEdit(tripId: string) {
     finally { setUpdatingDate(undefined); }
   };
 
-  const undoAiChange = async () => {
-    setUndoing(true); setError(undefined); setUndoMessage(undefined);
-    try {
-      const restored = await undoAiPlan(tripId);
-      if (!restored) { setUndoMessage("되돌릴 AI 변경이 없어요."); return; }
-      setItinerary(restored);
-    } catch (caught) { setError(apiErrorMessage(caught)); }
-    finally { setUndoing(false); }
-  };
-
-  return { dates, error, itinerary, moveToAdjacentDay, places, reload, removeFromItinerary, reorderWithinDay, replaceDayLodging, save, saving, setPlacesForDate, undoAiChange, undoing, undoMessage, updateDayWithAi, updatingDate };
+  return { dates, error, itinerary, moveToAdjacentDay, places, reload, removeFromItinerary, reorderWithinDay, replaceDayLodging, save, saving, setPlacesForDate, updateDayWithAi, updatingDate };
 }
 
 function serializeItineraryItems(itinerary: Itinerary) {

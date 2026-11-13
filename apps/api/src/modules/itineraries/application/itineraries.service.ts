@@ -107,6 +107,13 @@ export class ItinerariesService {
     const placedIds = new Set(items.map((item) => item.savedPlaceId));
     const boundaryTravel = await this.estimateBoundaryTravel(items, trip);
     const responseItems = items.map(ItineraryResponseDtoItem);
+    const travelByItemId = await this.estimateItineraryTravel(items);
+    for (const item of responseItems) {
+      const duration = travelByItemId.get(item.id);
+      if (duration == null) continue;
+      item.travelMethod = '대중교통';
+      item.travelDurationMinutes = duration;
+    }
     const firstStartDateItem = responseItems.find((item) => item.date === trip.startDate);
     if (firstStartDateItem && boundaryTravel.startDurationMinutes != null) {
       firstStartDateItem.travelMethod = '대중교통';
@@ -142,6 +149,30 @@ export class ItinerariesService {
       estimate(last?.savedPlace?.googlePlaceId, trip.endPoint?.googlePlaceId),
     ]);
     return { startDurationMinutes, endDurationMinutes };
+  }
+
+  private async estimateItineraryTravel(items: ItineraryItemEntity[]): Promise<Map<string, number>> {
+    const estimates = new Map<string, number>();
+    const legs = items.flatMap((destination, index) => {
+      const origin = items[index - 1];
+      if (!origin || origin.date !== destination.date) return [];
+      const originGooglePlaceId = origin.savedPlace?.googlePlaceId;
+      const destinationGooglePlaceId = destination.savedPlace?.googlePlaceId;
+      if (!originGooglePlaceId || !destinationGooglePlaceId) return [];
+      return [{ destinationItemId: destination.id, originGooglePlaceId, destinationGooglePlaceId }];
+    });
+    await Promise.all(legs.map(async (leg) => {
+      try {
+        const route = await this.routes.transit({
+          originGooglePlaceId: leg.originGooglePlaceId,
+          destinationGooglePlaceId: leg.destinationGooglePlaceId,
+        });
+        if (route) estimates.set(leg.destinationItemId, route.durationMinutes);
+      } catch {
+        this.logger.warn(`Itinerary route estimate unavailable origin=${leg.originGooglePlaceId} destination=${leg.destinationGooglePlaceId}`);
+      }
+    }));
+    return estimates;
   }
 
   private async findConflicts(trip: TripEntity, input: ReplaceItineraryItemDto[]): Promise<string[]> {

@@ -54,6 +54,7 @@ describe('AI plan quality severity', () => {
         travelMethod: '대중교통', travelDurationMinutes: 45,
       }],
       locked: [],
+      placeTagsById: new Map([['recommended-1', PlaceTag.Attraction]]),
       output: { placements: [], unplaced: [], recommendations: [] },
     });
 
@@ -62,6 +63,33 @@ describe('AI plan quality severity', () => {
       'outside_available_window:2026-11-08',
     ]));
     expect(issues.every(isBlockingQualityIssue)).toBe(true);
+  });
+
+  it('requires breakfast, lunch, and dinner on a full day and does not count cafes as meals', () => {
+    const visits = [
+      { savedPlaceId: 'breakfast', scheduledTime: '09:00' },
+      { savedPlaceId: 'cafe', scheduledTime: '12:30' },
+      { savedPlaceId: 'dinner', scheduledTime: '18:30' },
+    ].map((visit, position) => ({
+      ...visit, date: '2026-11-08', position, durationMinutes: 120,
+      activitySummary: '방문', travelMethod: '도보', travelDurationMinutes: 30,
+    }));
+    const issues = assessPlanQuality({
+      days: [{
+        date: '2026-11-08', startLodging: null, endLodging: null,
+        availableStartTime: '09:00', availableEndTime: '21:00', targetPlannedMinutes: 450,
+      }],
+      density: TravelDensity.Balanced,
+      planningPlaces: [], generated: visits, recommended: [], locked: [],
+      placeTagsById: new Map([
+        ['breakfast', PlaceTag.Food], ['cafe', PlaceTag.Cafe], ['dinner', PlaceTag.Food],
+      ]),
+      output: { placements: [], unplaced: [], recommendations: [] },
+    });
+
+    expect(issues).toContain('missing_meal:2026-11-08:lunch');
+    expect(issues).not.toContain('missing_meal:2026-11-08:breakfast');
+    expect(issues).not.toContain('missing_meal:2026-11-08:dinner');
   });
 });
 
@@ -406,7 +434,7 @@ describe('AiPlanningService', () => {
     const tripId = '10000000-0000-4000-8000-000000000020';
     const target = {
       id: '20000000-0000-4000-8000-000000000020', name: '경복궁', address: '서울 종로구',
-      latitude: 37.58, longitude: 126.98, tag: PlaceTag.Attraction, preference: PlacePreference.MustVisit,
+      latitude: 37.58, longitude: 126.98, tag: PlaceTag.Food, preference: PlacePreference.MustVisit,
       note: null, isPrimaryLodging: false,
     };
     const target2 = { ...target, id: '20000000-0000-4000-8000-000000000022', name: '북촌한옥마을' };
@@ -435,8 +463,8 @@ describe('AiPlanningService', () => {
     const planner = { generate: vi.fn().mockResolvedValue({
       placements: [target, target2, target3].map((place, position) => ({
         savedPlaceId: place.id, date: '2026-11-08', position,
-        startTime: ['09:00', '10:30', '12:00'][position],
-        durationMinutes: 90, activity: `${place.name} 관람`, travelMethod: '대중교통', travelDurationMinutes: 0,
+        startTime: ['09:00', '12:00', '18:00'][position],
+        durationMinutes: 90, activity: `${place.name} 식사`, travelMethod: '대중교통', travelDurationMinutes: 0,
       })),
       unplaced: [],
       recommendations: [],
@@ -513,12 +541,12 @@ describe('AiPlanningService', () => {
       '30000000-0000-4000-8000-000000000012',
       '30000000-0000-4000-8000-000000000013',
     ];
-    const recommendations = ['서울숲', '성수 미술관', '성수 카페'].map((placeName, index) => ({
+    const recommendations = ['아침 식당', '점심 식당', '저녁 식당'].map((placeName, index) => ({
       placeName,
       regionName: 'Seoul',
       suggestedDate: '2026-11-08',
       position: index,
-      startTime: ['09:20', '12:40', '16:00'][index]!,
+      startTime: ['09:20', '12:40', '18:00'][index]!,
       durationMinutes: 180,
       activity: `${placeName} 둘러보기`,
       travelMethod: '대중교통',
@@ -579,7 +607,7 @@ describe('AiPlanningService', () => {
       {
         search: vi.fn((query: string) => Promise.resolve([{
           googlePlaceId: `google-${query}`, name: query, address: 'Seoul Seongdong-gu',
-          latitude: 37.55, longitude: 127.04, primaryType: 'tourist_attraction',
+          latitude: 37.55, longitude: 127.04, primaryType: query.includes('식당') ? 'restaurant' : 'tourist_attraction',
         }])),
         getCoordinates: vi.fn(),
       },
@@ -637,7 +665,7 @@ describe('AiPlanningService', () => {
     };
     const visit = {
       id: '30000000-0000-4000-8000-000000000001', name: '원대리 자작나무숲', address: '강원특별자치도 인제군',
-      latitude: 38.2, longitude: 128.24, tag: PlaceTag.Activity, preference: PlacePreference.MustVisit,
+      latitude: 38.2, longitude: 128.24, tag: PlaceTag.Food, preference: PlacePreference.MustVisit,
       note: 'Morning visit', isPrimaryLodging: false,
     };
     const previousAiRecommendation = {
@@ -645,7 +673,10 @@ describe('AiPlanningService', () => {
       latitude: 37.55, longitude: 126.92, tag: PlaceTag.Cafe, preference: PlacePreference.IfTimeAllows,
       note: 'AI 추천 · 이전 일정 보완', isPrimaryLodging: false,
     };
-    const recommendedId = '30000000-0000-4000-8000-000000000002';
+    const recommendedIds = [
+      '30000000-0000-4000-8000-000000000002',
+      '30000000-0000-4000-8000-000000000003',
+    ];
     const remove = vi.fn().mockResolvedValue([]);
     const validPlannerOutput = {
       placements: [{
@@ -658,6 +689,10 @@ describe('AiPlanningService', () => {
         placeName: 'Gyeongbokgung', regionName: 'Seoul', suggestedDate: '2026-11-08', position: 1,
         startTime: '13:00', durationMinutes: 240, activity: '경복궁 주요 전각 관람', reason: 'A central historic destination',
         travelMethod: '대중교통', travelDurationMinutes: 25,
+      }, {
+        placeName: 'Dinner restaurant', regionName: 'Seoul', suggestedDate: '2026-11-08', position: 2,
+        startTime: '18:00', durationMinutes: 90, activity: '저녁 식사', reason: 'A local dinner restaurant',
+        travelMethod: '대중교통', travelDurationMinutes: 15,
       }],
     };
     const planner = {
@@ -684,7 +719,7 @@ describe('AiPlanningService', () => {
       {
         find: vi.fn().mockResolvedValue([primary, secondary, visit, previousAiRecommendation]),
         create: vi.fn((input: Record<string, unknown>) => input),
-        save: vi.fn((input: Record<string, unknown>) => Promise.resolve({ ...input, id: recommendedId })),
+        save: vi.fn((input: Record<string, unknown>) => Promise.resolve({ ...input, id: recommendedIds.shift()! })),
         remove,
       } as never,
       planner,
@@ -700,10 +735,10 @@ describe('AiPlanningService', () => {
       { assertAllowed: vi.fn() } as never,
       { assertCanGenerateAiPlan: vi.fn(), recordSuccessfulAiGeneration: vi.fn() } as never,
       {
-        search: vi.fn().mockResolvedValue([{
-          googlePlaceId: 'google-palace', name: 'Gyeongbokgung', address: 'Seoul Jongno-gu',
-          latitude: 37.58, longitude: 126.98, primaryType: 'tourist_attraction',
-        }]),
+        search: vi.fn((query: string) => Promise.resolve([{
+          googlePlaceId: `google-${query}`, name: query, address: 'Seoul Jongno-gu',
+          latitude: 37.58, longitude: 126.98, primaryType: 'restaurant',
+        }])),
         getCoordinates: vi.fn(),
       },
       { transit: vi.fn() },
@@ -757,9 +792,14 @@ describe('AiPlanningService', () => {
         travelMethod: '대중교통', travelDurationMinutes: 20,
       },
       {
-        savedPlaceId: recommendedId, date: '2026-11-08', position: 1, locked: false,
+        savedPlaceId: '30000000-0000-4000-8000-000000000002', date: '2026-11-08', position: 1, locked: false,
         scheduledTime: '13:45', durationMinutes: 240, activitySummary: '경복궁 주요 전각 관람',
         travelMethod: '대중교통', travelDurationMinutes: 25,
+      },
+      {
+        savedPlaceId: '30000000-0000-4000-8000-000000000003', date: '2026-11-08', position: 2, locked: false,
+        scheduledTime: '18:00', durationMinutes: 90, activitySummary: '저녁 식사',
+        travelMethod: '대중교통', travelDurationMinutes: 15,
       },
     ], 'ai');
     expect(remove).not.toHaveBeenCalledWith([previousAiRecommendation]);

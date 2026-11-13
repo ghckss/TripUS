@@ -35,7 +35,7 @@ export default function ItineraryScreen() {
   const {
     dates, error, itinerary, places, reload,
     removeFromItinerary, reorderWithinDay, replaceDayLodging, save, saving, setPlacesForDate,
-    undoAiChange, undoing, undoMessage, updateDayWithAi, updatingDate,
+    updateDayWithAi, updatingDate,
   } = useItineraryEdit(tripId);
   const { showDialog } = useAppDialog();
   const screenRef = useRef<ScrollViewInstance>(null);
@@ -139,18 +139,18 @@ export default function ItineraryScreen() {
 
     {selectedDate && <Card>
       <View style={styles.row}><AppText variant="heading">Day {dayIndex + 1}</AppText><Pill label={selectedDate} /></View>
-      <Button
-        disabled={Boolean(updatingDate)}
-        label={updatingDate === selectedDate ? "이 날짜 일정 업데이트 중…" : "AI로 이 날짜 일정 업데이트"}
-        variant="secondary"
-        testID={`itinerary-ai-update-${selectedDate}`}
-        onPress={confirmDayUpdate}
-      />
       <DayRouteMap animationPaused={mapAnimationPaused} focusTarget={mapFocusTarget} items={items} />
 
       <View style={styles.scheduleHeader}>
         <AppText variant="heading">방문 일정</AppText>
-        {items.length > 0 && <AppText variant="caption" color={colors.muted}>카드를 끌어 이동</AppText>}
+        <Button
+          disabled={Boolean(updatingDate)}
+          label={updatingDate === selectedDate ? "업데이트 중…" : "일정 업데이트"}
+          variant="secondary"
+          style={styles.updateButton}
+          testID={`itinerary-ai-update-${selectedDate}`}
+          onPress={confirmDayUpdate}
+        />
       </View>
       {items.length === 0 && <AppText color={colors.muted}>아직 배치된 장소가 없어요.</AppText>}
       <View style={styles.placeList}>
@@ -225,13 +225,10 @@ export default function ItineraryScreen() {
           scheduledTime={items.at(-1)!.scheduledTime}
         />}
       </View>
-      <AppText variant="caption" color={colors.muted}>왼쪽 핸들을 누른 채 위·아래로 끌어 순서를 바꿔요. 숙소와 시작·종료 지점은 고정돼요.</AppText>
-      <Button label="＋ 여행 장소 추가" variant="ghost" testID={`itinerary-add-places-${selectedDate}`} onPress={() => setPlacePickerDay({ date: selectedDate, index: dayIndex })} />
+      <Button label="＋" variant="ghost" testID={`itinerary-add-places-${selectedDate}`} onPress={() => setPlacePickerDay({ date: selectedDate, index: dayIndex })} />
     </Card>}
 
     <Button label={saving ? "저장 중…" : "일정 저장"} disabled={!itinerary || saving} testID="itinerary-save" onPress={() => void save().then((saved) => { if (saved) router.back(); })} />
-    <Button label={undoing ? "되돌리는 중…" : "최근 AI 변경 한 번 되돌리기"} disabled={undoing} variant="ghost" onPress={() => void undoAiChange()} />
-    {undoMessage && <AppText variant="caption" color={colors.muted} style={styles.undoMessage}>{undoMessage}</AppText>}
     {placePickerDay && <DayPlacePicker tripId={tripId} date={placePickerDay.date} dayIndex={placePickerDay.index} items={itinerary?.items ?? []} places={places} onApply={setPlacesForDate} onClose={() => setPlacePickerDay(undefined)} />}
     {lodgingPicker && <LodgingEndpointPicker
       current={lodgingPicker.current}
@@ -275,6 +272,7 @@ const styles = StyleSheet.create({
   tab: { minWidth: 88, gap: 2, alignItems: "center", borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   selectedTab: { borderColor: colors.primary, backgroundColor: colors.primary },
   scheduleHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: spacing.sm },
+  updateButton: { minHeight: 40, paddingHorizontal: spacing.md },
   placeList: { overflow: "visible" },
   sortableViewport: { zIndex: 2, elevation: 2, overflow: "visible" },
   sortableList: { flex: 1, overflow: "visible", backgroundColor: "transparent" },
@@ -284,5 +282,4 @@ const styles = StyleSheet.create({
   connectorLine: { position: "absolute", top: 0, bottom: 0, left: 67, width: 2, backgroundColor: colors.line },
   connectorDot: { position: "absolute", left: 64, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.secondary },
   connectorLabel: { alignSelf: "flex-start", marginLeft: 88, borderRadius: radius.pill, backgroundColor: colors.secondarySoft, paddingHorizontal: spacing.sm, paddingVertical: 2 },
-  undoMessage: { marginTop: -spacing.sm, textAlign: "center" },
 });
