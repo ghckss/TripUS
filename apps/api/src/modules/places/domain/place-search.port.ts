@@ -9,7 +9,14 @@ export interface PlaceSearchCandidate {
   longitude: number | null;
 }
 
+export interface PlacePhoto {
+  imageUrl: string;
+  googleMapsUri: string;
+  authorNames: string[];
+}
+
 export interface PlaceSearchPort {
   search(query: string, destination: string): Promise<PlaceSearchCandidate[]>;
   getCoordinates(googlePlaceId: string): Promise<{ latitude: number; longitude: number } | null>;
+  getPhoto(googlePlaceId: string): Promise<PlacePhoto | null>;
 }

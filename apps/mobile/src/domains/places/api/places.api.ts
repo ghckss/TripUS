@@ -8,6 +8,7 @@ export type SavedPlace = components["schemas"]["SavedPlaceResponseDto"];
 export type CreateSavedPlaceInput = components["schemas"]["CreateSavedPlaceDto"];
 export type SavePlaceResult = components["schemas"]["SavePlaceResultDto"];
 export type PlaceSearchCandidate = components["schemas"]["PlaceSearchCandidateDto"];
+export type PlacePhoto = components["schemas"]["PlacePhotoResponseDto"];
 export type UpdateSavedPlaceInput = components["schemas"]["UpdateSavedPlaceDto"];
 
 export function filterTravelPlaces(places: SavedPlace[]): SavedPlace[] {
@@ -26,6 +27,14 @@ export async function listPlaces(tripId: string): Promise<SavedPlace[]> {
 
 export async function listTravelPlaces(tripId: string): Promise<SavedPlace[]> {
   return filterTravelPlaces(await listPlaces(tripId));
+}
+
+export async function getPlacePhoto(tripId: string, placeId: string): Promise<PlacePhoto> {
+  const { data, error } = await tripUsApi.GET("/v1/trips/{tripId}/places/{placeId}/photo", {
+    params: { path: { tripId, placeId } },
+  });
+  if (error) throw new Error(apiErrorMessage(error));
+  return data;
 }
 
 export async function savePlace(

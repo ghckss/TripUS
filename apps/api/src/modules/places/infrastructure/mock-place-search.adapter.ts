@@ -8,6 +8,10 @@ export class MockPlaceSearchAdapter implements PlaceSearchPort {
     return Promise.resolve(null);
   }
 
+  getPhoto(): Promise<null> {
+    return Promise.resolve(null);
+  }
+
   search(query: string, destination: string): Promise<PlaceSearchCandidate[]> {
     const normalized = query.trim();
     return Promise.resolve([

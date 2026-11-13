@@ -11,6 +11,7 @@ import { SavedPlaceResponseDto, SavePlaceResultDto, SavePlaceStatus } from './dt
 import { PlaceSearchCandidateDto } from './dto/search-places.dto';
 import { UpdateSavedPlaceDto } from './dto/update-saved-place.dto';
 import { listCountryCities } from '../infrastructure/city-catalog';
+import { PlacePhotoResponseDto } from './dto/place-photo-response.dto';
 
 @Injectable()
 export class PlacesService {
@@ -47,6 +48,21 @@ export class PlacesService {
     const entities = await this.places.find({ where: { tripId }, order: { createdAt: 'DESC' } });
     await Promise.all(entities.map((entity) => this.hydrateMissingCoordinates(entity)));
     return entities.map((entity) => SavedPlaceResponseDto.fromEntity(entity));
+  }
+
+  async photo(tripId: string, placeId: string): Promise<PlacePhotoResponseDto> {
+    await this.assertOwnedActiveTrip(tripId);
+    const place = await this.findSavedPlace(tripId, placeId);
+    if (!place.googlePlaceId || place.googlePlaceId.startsWith('mock:') || place.googlePlaceId.startsWith('catalog:')) {
+      return { imageUrl: null, googleMapsUri: null, authorNames: [] };
+    }
+    try {
+      const photo = await this.placeSearch.getPhoto(place.googlePlaceId);
+      return photo ?? { imageUrl: null, googleMapsUri: null, authorNames: [] };
+    } catch {
+      // A representative image is optional and must never make the place library unavailable.
+      return { imageUrl: null, googleMapsUri: null, authorNames: [] };
+    }
   }
 
   async create(tripId: string, input: CreateSavedPlaceDto): Promise<SavePlaceResultDto> {

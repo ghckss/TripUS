@@ -7,6 +7,7 @@ import { PlacesService } from '../application/places.service';
 import { PlaceSearchCandidateDto, SearchCitiesQueryDto, SearchPlacesByDestinationQueryDto, SearchPlacesQueryDto } from '../application/dto/search-places.dto';
 import { UpdateSavedPlaceDto } from '../application/dto/update-saved-place.dto';
 import { RemoveSavedPlacesDto } from '../application/dto/remove-saved-places.dto';
+import { PlacePhotoResponseDto } from '../application/dto/place-photo-response.dto';
 
 @ApiTags('places')
 @Controller('trips/:tripId/places')
@@ -18,6 +19,17 @@ export class PlacesController {
   @ApiOkResponse({ type: SavedPlaceResponseDto, isArray: true })
   list(@Param('tripId', new ParseUUIDPipe()) tripId: string): Promise<SavedPlaceResponseDto[]> {
     return this.places.list(tripId);
+  }
+
+  @Get(':placeId/photo')
+  @ApiParam({ name: 'tripId', type: String, format: 'uuid' })
+  @ApiParam({ name: 'placeId', type: String, format: 'uuid' })
+  @ApiOkResponse({ type: PlacePhotoResponseDto })
+  photo(
+    @Param('tripId', new ParseUUIDPipe()) tripId: string,
+    @Param('placeId', new ParseUUIDPipe()) placeId: string,
+  ): Promise<PlacePhotoResponseDto> {
+    return this.places.photo(tripId, placeId);
   }
 
   @Get('search')

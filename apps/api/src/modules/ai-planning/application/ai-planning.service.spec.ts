@@ -499,7 +499,7 @@ describe('AiPlanningService', () => {
       { getCurrentUserId: vi.fn().mockReturnValue('user-1') },
       { assertAllowed: vi.fn() } as never,
       { assertCanGenerateAiPlan: vi.fn(), recordSuccessfulAiGeneration: vi.fn() } as never,
-      { search: vi.fn(), getCoordinates: vi.fn() },
+      { search: vi.fn(), getCoordinates: vi.fn(), getPhoto: vi.fn() },
       { transit: vi.fn().mockResolvedValue(null) },
     );
 
@@ -610,6 +610,7 @@ describe('AiPlanningService', () => {
           latitude: 37.55, longitude: 127.04, primaryType: query.includes('식당') ? 'restaurant' : 'tourist_attraction',
         }])),
         getCoordinates: vi.fn(),
+        getPhoto: vi.fn(),
       },
       { transit: vi.fn().mockResolvedValue(null) },
     );
@@ -740,6 +741,7 @@ describe('AiPlanningService', () => {
           latitude: 37.58, longitude: 126.98, primaryType: 'restaurant',
         }])),
         getCoordinates: vi.fn(),
+        getPhoto: vi.fn(),
       },
       { transit: vi.fn() },
     );

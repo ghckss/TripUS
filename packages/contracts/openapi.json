@@ -520,6 +520,46 @@
         ]
       }
     },
+    "/v1/trips/{tripId}/places/{placeId}/photo": {
+      "get": {
+        "operationId": "PlacesController_photo",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "placeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlacePhotoResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "places"
+        ]
+      }
+    },
     "/v1/trips/{tripId}/places/search": {
       "get": {
         "operationId": "PlacesController_search",
@@ -1891,6 +1931,28 @@
           "tag",
           "preference",
           "isPrimaryLodging"
+        ]
+      },
+      "PlacePhotoResponseDto": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "googleMapsUri": {
+            "type": "string",
+            "nullable": true
+          },
+          "authorNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "authorNames"
         ]
       },
       "PlaceSearchCandidateDto": {

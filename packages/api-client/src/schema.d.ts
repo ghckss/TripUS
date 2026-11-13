@@ -228,6 +228,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trips/{tripId}/places/{placeId}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlacesController_photo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trips/{tripId}/places/search": {
         parameters: {
             query?: never;
@@ -593,6 +609,11 @@ export interface components {
             preference: components["schemas"]["PlacePreference"];
             note?: string | null;
             isPrimaryLodging: boolean;
+        };
+        PlacePhotoResponseDto: {
+            imageUrl?: string | null;
+            googleMapsUri?: string | null;
+            authorNames: string[];
         };
         PlaceSearchCandidateDto: {
             googlePlaceId: string;
@@ -1142,6 +1163,28 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    PlacesController_photo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+                placeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlacePhotoResponseDto"];
+                };
             };
         };
     };

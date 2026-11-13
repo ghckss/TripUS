@@ -29,11 +29,17 @@ function createService() {
   const identity: IdentityPort = { getCurrentUserId: () => userId };
   const placeSearchSearch = vi.fn<PlaceSearchPort['search']>();
   const placeSearchGetCoordinates = vi.fn<PlaceSearchPort['getCoordinates']>();
-  const placeSearch: PlaceSearchPort = { search: placeSearchSearch, getCoordinates: placeSearchGetCoordinates };
+  const placeSearchGetPhoto = vi.fn<PlaceSearchPort['getPhoto']>();
+  const placeSearch: PlaceSearchPort = {
+    search: placeSearchSearch,
+    getCoordinates: placeSearchGetCoordinates,
+    getPhoto: placeSearchGetPhoto,
+  };
   return {
     places,
     placeSearchSearch,
     placeSearchGetCoordinates,
+    placeSearchGetPhoto,
     trips,
     service: new PlacesService(
       places as unknown as Repository<SavedPlaceEntity>,
@@ -145,6 +151,26 @@ describe('PlacesService', () => {
     expect(placeSearchGetCoordinates).toHaveBeenCalledWith('google-place-1');
     expect(places.save).toHaveBeenCalledWith(expect.objectContaining({ latitude: 37.5796, longitude: 126.9718 }));
     expect(result[0]).toMatchObject({ latitude: 37.5796, longitude: 126.9718 });
+  });
+
+  it('loads a current representative photo only after checking trip ownership', async () => {
+    const { placeSearchGetPhoto, places, service, trips } = createService();
+    trips.findOneBy.mockResolvedValue({ id: tripId });
+    places.findOneBy.mockResolvedValue({
+      id: '20000000-0000-4000-8000-000000000001', tripId, googlePlaceId: 'google-place-1',
+    });
+    placeSearchGetPhoto.mockResolvedValue({
+      imageUrl: 'https://example.com/photo.jpg',
+      googleMapsUri: 'https://maps.google.com/photo',
+      authorNames: ['사진가'],
+    });
+
+    await expect(service.photo(tripId, '20000000-0000-4000-8000-000000000001')).resolves.toEqual({
+      imageUrl: 'https://example.com/photo.jpg',
+      googleMapsUri: 'https://maps.google.com/photo',
+      authorNames: ['사진가'],
+    });
+    expect(placeSearchGetPhoto).toHaveBeenCalledWith('google-place-1');
   });
 
   it('deletes a saved place only after checking trip ownership', async () => {

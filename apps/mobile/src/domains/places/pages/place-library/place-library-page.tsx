@@ -1,6 +1,8 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Image } from "expo-image";
+import { useEffect, useMemo, useState } from "react";
+import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { getPlacePhoto, type PlacePhoto } from "@/domains/places/api/places.api";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -75,9 +77,7 @@ export default function PlacesScreen() {
       {!loading && places.length === 0 && <Card><AppText variant="heading">아직 저장한 장소가 없어요</AppText><AppText color={colors.muted}>가고 싶은 장소를 먼저 저장해 보세요.</AppText></Card>}
       {filteredPlaces.map((place) => <Card key={place.id}>
         <View style={styles.placeCard}>
-          <View style={[styles.placeVisual, tagVisualStyle(place.tag)]}>
-            <AppText style={styles.placeVisualText}>{tagIcon(place.tag)}</AppText>
-          </View>
+          <PlaceCardVisual placeId={place.id} tag={place.tag} tripId={tripId} />
           <View style={styles.placeBody}>
             <View style={styles.row}>
               <View style={styles.titleRow}>
@@ -122,6 +122,43 @@ function tagVisualStyle(tag: string) {
   return styles.defaultVisual;
 }
 
+function PlaceCardVisual({ placeId, tag, tripId }: { placeId: string; tag: string; tripId: string }) {
+  const [photo, setPhoto] = useState<PlacePhoto | null>();
+  useEffect(() => {
+    let active = true;
+    void getPlacePhoto(tripId, placeId)
+      .then((nextPhoto) => { if (active) setPhoto(nextPhoto.imageUrl && nextPhoto.googleMapsUri ? nextPhoto : null); })
+      .catch(() => { if (active) setPhoto(null); });
+    return () => { active = false; };
+  }, [placeId, tripId]);
+
+  if (!photo?.imageUrl || !photo.googleMapsUri) {
+    return <View style={[styles.placeVisual, tagVisualStyle(tag)]}>
+      <AppText style={styles.placeVisualText}>{tagIcon(tag)}</AppText>
+    </View>;
+  }
+  const attribution = photo.authorNames.length > 0
+    ? `Google Maps · ${photo.authorNames.join(", ")}`
+    : "Google Maps에서 사진 보기";
+  const sourceUri = photo.googleMapsUri;
+  return <View style={styles.photoColumn}>
+    <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(sourceUri)}>
+      <Image
+        accessibilityLabel="장소 대표 사진"
+        cachePolicy="none"
+        contentFit="cover"
+        onError={() => setPhoto(null)}
+        source={{ uri: photo.imageUrl }}
+        style={styles.placePhoto}
+        transition={150}
+      />
+    </Pressable>
+    <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(sourceUri)}>
+      <AppText variant="caption" color={colors.muted} numberOfLines={2} style={styles.photoAttribution}>{attribution}</AppText>
+    </Pressable>
+  </View>;
+}
+
 export function placeDescription(note: string | null | undefined, address: string | null | undefined) {
   const cleaned = note?.replace(/^AI 추천\s*·\s*(?:보관함\s*·\s*)?/u, "").trim();
   return cleaned || address || "추가 설명이 없어요";
@@ -142,8 +179,11 @@ const styles = StyleSheet.create({
   placeBody: { flex: 1, gap: spacing.xs },
   placeCard: { flexDirection: "row", gap: spacing.md, alignItems: "center" },
   placeName: { flexShrink: 1 },
+  placePhoto: { width: 84, height: 76, borderRadius: 16, backgroundColor: colors.line },
   placeVisual: { width: 76, height: 76, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   placeVisualText: { fontSize: 30 },
+  photoAttribution: { fontSize: 12, lineHeight: 16, textAlign: "center" },
+  photoColumn: { width: 84, gap: spacing.xs },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.sm },
   selectionSummary: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   stickyAction: { backgroundColor: colors.canvas, paddingVertical: spacing.xs },
