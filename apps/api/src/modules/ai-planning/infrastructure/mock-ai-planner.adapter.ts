@@ -20,6 +20,7 @@ export class MockAiPlannerAdapter implements AiPlannerPort {
       })),
       unplaced: [],
       recommendations: [],
+      savedRecommendations: [],
     });
   }
 }

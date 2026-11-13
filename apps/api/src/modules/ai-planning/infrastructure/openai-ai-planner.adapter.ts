@@ -18,7 +18,7 @@ export const AI_PLANNER_SYSTEM_PROMPT = [
   '추천 장소는 선택 지역 안에서 찾는다. 단, 선택 지역 밖 저장 장소가 있는 날에는 그 저장 장소 주변의 동선을 완성하는 추천만 예외적으로 허용한다.',
   '추천은 정확한 고유명칭으로 검색 가능한 관광지, 식당, 카페, 시장, 상점, 공원, 박물관 또는 문화시설이어야 한다. 도시·행정구역·동네·역·공항·숙소를 활동 장소로 추천하지 않는다.',
   '식당, 카페, 술집은 여행지 고유의 음식과 문화를 경험할 수 있는 현지 업장을 우선한다. 사용자가 명시적으로 요청하지 않은 타국 콘셉트 업장(예: 일본 여행 중 한국 바)은 추천하지 않는다.',
-  'priorRecommendations는 과거 AI 추천 목록일 뿐 금지 목록이 아니다. 현재 일정에 가장 적합하면 다시 추천하고, 더 좋은 장소가 있으면 교체한다.',
+  'priorRecommendations는 과거 AI 추천 목록이다. 현재 수정 대상 날짜에 이미 있던 장소는 다시 선택할 수 있지만, referenceItinerary의 다른 날짜에 배치된 장소는 추가 요청사항에 명시적인 재방문 요청이 없으면 다시 추천하지 않는다.',
   'priorRecommendations에 현지성 규칙을 위반하는 장소가 있으면 그대로 재사용하지 말고 더 적합한 현지 장소로 교체한다.',
   '[일자별 완성도] targetPlannedMinutes가 0보다 큰 모든 날짜에는 실제 방문 장소가 있어야 하며, 그 날짜의 모든 durationMinutes와 travelDurationMinutes 합계가 targetPlannedMinutes 이상이어야 한다.',
   '각 day의 availableStartTime 이후부터 availableEndTime 이전까지 시간순으로 배치한다. 첫 활동 시작 전 이동시간과 마지막 활동 종료 후 숙소·종료 지점까지의 이동 여유도 고려한다.',
@@ -32,8 +32,11 @@ export const AI_PLANNER_SYSTEM_PROMPT = [
   'travelerContext.transportModes는 사용자가 허용한 이동수단의 목록이다. 목록 밖 이동수단을 임의로 사용하지 말고, 복수 수단이 있으면 구간별로 가장 현실적인 수단을 선택한다.',
   'travelerContext.additionalRequests에는 좋아하는 것과 피하고 싶은 것을 포함한 자유 요청이 들어온다. 동행자·예산·추가 요청, must_visit, lockedPlacements를 모두 존중한다.',
   '[날짜별 업데이트] referenceItinerary는 현재 수정 대상이 아닌 다른 날짜의 확정된 읽기 전용 일정이다. 그 안의 날짜나 장소를 placements 또는 recommendations로 반환하거나 이동·삭제·변경하지 않는다.',
-  'referenceItinerary의 장소, 지역, 시간대와 테마를 여행 전체 관점에서 검토해 수정 대상 날짜가 다른 날짜와 불필요하게 겹치지 않고 서로 보완되도록 설계한다. 단, 동선이나 사용자 요청상 같은 장소 재방문이 가장 합리적이면 중복을 허용한다.',
+  'referenceItinerary의 장소, 지역, 시간대와 테마를 여행 전체 관점에서 검토해 수정 대상 날짜가 다른 날짜와 겹치지 않고 서로 보완되도록 설계한다. 같은 장소 재방문은 travelerContext.additionalRequests에 다시 방문하거나 여러 번 방문하라는 명시적 요청이 있을 때만 허용한다.',
   '날짜별 업데이트 응답에는 days에 전달된 수정 대상 날짜만 포함한다. referenceItinerary의 날짜는 출력하지 않는다.',
+  '[일정 다양성] 사용자가 직접 저장·배치한 places와 lockedPlacements의 중복은 그대로 존중한다. AI가 새로 추천하는 recommendations는 동일한 실제 장소를 같은 여행에서 중복 추천하지 않는다.',
+  '카페, 디저트, 차 전문점 같은 휴식 장소는 travelerContext.additionalRequests에 카페 투어처럼 같은 유형을 여러 곳 방문하려는 명시적 요청이 없는 한 세부 유형별로 하루 한 곳만 recommendations에 넣는다. 카페+디저트, 카페+차처럼 세부 유형이 다르면 각각 한 곳씩 허용한다.',
+  '[장소 보관함] 일정에 배치하기에는 시간이나 동선이 맞지 않지만 여행지에서 추천할 가치가 있는 유명 장소는 savedRecommendations에 넣는다. savedRecommendations는 일정에 배치하지 않으며, 정확한 고유명칭과 지역, 추천 이유만 작성한다. 억지로 채우지 말고 최대 5곳까지만 제안한다.',
   'unplaced는 정상 결과에서는 항상 빈 배열이어야 한다. 모든 저장 장소를 포함하면서 완전한 일정을 만들 수 없다면 불완전한 결과를 타협해서 반환하지 말고 전체 배치를 다시 설계한다.',
   '영업시간을 확인했다고 단정하거나 장소, 위치, 날짜, 운영시간을 지어내지 않는다. 예약이나 운영시간 확인이 중요한 경우에만 activity에 짧은 확인 안내를 포함한다.',
   '응답 전 자체 점검: 모든 저장 장소가 정확히 한 번 배치됐는지, 사용 가능한 모든 날짜가 채워졌는지, 날짜별 목표 시간이 충족됐는지, 시간이 겹치지 않는지, 추천 장소가 구체적이고 검색 가능한지 확인한 뒤 완전한 전체 일정만 반환한다.',
@@ -63,6 +66,12 @@ const RecommendationSchema = z.object({
   reason: z.string().min(1),
 });
 
+const SavedRecommendationSchema = z.object({
+  placeName: z.string().min(1),
+  regionName: z.string().min(1),
+  reason: z.string().min(1),
+});
+
 export function createAiPlanSchema(allowedPlaceIds: string[]) {
   const allowedId = allowedPlaceIds.length > 0
     ? z.enum(allowedPlaceIds as [string, ...string[]])
@@ -81,6 +90,7 @@ export function createAiPlanSchema(allowedPlaceIds: string[]) {
     recommendations: allowedPlaceIds.length === 0
       ? z.array(RecommendationSchema).min(1)
       : z.array(RecommendationSchema),
+    savedRecommendations: z.array(SavedRecommendationSchema).max(5),
   });
 }
 

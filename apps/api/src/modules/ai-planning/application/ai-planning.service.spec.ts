@@ -12,6 +12,7 @@ import {
 import { AiPlanGenerationStatus, AiTransportMode } from './dto/generate-ai-plan.dto';
 import {
   addLodgingEndpoints,
+  allowsMultipleOptionalStops,
   applyDailyPlanningTargets,
   assessPlanQuality,
   assessRawOutputContract,
@@ -20,10 +21,13 @@ import {
   buildPlannerDays,
   enumerateTripDates,
   findReusableAiRecommendation,
+  findTravelerDuplicatePlaceIds,
   isRecommendableCandidate,
   isBlockingQualityIssue,
   isWithinSelectedRegions,
   normalizeGeneratedPlacements,
+  optionalStopCategory,
+  shouldRejectAiPlaceDuplicate,
 } from './ai-planning.service';
 
 describe('AI plan quality severity', () => {
@@ -158,6 +162,89 @@ describe('AI recommendation local relevance', () => {
 
   it('keeps destination-local hospitality recommendations', () => {
     expect(isRecommendableCandidate({ name: '도톤보리 이자카야', primaryType: 'bar' }, '일본', '')).toBe(true);
+  });
+});
+
+describe('AI recommendation diversity', () => {
+  it('preserves traveler-selected duplicate places but not duplicated AI recommendations', () => {
+    const travelerPlaceId = 'traveler-place';
+    const aiPlaceId = 'ai-place';
+    const duplicates = findTravelerDuplicatePlaceIds([
+      { savedPlaceId: travelerPlaceId }, { savedPlaceId: travelerPlaceId },
+      { savedPlaceId: aiPlaceId }, { savedPlaceId: aiPlaceId },
+    ], new Map([
+      [travelerPlaceId, { note: null }],
+      [aiPlaceId, { note: 'AI 추천 · 일정 보완' }],
+    ]));
+
+    expect([...duplicates]).toEqual([travelerPlaceId]);
+  });
+
+  it('rejects an AI place already used on another date unless repeat visits were explicitly requested', () => {
+    expect(shouldRejectAiPlaceDuplicate(true, false, '감성 카페와 사진 명소')).toBe(true);
+    expect(shouldRejectAiPlaceDuplicate(true, false, '마루후쿠 커피를 1일차에도 넣어줘')).toBe(false);
+  });
+
+  it('treats cafes, desserts, and tea houses as separate optional-stop categories', () => {
+    expect(optionalStopCategory({ name: 'CORA COFFEE', primaryType: 'cafe' })).toBe('cafe');
+    expect(optionalStopCategory({ name: '말차 디저트 전문점', primaryType: 'dessert_shop' })).toBe('dessert');
+    expect(optionalStopCategory({ name: '교토 티하우스', primaryType: 'tea_house' })).toBe('tea');
+  });
+
+  it('allows multiple cafes only for an explicit multi-stop request', () => {
+    expect(allowsMultipleOptionalStops('감성 카페를 좋아해요', 'cafe')).toBe(false);
+    expect(allowsMultipleOptionalStops('카페 투어를 하고 싶어요', 'cafe')).toBe(true);
+    expect(allowsMultipleOptionalStops('카페 투어를 하고 싶어요', 'dessert')).toBe(false);
+  });
+
+  it('enforces other-day duplicates and per-category limits while materializing recommendations', async () => {
+    const existingAiCafe = {
+      id: 'existing-ai-cafe', googlePlaceId: 'google-existing', name: '기존 카페', note: 'AI 추천 · 기존 일정',
+    };
+    let savedIndex = 0;
+    const candidates = new Map([
+      ['기존 카페', { googlePlaceId: 'google-existing', name: '기존 카페', address: '오사카', primaryType: 'cafe', latitude: 34.6, longitude: 135.5 }],
+      ['새 카페', { googlePlaceId: 'google-cafe-1', name: '새 카페', address: '오사카', primaryType: 'cafe', latitude: 34.6, longitude: 135.5 }],
+      ['두번째 카페', { googlePlaceId: 'google-cafe-2', name: '두번째 카페', address: '오사카', primaryType: 'coffee_shop', latitude: 34.6, longitude: 135.5 }],
+      ['디저트 가게', { googlePlaceId: 'google-dessert', name: '디저트 가게', address: '오사카', primaryType: 'dessert_shop', latitude: 34.6, longitude: 135.5 }],
+    ]);
+    const service = new AiPlanningService(
+      {} as never,
+      {
+        create: vi.fn((input: Record<string, unknown>) => input),
+        save: vi.fn((input: Record<string, unknown>) => Promise.resolve({ ...input, id: `new-${savedIndex++}` })),
+      } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      { search: vi.fn((query: string) => Promise.resolve([candidates.get(query)])), getCoordinates: vi.fn() } as never,
+      {} as never,
+    );
+    const materializer = service as unknown as {
+      materializeRecommendations: (...args: unknown[]) => Promise<{
+        placements: Array<{ savedPlaceId: string }>;
+        rejected: Array<{ placeName: string; reason: string }>;
+      }>;
+    };
+    const recommendation = (placeName: string, position: number) => ({
+      placeName, regionName: '오사카', suggestedDate: '2026-11-18', position,
+      startTime: `${10 + position}:00`, durationMinutes: 60, activity: '방문',
+      travelMethod: '도보', travelDurationMinutes: 10, reason: '추천',
+    });
+
+    const result = await materializer.materializeRecommendations(
+      'trip-1', '일본', [],
+      ['기존 카페', '새 카페', '두번째 카페', '디저트 가게'].map(recommendation),
+      [existingAiCafe], new Set(['2026-11-18']), '', new Set([existingAiCafe.id]), new Map(),
+    );
+
+    expect(result.placements).toHaveLength(2);
+    expect(result.rejected).toEqual(expect.arrayContaining([
+      expect.objectContaining({ placeName: '기존 카페', reason: 'duplicate_ai_place' }),
+      expect.objectContaining({ placeName: '두번째 카페', reason: 'duplicate_cafe' }),
+    ]));
   });
 });
 
@@ -424,6 +511,7 @@ describe('AiPlanningService', () => {
       '30000000-0000-4000-8000-000000000010',
       '30000000-0000-4000-8000-000000000011',
       '30000000-0000-4000-8000-000000000012',
+      '30000000-0000-4000-8000-000000000013',
     ];
     const recommendations = ['서울숲', '성수 미술관', '성수 카페'].map((placeName, index) => ({
       placeName,
@@ -456,7 +544,12 @@ describe('AiPlanningService', () => {
           travelDurationMinutes: 10,
         })),
       })
-      .mockResolvedValue({ placements: [], unplaced: [], recommendations }) };
+      .mockResolvedValue({
+        placements: [],
+        unplaced: [],
+        recommendations,
+        savedRecommendations: [{ placeName: '서울공예박물관', regionName: 'Seoul', reason: '시간이 되면 추천할 명소' }],
+      }) };
     const replace = vi.fn().mockResolvedValue({
       status: ItineraryUpdateStatus.Updated,
       conflicts: [],
@@ -464,6 +557,7 @@ describe('AiPlanningService', () => {
     });
     let savedIndex = 0;
     const saveTrip = vi.fn((input: Record<string, unknown>) => Promise.resolve(input));
+    const savePlace = vi.fn((input: Record<string, unknown>) => Promise.resolve({ ...input, id: recommendationIds[savedIndex++] }));
     const service = new AiPlanningService(
       { findOneBy: vi.fn().mockResolvedValue({
         id: tripId, title: '서울 자유 여행', destination: 'Korea', timezone: 'Asia/Seoul',
@@ -474,7 +568,7 @@ describe('AiPlanningService', () => {
       {
         find: vi.fn().mockResolvedValue([]),
         create: vi.fn((input: Record<string, unknown>) => input),
-        save: vi.fn((input: Record<string, unknown>) => Promise.resolve({ ...input, id: recommendationIds[savedIndex++] })),
+        save: savePlace,
         remove: vi.fn(),
       } as never,
       planner,
@@ -518,6 +612,15 @@ describe('AiPlanningService', () => {
       expect.objectContaining({ savedPlaceId: recommendationIds[1], position: 1 }),
       expect.objectContaining({ savedPlaceId: recommendationIds[2], position: 2 }),
     ]), 'ai');
+    expect(savePlace).toHaveBeenCalledWith(expect.objectContaining({
+      name: '서울공예박물관',
+      note: 'AI 추천 · 보관함 · 시간이 되면 추천할 명소',
+    }));
+    expect(replace).not.toHaveBeenCalledWith(
+      tripId,
+      expect.arrayContaining([expect.objectContaining({ savedPlaceId: recommendationIds[3] })]),
+      'ai',
+    );
   });
 
   it('sends enriched trip, place, style, and daily lodging context to the planner', async () => {
@@ -659,6 +762,6 @@ describe('AiPlanningService', () => {
         travelMethod: '대중교통', travelDurationMinutes: 25,
       },
     ], 'ai');
-    expect(remove).toHaveBeenCalledWith([previousAiRecommendation]);
+    expect(remove).not.toHaveBeenCalledWith([previousAiRecommendation]);
   });
 });

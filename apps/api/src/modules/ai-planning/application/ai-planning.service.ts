@@ -114,8 +114,10 @@ export class AiPlanningService {
     const otherDatePlaceIds = new Set(current.items
       .filter((item) => targetDate && item.date !== targetDate)
       .map((item) => item.savedPlaceId));
+    const currentlyPlacedIds = new Set(current.items.map((item) => item.savedPlaceId));
+    const travelerDuplicatePlaceIds = findTravelerDuplicatePlaceIds(current.items, placesById);
     const locked = current.items.filter((item) =>
-      item.locked
+      (item.locked || travelerDuplicatePlaceIds.has(item.savedPlaceId))
       && !item.boundaryType
       && item.date !== null
       && item.position !== null
@@ -255,6 +257,12 @@ export class AiPlanningService {
           places,
           validDates,
           request.additionalRequests?.trim() ?? '',
+          otherDatePlaceIds,
+          buildOptionalStopUsage(
+            [...output.placements, ...locked.map((item) => ({ savedPlaceId: item.savedPlaceId, date: item.date! }))],
+            placesById,
+            validDates,
+          ),
         );
         createdRecommendationEntities = materialized.created;
         const allowed = new Set([...planningPlaces.map((place) => place.id), ...materialized.placements.map((item) => item.savedPlaceId)]);
@@ -314,7 +322,8 @@ export class AiPlanningService {
       }
       const reusedRecommendationIds = new Set(recommended.map((item) => item.savedPlaceId));
       const staleAiRecommendations = previousAiRecommendations.filter((place) =>
-        (!targetDate || targetDatePlaceIds.has(place.id))
+        currentlyPlacedIds.has(place.id)
+        && (!targetDate || targetDatePlaceIds.has(place.id))
         && (!targetDate || !otherDatePlaceIds.has(place.id))
         && !lockedIds.has(place.id) && !reusedRecommendationIds.has(place.id),
       );
@@ -336,6 +345,22 @@ export class AiPlanningService {
         });
         throw new AiPlannerError('invalid_output');
       }
+      const savedSuggestions = await this.materializeSavedRecommendations(
+        trip.id,
+        trip.destination,
+        recommendationRegions,
+        output.savedRecommendations ?? [],
+        [...places, ...materialized.created],
+        request.additionalRequests?.trim() ?? '',
+      );
+      createdRecommendationEntities.push(...savedSuggestions.created);
+      writeStructuredLog('info', 'ai.generation.saved_recommendations_materialized', {
+        generationId,
+        tripId,
+        received: output.savedRecommendations?.length ?? 0,
+        saved: savedSuggestions.created.length,
+        rejected: savedSuggestions.rejected,
+      });
       const placementsWithLodging = addLodgingEndpoints(
         mergeLockedPlacements(locked, [...generated, ...recommended]),
         days,
@@ -417,6 +442,8 @@ export class AiPlanningService {
     existingPlaces: SavedPlaceEntity[],
     validDates: Set<string>,
     additionalRequests: string,
+    otherDatePlaceIds: Set<string>,
+    initialOptionalStopUsage: Map<string, Set<OptionalStopCategory>>,
   ): Promise<{
     placements: PlannedPlacement[];
     created: SavedPlaceEntity[];
@@ -426,7 +453,11 @@ export class AiPlanningService {
     const knownNames = new Set(existingPlaces.map((place) => place.name.trim().toLocaleLowerCase()));
     const placements: PlannedPlacement[] = [];
     const created: SavedPlaceEntity[] = [];
-    const placedIds = new Set<string>();
+    const placedDatesById = new Map<string, Set<string>>();
+    const newlyCreatedByGoogleId = new Map<string, SavedPlaceEntity>();
+    const optionalStopUsage = new Map(
+      [...initialOptionalStopUsage].map(([date, categories]) => [date, new Set(categories)]),
+    );
     const rejected: Array<{ placeName: string; suggestedDate: string; reason: string }> = [];
 
     for (const recommendation of recommendations) {
@@ -446,17 +477,43 @@ export class AiPlanningService {
           continue;
         }
         const normalizedCandidateName = candidate.name.trim().toLocaleLowerCase();
-        const priorAiPlace = findReusableAiRecommendation(existingPlaces, candidate);
+        const priorAiPlace = findReusableAiRecommendation(existingPlaces, candidate)
+          ?? newlyCreatedByGoogleId.get(candidate.googlePlaceId);
         if (priorAiPlace) {
-          if (!placedIds.has(priorAiPlace.id)) {
-            placedIds.add(priorAiPlace.id);
-            placements.push(toRecommendedPlacement(priorAiPlace.id, recommendation));
+          const scheduledDates = placedDatesById.get(priorAiPlace.id) ?? new Set<string>();
+          if (shouldRejectAiPlaceDuplicate(
+            otherDatePlaceIds.has(priorAiPlace.id),
+            scheduledDates.size > 0,
+            additionalRequests,
+          )) {
+            rejected.push({ placeName: recommendation.placeName, suggestedDate: recommendation.suggestedDate, reason: 'duplicate_ai_place' });
+            continue;
           }
+          if (scheduledDates.has(recommendation.suggestedDate)) {
+            rejected.push({ placeName: recommendation.placeName, suggestedDate: recommendation.suggestedDate, reason: 'duplicate_ai_place_same_day' });
+            continue;
+          }
+          const optionalCategory = optionalStopCategory(candidate);
+          if (isOptionalStopAlreadyUsed(optionalStopUsage, recommendation.suggestedDate, optionalCategory)
+            && !allowsMultipleOptionalStops(additionalRequests, optionalCategory)) {
+            rejected.push({ placeName: recommendation.placeName, suggestedDate: recommendation.suggestedDate, reason: `duplicate_${optionalCategory}` });
+            continue;
+          }
+          scheduledDates.add(recommendation.suggestedDate);
+          placedDatesById.set(priorAiPlace.id, scheduledDates);
+          markOptionalStop(optionalStopUsage, recommendation.suggestedDate, optionalCategory);
+          placements.push(toRecommendedPlacement(priorAiPlace.id, recommendation));
           continue;
         }
         if (knownGoogleIds.has(candidate.googlePlaceId) || knownNames.has(normalizedCandidateName)) {
           this.logger.warn(`AI recommendation rejected reason=duplicate_saved_place name=${recommendation.placeName}`);
           rejected.push({ placeName: recommendation.placeName, suggestedDate: recommendation.suggestedDate, reason: 'duplicate_saved_place' });
+          continue;
+        }
+        const optionalCategory = optionalStopCategory(candidate);
+        if (isOptionalStopAlreadyUsed(optionalStopUsage, recommendation.suggestedDate, optionalCategory)
+          && !allowsMultipleOptionalStops(additionalRequests, optionalCategory)) {
+          rejected.push({ placeName: recommendation.placeName, suggestedDate: recommendation.suggestedDate, reason: `duplicate_${optionalCategory}` });
           continue;
         }
         const entity = await this.places.save(this.places.create({
@@ -474,7 +531,9 @@ export class AiPlanningService {
         knownGoogleIds.add(candidate.googlePlaceId);
         knownNames.add(normalizedCandidateName);
         created.push(entity);
-        placedIds.add(entity.id);
+        newlyCreatedByGoogleId.set(candidate.googlePlaceId, entity);
+        placedDatesById.set(entity.id, new Set([recommendation.suggestedDate]));
+        markOptionalStop(optionalStopUsage, recommendation.suggestedDate, optionalCategory);
         placements.push(toRecommendedPlacement(entity.id, recommendation));
       } catch {
         this.logger.warn(`AI recommended place could not be verified name=${recommendation.placeName}`);
@@ -482,6 +541,60 @@ export class AiPlanningService {
       }
     }
     return { placements, created, rejected };
+  }
+
+  private async materializeSavedRecommendations(
+    tripId: string,
+    destination: string,
+    selectedRegions: Array<{ name: string; latitude?: number | null; longitude?: number | null }>,
+    recommendations: NonNullable<AiPlannerOutput['savedRecommendations']>,
+    existingPlaces: SavedPlaceEntity[],
+    additionalRequests: string,
+  ): Promise<{ created: SavedPlaceEntity[]; rejected: Array<{ placeName: string; reason: string }> }> {
+    const knownGoogleIds = new Set(existingPlaces.flatMap((place) => place.googlePlaceId ? [place.googlePlaceId] : []));
+    const knownNames = new Set(existingPlaces.map((place) => place.name.trim().toLocaleLowerCase()));
+    const created: SavedPlaceEntity[] = [];
+    const rejected: Array<{ placeName: string; reason: string }> = [];
+
+    for (const recommendation of recommendations) {
+      try {
+        const candidates = await this.placeSearch.search(
+          recommendation.placeName,
+          `${recommendation.regionName}, ${destination}`,
+        );
+        const candidate = candidates.find((item) =>
+          isWithinSelectedRegions(recommendation.regionName, item, selectedRegions)
+          && isRecommendableCandidate(item, destination, additionalRequests),
+        );
+        if (!candidate) {
+          rejected.push({ placeName: recommendation.placeName, reason: 'not_found_or_outside_region' });
+          continue;
+        }
+        const normalizedName = candidate.name.trim().toLocaleLowerCase();
+        if (knownGoogleIds.has(candidate.googlePlaceId) || knownNames.has(normalizedName)) {
+          rejected.push({ placeName: recommendation.placeName, reason: 'duplicate_saved_place' });
+          continue;
+        }
+        const entity = await this.places.save(this.places.create({
+          tripId,
+          googlePlaceId: candidate.googlePlaceId,
+          name: candidate.name,
+          address: candidate.address,
+          latitude: candidate.latitude,
+          longitude: candidate.longitude,
+          tag: recommendationTag(candidate),
+          preference: PlacePreference.IfTimeAllows,
+          note: `AI 추천 · 보관함 · ${recommendation.reason}`,
+          isPrimaryLodging: false,
+        }));
+        knownGoogleIds.add(candidate.googlePlaceId);
+        knownNames.add(normalizedName);
+        created.push(entity);
+      } catch {
+        rejected.push({ placeName: recommendation.placeName, reason: 'lookup_failed' });
+      }
+    }
+    return { created, rejected };
   }
 
   private async enrichTravelEstimates(
@@ -547,6 +660,99 @@ function buildReferenceItinerary(
   }
 
   return [...visitsByDate].map(([date, visits]) => ({ date, visits }));
+}
+
+export type OptionalStopCategory = 'cafe' | 'dessert' | 'tea';
+
+export function optionalStopCategory(
+  place: { name: string; primaryType?: string | null; tag?: string | null },
+): OptionalStopCategory | null {
+  const type = place.primaryType?.toLocaleLowerCase() ?? '';
+  const name = place.name.toLocaleLowerCase();
+  if (/(?:tea_house|tea_room)/u.test(type) || /(?:티룸|티하우스|차 전문|tea room|tea house)/u.test(name)) return 'tea';
+  if (/(?:bakery|dessert|ice_cream|confectionery|chocolate|donut)/u.test(type)
+    || /(?:디저트|베이커리|아이스크림|초콜릿|도넛|파티세리|케이크)/u.test(name)) return 'dessert';
+  if (/(?:cafe|coffee)/u.test(type) || place.tag === PlaceTag.Cafe
+    || /(?:카페|커피|coffee|珈琲)/u.test(name)) return 'cafe';
+  return null;
+}
+
+export function hasExplicitRepeatRequest(additionalRequests: string): boolean {
+  return /(?:재방문|다시\s*방문|두\s*번|2\s*번|여러\s*번|반복|중복|매일|모든\s*날|각\s*날짜|에도\s*(?:가|방문|넣))/u
+    .test(additionalRequests.toLocaleLowerCase());
+}
+
+export function shouldRejectAiPlaceDuplicate(
+  scheduledOnOtherDate: boolean,
+  alreadyRecommendedInResponse: boolean,
+  additionalRequests: string,
+): boolean {
+  return (scheduledOnOtherDate || alreadyRecommendedInResponse)
+    && !hasExplicitRepeatRequest(additionalRequests);
+}
+
+export function findTravelerDuplicatePlaceIds(
+  items: Array<{ savedPlaceId: string }>,
+  placesById: Map<string, Pick<SavedPlaceEntity, 'note'>>,
+): Set<string> {
+  const placementCounts = items.reduce((counts, item) => {
+    counts.set(item.savedPlaceId, (counts.get(item.savedPlaceId) ?? 0) + 1);
+    return counts;
+  }, new Map<string, number>());
+  return new Set(
+    [...placementCounts]
+      .filter(([placeId, count]) => count > 1 && !isAiRecommendedPlace(placesById.get(placeId) ?? { note: null }))
+      .map(([placeId]) => placeId),
+  );
+}
+
+export function allowsMultipleOptionalStops(
+  additionalRequests: string,
+  category: OptionalStopCategory | null,
+): boolean {
+  if (!category) return false;
+  const aliases: Record<OptionalStopCategory, RegExp> = {
+    cafe: /(?:카페|커피|coffee)/u,
+    dessert: /(?:디저트|베이커리|아이스크림|케이크|dessert|bakery)/u,
+    tea: /(?:차\s*전문|티룸|티하우스|tea)/u,
+  };
+  const multipleIntent = /(?:투어|여러|다양|두\s*곳|2\s*곳|많이|위주|매일|마다)/u;
+  return aliases[category].test(additionalRequests.toLocaleLowerCase())
+    && multipleIntent.test(additionalRequests.toLocaleLowerCase());
+}
+
+function buildOptionalStopUsage(
+  placements: Array<{ savedPlaceId: string; date: string }>,
+  placesById: Map<string, SavedPlaceEntity>,
+  validDates: Set<string>,
+): Map<string, Set<OptionalStopCategory>> {
+  const usage = new Map<string, Set<OptionalStopCategory>>();
+  for (const placement of placements) {
+    if (!validDates.has(placement.date)) continue;
+    const place = placesById.get(placement.savedPlaceId);
+    const category = place ? optionalStopCategory(place) : null;
+    markOptionalStop(usage, placement.date, category);
+  }
+  return usage;
+}
+
+function isOptionalStopAlreadyUsed(
+  usage: Map<string, Set<OptionalStopCategory>>,
+  date: string,
+  category: OptionalStopCategory | null,
+): boolean {
+  return category !== null && (usage.get(date)?.has(category) ?? false);
+}
+
+function markOptionalStop(
+  usage: Map<string, Set<OptionalStopCategory>>,
+  date: string,
+  category: OptionalStopCategory | null,
+): void {
+  if (!category) return;
+  const categories = usage.get(date) ?? new Set<OptionalStopCategory>();
+  categories.add(category);
+  usage.set(date, categories);
 }
 
 export function isWithinSelectedRegions(

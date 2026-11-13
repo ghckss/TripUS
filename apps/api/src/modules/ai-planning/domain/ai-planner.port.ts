@@ -47,7 +47,9 @@ export const AI_PLANNING_TASK = {
     '가까운 장소를 한 권역으로 묶고 추천 장소 사이의 이동은 30분 이내가 되도록 한다.',
     '여행 밀도, 선택한 여행 방식들, 복수 이동수단, 예산, 추가 요청사항 및 lockedPlacements를 존중한다.',
     'referenceItinerary가 있으면 수정 대상이 아닌 다른 날짜의 읽기 전용 일정이다. 해당 날짜를 변경하거나 응답에 포함하지 말고, 장소·지역·테마 중복과 여행 전체 흐름을 판단하는 참고 자료로만 사용한다.',
-    '다른 날짜와 불필요하게 같은 장소나 유사한 동선을 반복하지 않되, 전체 동선상 재방문이 가장 합리적이면 반복할 수 있다.',
+    '사용자가 직접 배치한 장소는 여러 날짜에 중복되어도 유지한다. AI 추천 장소는 추가 요청사항에 명시적인 재방문 요청이 없는 한 places, referenceItinerary 또는 같은 응답의 다른 날짜와 중복하지 않는다.',
+    '카페, 디저트, 차처럼 관광 명소나 식사 장소가 아닌 휴식 장소는 명시적인 투어 요청이 없는 한 같은 세부 유형을 하루 한 곳만 추천한다. 카페와 디저트, 카페와 차처럼 세부 유형이 다르면 함께 추천할 수 있다.',
+    '일정에 넣기에는 동선이나 시간이 맞지 않지만 추천할 가치가 있는 실제 장소는 savedRecommendations에 넣어 장소 보관함 후보로 제공한다.',
     '추천은 검색 가능한 실제 관광지, 식당, 카페, 시장, 상점, 공원, 박물관 또는 문화시설만 사용한다.',
     '식당, 카페, 술집은 여행지의 현지 음식과 문화를 경험할 수 있는 장소를 우선하며, 사용자가 명시적으로 요청하지 않은 타국 콘셉트 업장은 추천하지 않는다.',
     '역, 공항, 숙소, 도시, 동네, 행정구역을 활동 장소로 추천하지 않는다.',
@@ -163,6 +165,11 @@ export interface AiPlannerOutput {
     activity: string;
     travelMethod: string;
     travelDurationMinutes: number;
+    reason: string;
+  }>;
+  savedRecommendations?: Array<{
+    placeName: string;
+    regionName: string;
     reason: string;
   }>;
   usage?: { inputTokens: number; outputTokens: number };
