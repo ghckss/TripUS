@@ -79,4 +79,16 @@ describe("AiPlanScreen", () => {
 
     expect(alert).toHaveBeenCalledWith("불러올 최근 요청이 없어요");
   });
+
+  it("explains the density, travel method, and budget choices", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+    const screen = await render(<AiPlanScreen />);
+
+    await fireEvent.press(screen.getByLabelText("여행의 밀도 선택지 설명"));
+    expect(alert).toHaveBeenLastCalledWith("여행의 밀도", expect.stringContaining("꽉 채워서"));
+    await fireEvent.press(screen.getByLabelText("여행의 방식 선택지 설명"));
+    expect(alert).toHaveBeenLastCalledWith("여행의 방식", expect.stringContaining("자연·휴식"));
+    await fireEvent.press(screen.getByLabelText("예산 선택지 설명"));
+    expect(alert).toHaveBeenLastCalledWith("예산", expect.stringContaining("가성비"));
+  });
 });

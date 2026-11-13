@@ -79,7 +79,20 @@ export class AiPlanningService {
     return { request: normalizeLatestAiPlanRequest(trip.latestAiPlanRequest) };
   }
 
-  async generate(tripId: string, request: GenerateAiPlanDto): Promise<GenerateAiPlanResponseDto> {
+  async generateDay(tripId: string, date: string): Promise<GenerateAiPlanResponseDto> {
+    const trip = await this.trips.findOneBy({
+      id: tripId,
+      ownerId: this.identity.getCurrentUserId(),
+      active: true,
+    });
+    if (!trip) throw new NotFoundException('Trip not found');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < trip.startDate || date > trip.endDate) {
+      throw new BadRequestException('AI_PLAN_DATE_OUT_OF_RANGE');
+    }
+    return this.generate(tripId, normalizeLatestAiPlanRequest(trip.latestAiPlanRequest) ?? defaultAiPlanRequest(), date);
+  }
+
+  async generate(tripId: string, request: GenerateAiPlanDto, targetDate?: string): Promise<GenerateAiPlanResponseDto> {
     const { density } = request;
     const generationId = randomUUID();
     const startedAt = performance.now();
@@ -87,17 +100,26 @@ export class AiPlanningService {
     await this.entitlements.assertCanGenerateAiPlan();
     const trip = await this.trips.findOneBy({ id: tripId, ownerId: this.identity.getCurrentUserId(), active: true });
     if (!trip) throw new NotFoundException('Trip not found');
-    trip.latestAiPlanRequest = { ...request };
-    await this.trips.save(trip);
+    if (!targetDate) {
+      trip.latestAiPlanRequest = { ...request };
+      await this.trips.save(trip);
+    }
     const places = await this.places.find({ where: { tripId }, order: { createdAt: 'ASC' } });
     const primaryLodging = places.find((place) => place.isPrimaryLodging);
     const current = await this.itineraries.get(tripId);
     const placesById = new Map(places.map((place) => [place.id, place]));
+    const targetDatePlaceIds = new Set(current.items
+      .filter((item) => !targetDate || item.date === targetDate)
+      .map((item) => item.savedPlaceId));
+    const otherDatePlaceIds = new Set(current.items
+      .filter((item) => targetDate && item.date !== targetDate)
+      .map((item) => item.savedPlaceId));
     const locked = current.items.filter((item) =>
       item.locked
       && !item.boundaryType
       && item.date !== null
       && item.position !== null
+      && (!targetDate || item.date === targetDate)
       && placesById.get(item.savedPlaceId)?.tag !== PlaceTag.Lodging,
     );
     const lockedIds = new Set(locked.map((item) => item.savedPlaceId));
@@ -106,7 +128,8 @@ export class AiPlanningService {
     const planningPlaces = places.filter((place) =>
       place.tag !== PlaceTag.Lodging
       && !lockedIds.has(place.id)
-      && !isAiRecommendedPlace(place),
+      && !isAiRecommendedPlace(place)
+      && (!targetDate || targetDatePlaceIds.has(place.id)),
     );
     const recommendationRegions = [
       ...selectedRegions,
@@ -122,7 +145,7 @@ export class AiPlanningService {
       density,
       trip.startPoint?.time ?? null,
       trip.endPoint?.time ?? null,
-    );
+    ).filter((day) => !targetDate || day.date === targetDate);
     let createdRecommendationEntities: SavedPlaceEntity[] = [];
     try {
       writeStructuredLog('info', 'ai.generation.started', {
@@ -287,7 +310,9 @@ export class AiPlanningService {
       }
       const reusedRecommendationIds = new Set(recommended.map((item) => item.savedPlaceId));
       const staleAiRecommendations = previousAiRecommendations.filter((place) =>
-        !lockedIds.has(place.id) && !reusedRecommendationIds.has(place.id),
+        (!targetDate || targetDatePlaceIds.has(place.id))
+        && (!targetDate || !otherDatePlaceIds.has(place.id))
+        && !lockedIds.has(place.id) && !reusedRecommendationIds.has(place.id),
       );
       writeStructuredLog('info', 'ai.generation.recommendations_materialized', {
         generationId,
@@ -316,7 +341,9 @@ export class AiPlanningService {
         [...places, ...materialized.created],
         request.transportModes,
       );
-      const result = await this.itineraries.replace(tripId, placements, ItinerarySource.Ai);
+      const result = targetDate
+        ? await this.itineraries.replaceDay(tripId, targetDate, placements, ItinerarySource.Ai)
+        : await this.itineraries.replace(tripId, placements, ItinerarySource.Ai);
       let finalItinerary = result.itinerary;
       if (result.status === ItineraryUpdateStatus.Updated) {
         await this.entitlements.recordSuccessfulAiGeneration();
@@ -934,6 +961,15 @@ function normalizeLatestAiPlanRequest(input: TripAiPlanRequest | null): Generate
     ...(input.companions ? { companions: input.companions } : {}),
     ...(budgetValues.has(input.budgetLevel as AiBudgetLevel) ? { budgetLevel: input.budgetLevel as AiBudgetLevel } : {}),
     ...((input.additionalRequests || legacyRequests) ? { additionalRequests: input.additionalRequests || legacyRequests } : {}),
+  };
+}
+
+function defaultAiPlanRequest(): GenerateAiPlanDto {
+  return {
+    density: TravelDensity.Balanced,
+    themes: [TravelTheme.Highlights],
+    transportModes: [AiTransportMode.PublicTransit],
+    budgetLevel: AiBudgetLevel.Standard,
   };
 }
 

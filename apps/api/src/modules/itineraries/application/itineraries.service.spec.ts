@@ -155,4 +155,38 @@ describe('ItinerariesService', () => {
       expect.objectContaining({ savedPlaceId, date: '2026-11-09' }),
     ]));
   });
+
+  it('replaces only the requested date', async () => {
+    const tripId = '10000000-0000-4000-8000-000000000001';
+    const savedPlaceId = '20000000-0000-4000-8000-000000000001';
+    const items = { find: vi.fn().mockResolvedValue([]) };
+    const places = { countBy: vi.fn().mockResolvedValue(1), find: vi.fn().mockResolvedValue([]) };
+    const trips = { findOneBy: vi.fn().mockResolvedValue({
+      id: tripId, active: true, startDate: '2026-11-08', endDate: '2026-11-10', startPoint: null, endPoint: null,
+    }) };
+    const manager = {
+      create: vi.fn((_entity: typeof ItineraryItemEntity, value: Partial<ItineraryItemEntity>) => value as ItineraryItemEntity),
+      delete: vi.fn().mockResolvedValue(undefined),
+      save: vi.fn().mockResolvedValue(undefined),
+    };
+    const dataSource = { transaction: vi.fn(async (callback: (transactionManager: typeof manager) => Promise<void>) => callback(manager)) };
+    const service = new ItinerariesService(
+      items as unknown as Repository<ItineraryItemEntity>,
+      places as unknown as Repository<SavedPlaceEntity>,
+      trips as unknown as Repository<TripEntity>,
+      dataSource as unknown as DataSource,
+      { getCurrentUserId: vi.fn().mockReturnValue('user-1') },
+      { transit: vi.fn() },
+    );
+
+    const result = await service.replaceDay(tripId, '2026-11-09', [
+      { savedPlaceId, date: '2026-11-09', position: 0, scheduledTime: '10:30' },
+    ]);
+
+    expect(result.status).toBe('updated');
+    expect(manager.delete).toHaveBeenCalledWith(ItineraryItemEntity, { tripId, date: '2026-11-09' });
+    expect(manager.save).toHaveBeenCalledWith(ItineraryItemEntity, [
+      expect.objectContaining({ savedPlaceId, date: '2026-11-09', scheduledTime: '10:30' }),
+    ]);
+  });
 });

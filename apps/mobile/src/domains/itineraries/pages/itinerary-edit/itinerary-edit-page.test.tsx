@@ -1,4 +1,5 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { Alert } from "react-native";
 
 import ItineraryScreen from "./itinerary-edit-page";
 
@@ -8,6 +9,7 @@ const mockReorderWithinDay = jest.fn();
 const mockReplaceDayLodging = jest.fn();
 const mockSearchPlaces = jest.fn();
 const mockSavePlace = jest.fn();
+const mockUpdateDayWithAi = jest.fn().mockResolvedValue(true);
 let mockDates = ["2026-11-08"];
 let mockItinerary = { items: [] as Record<string, unknown>[], unplaced: [] as Record<string, unknown>[] };
 let mockPlaces: { id: string; name: string; address: string; tag: string; isPrimaryLodging?: boolean }[] = [{ id: "place-1", name: "감천문화마을", address: "부산 사하구", tag: "attraction" }];
@@ -40,6 +42,8 @@ jest.mock("./use-itinerary-edit", () => ({
     undoAiChange: jest.fn(),
     undoing: false,
     undoMessage: mockUndoMessage,
+    updateDayWithAi: mockUpdateDayWithAi,
+    updatingDate: undefined,
   }),
 }));
 
@@ -165,19 +169,35 @@ describe("ItineraryScreen day editing", () => {
     expect(screen.getByText("흰여울문화마을")).toBeOnTheScreen();
   });
 
-  it("shows only the place name inside a manually added itinerary card", async () => {
+  it("shows the arrival time under the place name", async () => {
     mockItinerary = {
-      items: [{ id: "item-1", savedPlaceId: "place-1", placeName: "감천문화마을", date: "2026-11-08", position: 0, source: "manual" }],
+      items: [{ id: "item-1", savedPlaceId: "place-1", placeName: "감천문화마을", date: "2026-11-08", position: 0, scheduledTime: "10:30", source: "manual" }],
       unplaced: [],
     };
 
     const screen = await render(<ItineraryScreen />);
 
     expect(screen.getByText("감천문화마을")).toBeOnTheScreen();
-    expect(screen.queryByText(/도착/)).not.toBeOnTheScreen();
+    expect(screen.getByText("도착 10:30")).toBeOnTheScreen();
     expect(screen.queryByText(/소요/)).not.toBeOnTheScreen();
     expect(screen.queryByText(/상세 설명/)).not.toBeOnTheScreen();
     expect(screen.getByTestId("mock-sortable").props.testUseFlatList).toBe(false);
+  });
+
+  it("updates only the selected day after confirmation", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation((_title, _message, buttons) => {
+      buttons?.find((button) => button.text === "업데이트")?.onPress?.();
+    });
+    const screen = await render(<ItineraryScreen />);
+
+    await fireEvent.press(screen.getByTestId("itinerary-ai-update-2026-11-08"));
+
+    expect(alert).toHaveBeenCalledWith(
+      "Day 1 일정을 업데이트할까요?",
+      expect.stringContaining("다른 날짜 일정은 변경하지 않아요"),
+      expect.any(Array),
+    );
+    expect(mockUpdateDayWithAi).toHaveBeenCalledWith("2026-11-08");
   });
 
   it("shows travel time on the connector between itinerary cards", async () => {

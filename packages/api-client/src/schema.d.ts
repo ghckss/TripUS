@@ -132,6 +132,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trips/{tripId}/ai-plans/days/{date}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AiPlanningController_generateDay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trips/{tripId}/itinerary": {
         parameters: {
             query?: never;
@@ -918,6 +934,28 @@ export interface operations {
                 "application/json": components["schemas"]["GenerateAiPlanDto"];
             };
         };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerateAiPlanResponseDto"];
+                };
+            };
+        };
+    };
+    AiPlanningController_generateDay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+                date: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             200: {
                 headers: {

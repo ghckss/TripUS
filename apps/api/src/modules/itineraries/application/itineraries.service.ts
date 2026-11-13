@@ -59,6 +59,45 @@ export class ItinerariesService {
     return { status: ItineraryUpdateStatus.Updated, conflicts: [], itinerary: await this.read(trip) };
   }
 
+  async replaceDay(
+    tripId: string,
+    date: string,
+    input: ReplaceItineraryItemDto[],
+    source = ItinerarySource.Manual,
+  ): Promise<ItineraryUpdateResultDto> {
+    const trip = await this.assertOwnedActiveTrip(tripId);
+    const conflicts = input.some((item) => item.date !== date)
+      ? ['DATE_SCOPE_MISMATCH']
+      : await this.findConflicts(trip, input);
+    if (conflicts.length > 0) {
+      return { status: ItineraryUpdateStatus.Conflict, conflicts, itinerary: await this.read(trip) };
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(ItineraryItemEntity, { tripId, date });
+      if (input.length > 0) {
+        await manager.save(ItineraryItemEntity, input.map((item) => manager.create(ItineraryItemEntity, {
+          tripId,
+          savedPlaceId: item.savedPlaceId,
+          date: item.date,
+          position: item.position,
+          scheduledTime: item.scheduledTime ?? null,
+          durationMinutes: item.durationMinutes ?? null,
+          activitySummary: item.activitySummary ?? null,
+          travelMethod: item.travelMethod ?? null,
+          travelDurationMinutes: item.travelDurationMinutes ?? null,
+          locked: item.locked ?? false,
+          source,
+          visitStatus: null,
+          rating: null,
+          review: null,
+        })));
+      }
+    });
+
+    return { status: ItineraryUpdateStatus.Updated, conflicts: [], itinerary: await this.read(trip) };
+  }
+
   private async read(trip: TripEntity): Promise<ItineraryResponseDto> {
     const tripId = trip.id;
     const [items, places] = await Promise.all([

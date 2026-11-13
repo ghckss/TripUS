@@ -29,4 +29,15 @@ export class AiPlanningController {
   generate(@Param('tripId', new ParseUUIDPipe()) tripId: string, @Body() input: GenerateAiPlanDto): Promise<GenerateAiPlanResponseDto> {
     return this.planning.generate(tripId, input);
   }
+
+  @Post('days/:date')
+  @ApiParam({ name: 'tripId', type: String, format: 'uuid' })
+  @ApiParam({ name: 'date', type: String, format: 'date' })
+  @ApiOkResponse({ type: GenerateAiPlanResponseDto })
+  generateDay(
+    @Param('tripId', new ParseUUIDPipe()) tripId: string,
+    @Param('date') date: string,
+  ): Promise<GenerateAiPlanResponseDto> {
+    return this.planning.generateDay(tripId, date);
+  }
 }

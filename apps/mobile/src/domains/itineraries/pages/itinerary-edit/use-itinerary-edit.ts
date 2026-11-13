@@ -4,7 +4,7 @@ import { useFocusEffect } from "expo-router";
 import { apiErrorMessage } from "@/shared/api/trip-us-api";
 import { getTrip } from "@/domains/trips";
 import { listPlaces, type SavedPlace } from "@/domains/places/api/places.api";
-import { getItinerary, isItineraryBoundary, replaceItinerary, undoAiPlan, type Itinerary } from "../../api/itineraries.api";
+import { generateAiPlanDay, getItinerary, isItineraryBoundary, replaceItinerary, undoAiPlan, type Itinerary } from "../../api/itineraries.api";
 import { ensureLodgingEndpoints, isLodgingPlace, replaceLodgingBoundary, type LodgingEdge } from "./itinerary-lodging-endpoints";
 import { reorderItineraryWithinDay } from "./itinerary-reorder";
 
@@ -52,6 +52,7 @@ export function useItineraryEdit(tripId: string) {
   const [places, setPlaces] = useState<SavedPlace[]>([]);
   const [undoing, setUndoing] = useState(false);
   const [undoMessage, setUndoMessage] = useState<string>();
+  const [updatingDate, setUpdatingDate] = useState<string>();
 
   const reload = useCallback(async () => {
     setError(undefined);
@@ -149,16 +150,24 @@ export function useItineraryEdit(tripId: string) {
     setSaving(true); setError(undefined);
     try {
       const prepared = ensureLodgingEndpoints(itinerary, dates, places);
-      setItinerary(await replaceItinerary(tripId, prepared.items.filter((item) => !isItineraryBoundary(item)).map((item) => ({
-        savedPlaceId: item.savedPlaceId, date: item.date!, position: item.position!, locked: false,
-        ...(item.scheduledTime ? { scheduledTime: item.scheduledTime } : {}),
-        ...(item.durationMinutes ? { durationMinutes: item.durationMinutes } : {}),
-        ...(item.activitySummary ? { activitySummary: item.activitySummary } : {}),
-        ...(item.travelMethod ? { travelMethod: item.travelMethod } : {}),
-        ...(item.travelDurationMinutes != null ? { travelDurationMinutes: item.travelDurationMinutes } : {}),
-      }))));
+      setItinerary(await replaceItinerary(tripId, serializeItineraryItems(prepared)));
       return true;
     } catch (caught) { setError(apiErrorMessage(caught)); return false; } finally { setSaving(false); }
+  };
+
+  const updateDayWithAi = async (date: string) => {
+    if (!itinerary || updatingDate) return false;
+    setUpdatingDate(date); setError(undefined);
+    try {
+      const prepared = ensureLodgingEndpoints(itinerary, dates, places);
+      await replaceItinerary(tripId, serializeItineraryItems(prepared));
+      const updated = await generateAiPlanDay(tripId, date);
+      const nextPlaces = await listPlaces(tripId);
+      setPlaces(nextPlaces);
+      setItinerary(ensureLodgingEndpoints(applySavedPlaceCoordinates(updated, nextPlaces), dates, nextPlaces));
+      return true;
+    } catch (caught) { setError(apiErrorMessage(caught)); return false; }
+    finally { setUpdatingDate(undefined); }
   };
 
   const undoAiChange = async () => {
@@ -171,5 +180,16 @@ export function useItineraryEdit(tripId: string) {
     finally { setUndoing(false); }
   };
 
-  return { dates, error, itinerary, moveToAdjacentDay, places, reload, removeFromItinerary, reorderWithinDay, replaceDayLodging, save, saving, setPlacesForDate, undoAiChange, undoing, undoMessage };
+  return { dates, error, itinerary, moveToAdjacentDay, places, reload, removeFromItinerary, reorderWithinDay, replaceDayLodging, save, saving, setPlacesForDate, undoAiChange, undoing, undoMessage, updateDayWithAi, updatingDate };
+}
+
+function serializeItineraryItems(itinerary: Itinerary) {
+  return itinerary.items.filter((item) => !isItineraryBoundary(item)).map((item) => ({
+    savedPlaceId: item.savedPlaceId, date: item.date!, position: item.position!, locked: false,
+    ...(item.scheduledTime ? { scheduledTime: item.scheduledTime } : {}),
+    ...(item.durationMinutes ? { durationMinutes: item.durationMinutes } : {}),
+    ...(item.activitySummary ? { activitySummary: item.activitySummary } : {}),
+    ...(item.travelMethod ? { travelMethod: item.travelMethod } : {}),
+    ...(item.travelDurationMinutes != null ? { travelDurationMinutes: item.travelDurationMinutes } : {}),
+  }));
 }

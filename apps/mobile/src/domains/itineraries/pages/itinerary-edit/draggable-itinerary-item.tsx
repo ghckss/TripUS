@@ -10,6 +10,8 @@ type Props = {
   maxIndex?: number;
   minIndex?: number;
   placeName: string;
+  scheduledTime?: string | null;
+  timePrefix?: "도착" | "출발";
   fixed?: boolean;
   fixedLabel?: string;
   onEdit?: () => void;
@@ -30,6 +32,8 @@ export function DraggableItineraryItem({
   onRemove,
   onReorder,
   placeName,
+  scheduledTime,
+  timePrefix = "도착",
 }: Props) {
   const accessibilityActions = [
     ...(index > minIndex ? [{ name: "decrement" as const, label: "앞 순서로 이동" }] : []),
@@ -58,13 +62,19 @@ export function DraggableItineraryItem({
         </SortableItem.Handle>
         <Pressable accessibilityLabel={`${placeName} 지도에서 보기`} accessibilityRole="button" onPress={onPress} style={styles.placeContent}>
           <View style={styles.order}><AppText variant="caption" color={colors.white}>{index + 1}</AppText></View>
-          <AppText numberOfLines={2} variant="label" style={styles.name}>{placeName}</AppText>
+          <View style={styles.placeText}>
+            <AppText numberOfLines={2} variant="label" style={styles.name}>{placeName}</AppText>
+            <AppText variant="caption" color={colors.muted}>{scheduledTime ? `${timePrefix} ${scheduledTime}` : `${timePrefix} 시간 미정`}</AppText>
+          </View>
         </Pressable>
       </> : <>
         <View style={styles.fixedHandleSpacer} />
         <Pressable accessibilityLabel={`${placeName} 지도에서 보기`} accessibilityRole="button" onPress={onPress} style={styles.placeSummary}>
         <View style={styles.order}><AppText variant="caption" color={colors.white}>{index + 1}</AppText></View>
-        <AppText numberOfLines={2} variant="label" style={styles.name}>{placeName}</AppText>
+        <View style={styles.placeText}>
+          <AppText numberOfLines={2} variant="label" style={styles.name}>{placeName}</AppText>
+          <AppText variant="caption" color={colors.muted}>{scheduledTime ? `${timePrefix} ${scheduledTime}` : `${timePrefix} 시간 미정`}</AppText>
+        </View>
         </Pressable>
       </>}
       {fixed && onEdit && <Pressable accessibilityLabel={`${placeName} ${fixedLabel} 수정`} hitSlop={8} onPress={onEdit} style={styles.edit}>
@@ -85,7 +95,8 @@ const styles = StyleSheet.create({
   placeContent: { flex: 1, minHeight: 44, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   placeSummary: { flex: 1, minHeight: 44, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   order: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary },
-  name: { flex: 1 },
+  placeText: { flex: 1, justifyContent: "center" },
+  name: { flexShrink: 1 },
   remove: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   edit: { minWidth: 44, minHeight: 40, alignItems: "center", justifyContent: "center" },
   travelRow: { marginTop: -spacing.xs, paddingLeft: 44 },

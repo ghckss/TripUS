@@ -222,6 +222,46 @@
         ]
       }
     },
+    "/v1/trips/{tripId}/ai-plans/days/{date}": {
+      "post": {
+        "operationId": "AiPlanningController_generateDay",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateAiPlanResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ai-planning"
+        ]
+      }
+    },
     "/v1/trips/{tripId}/itinerary": {
       "get": {
         "operationId": "ItinerariesController_get",

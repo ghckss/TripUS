@@ -39,12 +39,34 @@ export async function generateAiPlan(tripId: string, request: AiPlanRequest): Pr
       trackEvent("ai_plan.internal_retry", { tripId, attempt, reason: data.failureReason ?? "unknown" });
       continue;
     }
+    await deleteCache(cacheKeys.places(tripId));
     await writeCache(cacheKeys.itinerary(tripId), data.itinerary);
     await writeCache(cacheKeys.aiUndo(tripId), previous);
     trackEvent("ai_plan.generated", { tripId, density: request.density, themes: request.themes.join(","), itemCount: data.itinerary.items.length });
     return data.itinerary;
   }
   throw new Error("일정을 구성하는 데 시간이 더 필요해요. 잠시 후 자동으로 다시 시도해 주세요.");
+}
+
+export async function generateAiPlanDay(tripId: string, date: string): Promise<Itinerary> {
+  const previous = await getItinerary(tripId);
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const { data, error } = await tripUsApi.POST("/v1/trips/{tripId}/ai-plans/days/{date}", {
+      params: { path: { tripId, date } },
+    });
+    if (error) throw new Error(apiErrorMessage(error));
+    if (data.status === "conflict") throw new Error("해당 날짜 일정을 다시 구성하지 못했어요.");
+    if (data.status === "unavailable") {
+      trackEvent("ai_plan.day_internal_retry", { tripId, date, attempt, reason: data.failureReason ?? "unknown" });
+      continue;
+    }
+    await deleteCache(cacheKeys.places(tripId));
+    await writeCache(cacheKeys.itinerary(tripId), data.itinerary);
+    await writeCache(cacheKeys.aiUndo(tripId), previous);
+    trackEvent("ai_plan.day_generated", { tripId, date, itemCount: data.itinerary.items.length });
+    return data.itinerary;
+  }
+  throw new Error("해당 날짜 일정을 구성하는 데 시간이 더 필요해요. 잠시 후 다시 시도해 주세요.");
 }
 
 export async function getLatestAiPlanRequest(tripId: string): Promise<AiPlanRequest | null> {

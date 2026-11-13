@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
 import { Sortable, SortableItem, type SortableRenderItemProps } from "react-native-reanimated-dnd";
 
 import { colors, radius, spacing } from "@/shared/design/tokens";
@@ -33,7 +33,7 @@ export default function ItineraryScreen() {
   const {
     dates, error, itinerary, places, reload,
     removeFromItinerary, reorderWithinDay, replaceDayLodging, save, saving, setPlacesForDate,
-    undoAiChange, undoing, undoMessage,
+    undoAiChange, undoing, undoMessage, updateDayWithAi, updatingDate,
   } = useItineraryEdit(tripId);
   const screenRef = useRef<ScrollViewInstance>(null);
   const reorderCommitTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -99,6 +99,15 @@ export default function ItineraryScreen() {
     }, 310);
   };
 
+  const confirmDayUpdate = () => Alert.alert(
+    `Day ${dayIndex + 1} 일정을 업데이트할까요?`,
+    "사용자가 추가한 장소를 포함해 이 날짜만 다시 구성하고, 다른 날짜 일정은 변경하지 않아요.",
+    [
+      { text: "취소", style: "cancel" },
+      { text: "업데이트", onPress: () => void updateDayWithAi(selectedDate) },
+    ],
+  );
+
   return <Screen
     ref={screenRef}
     testID="itinerary-screen"
@@ -125,6 +134,13 @@ export default function ItineraryScreen() {
 
     {selectedDate && <Card>
       <View style={styles.row}><AppText variant="heading">Day {dayIndex + 1}</AppText><Pill label={selectedDate} /></View>
+      <Button
+        disabled={Boolean(updatingDate)}
+        label={updatingDate === selectedDate ? "이 날짜 일정 업데이트 중…" : "AI로 이 날짜 일정 업데이트"}
+        variant="secondary"
+        testID={`itinerary-ai-update-${selectedDate}`}
+        onPress={confirmDayUpdate}
+      />
       <DayRouteMap animationPaused={mapAnimationPaused} focusTarget={mapFocusTarget} items={items} />
 
       <View style={styles.scheduleHeader}>
@@ -144,6 +160,8 @@ export default function ItineraryScreen() {
           onRemove={() => undefined}
           onReorder={() => undefined}
           placeName={items[0].placeName}
+          scheduledTime={items[0].scheduledTime}
+          timePrefix="출발"
         />}
         {hasFixedStart && items.length > 1 && <TravelConnector durationMinutes={items[1].travelDurationMinutes} />}
         {movableItems.length > 0 && <View
@@ -181,6 +199,7 @@ export default function ItineraryScreen() {
                   onRemove={() => removeFromItinerary(item.id)}
                   onReorder={(targetIndex) => reorderWithinDay(item.id, targetIndex)}
                   placeName={item.placeName}
+                  scheduledTime={item.scheduledTime}
                 />
                 {placeIndex < items.length - 1 && <TravelConnector durationMinutes={items[placeIndex + 1].travelDurationMinutes} />}
               </SortableItem>;
@@ -198,6 +217,7 @@ export default function ItineraryScreen() {
           onRemove={() => undefined}
           onReorder={() => undefined}
           placeName={items.at(-1)!.placeName}
+          scheduledTime={items.at(-1)!.scheduledTime}
         />}
       </View>
       <AppText variant="caption" color={colors.muted}>왼쪽 핸들을 누른 채 위·아래로 끌어 순서를 바꿔요. 숙소와 시작·종료 지점은 고정돼요.</AppText>

@@ -40,6 +40,25 @@ const budgetOptions: { label: string; value: AiBudgetLevel }[] = [
   { label: "여유롭게", value: "premium" },
 ];
 
+const settingDescriptions = {
+  density: "여유롭게: 쉬는 시간을 충분히 두고 핵심 장소를 둘러봐요.\n알차게: 관광과 휴식을 균형 있게 채워요.\n꽉 채워서: 하루를 길게 활용해 더 많은 장소를 방문해요.",
+  themes: "맛집 탐방: 식당과 먹거리를 중심으로 구성해요.\n대표 명소: 처음 가는 여행지의 필수 코스를 우선해요.\n카페·감성: 분위기 좋은 카페와 사진 명소를 담아요.\n문화·전시: 박물관, 미술관과 문화 공간을 둘러봐요.\n쇼핑: 시장, 상점과 쇼핑 거리를 포함해요.\n자연·휴식: 공원과 자연 속에서 쉬는 시간을 늘려요.",
+  budget: "가성비: 비용 부담이 적은 장소와 식사를 우선해요.\n보통: 가격과 만족도의 균형을 맞춰요.\n여유롭게: 특별한 경험과 인기 장소도 적극적으로 포함해요.",
+};
+
+function SettingLabel({ label, description }: { label: string; description: string }) {
+  return <View style={styles.settingLabel}>
+    <AppText variant="label">{label}</AppText>
+    <Pressable
+      accessibilityLabel={`${label} 선택지 설명`}
+      accessibilityRole="button"
+      hitSlop={8}
+      onPress={() => Alert.alert(label, description)}
+      style={styles.infoButton}
+    ><AppText color={colors.muted}>ⓘ</AppText></Pressable>
+  </View>;
+}
+
 export default function AiPlanScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const [density, setDensity] = useState<TravelDensity>("relaxed");
@@ -107,9 +126,9 @@ export default function AiPlanScreen() {
         ><AppText style={styles.loadIcon}>↻</AppText></Pressable>
       </View>
       <AppText color={colors.muted}>저장한 장소를 중심으로 동선, 시간과 식사까지 빈틈없이 구성해요.</AppText>
-      <AppText variant="label">여행의 밀도</AppText>
+      <SettingLabel label="여행의 밀도" description={settingDescriptions.density} />
       <View style={styles.wrap}>{densityOptions.map((item) => <Pill key={item.value} label={item.label} selected={density === item.value} onPress={() => setDensity(item.value)} />)}</View>
-      <AppText variant="label">여행의 방식</AppText>
+      <SettingLabel label="여행의 방식" description={settingDescriptions.themes} />
       <View style={styles.wrap}>{themeOptions.map((item) => <Pill key={item.value} label={item.label} selected={themes.includes(item.value)} onPress={() => toggleTheme(item.value)} />)}</View>
       <View style={styles.field}>
         <AppText variant="label">동행자</AppText>
@@ -127,7 +146,7 @@ export default function AiPlanScreen() {
         <View style={styles.wrap}>{transportOptions.map((item) => <Pill key={item.value} label={item.label} selected={transportModes.includes(item.value)} onPress={() => toggleTransportMode(item.value)} />)}</View>
       </View>
       <View style={styles.field}>
-        <AppText variant="label">예산</AppText>
+        <SettingLabel label="예산" description={settingDescriptions.budget} />
         <View style={styles.wrap}>{budgetOptions.map((item) => <Pill key={item.value} label={item.label} selected={budgetLevel === item.value} onPress={() => setBudgetLevel(item.value)} />)}</View>
       </View>
       <View style={styles.field}>
@@ -158,6 +177,8 @@ const styles = StyleSheet.create({
   loadButton: { width: 42, height: 42, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.line, borderRadius: radius.pill, backgroundColor: colors.surface },
   loadButtonPressed: { backgroundColor: colors.primarySoft },
   loadIcon: { fontSize: 25, lineHeight: 28, color: colors.primary },
+  settingLabel: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  infoButton: { width: 28, height: 28, alignItems: "center", justifyContent: "center" },
   field: { gap: spacing.sm },
   input: { minHeight: 48, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, paddingHorizontal: spacing.md, color: colors.ink, fontSize: 16 },
   multiline: { minHeight: 88, paddingTop: spacing.md },

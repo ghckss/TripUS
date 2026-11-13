@@ -9,7 +9,7 @@ import {
   TravelDensity,
   TravelTheme,
 } from '../domain/ai-planner.port';
-import { AiTransportMode } from './dto/generate-ai-plan.dto';
+import { AiPlanGenerationStatus, AiTransportMode } from './dto/generate-ai-plan.dto';
 import {
   addLodgingEndpoints,
   applyDailyPlanningTargets,
@@ -299,6 +299,98 @@ describe('AiPlanningService', () => {
       additionalRequests: '좋아하는 것: 현지 맛집\n피하고 싶은 것: 긴 대기',
     } });
     expect(findOneBy).toHaveBeenCalledWith({ id: tripId, ownerId: 'user-1', active: true });
+  });
+
+  it('regenerates only the requested date using the latest settings', async () => {
+    const tripId = '10000000-0000-4000-8000-000000000020';
+    const target = {
+      id: '20000000-0000-4000-8000-000000000020', name: '경복궁', address: '서울 종로구',
+      latitude: 37.58, longitude: 126.98, tag: PlaceTag.Attraction, preference: PlacePreference.MustVisit,
+      note: null, isPrimaryLodging: false,
+    };
+    const target2 = { ...target, id: '20000000-0000-4000-8000-000000000022', name: '북촌한옥마을' };
+    const target3 = { ...target, id: '20000000-0000-4000-8000-000000000023', name: '광장시장' };
+    const otherDay = {
+      id: '20000000-0000-4000-8000-000000000021', name: '서울숲', address: '서울 성동구',
+      latitude: 37.54, longitude: 127.04, tag: PlaceTag.Attraction, preference: PlacePreference.WantToVisit,
+      note: null, isPrimaryLodging: false,
+    };
+    const sharedRecommendation = {
+      ...target,
+      id: '20000000-0000-4000-8000-000000000024',
+      name: 'AI 추천 카페',
+      note: 'AI 추천 · 이전 일정 보완',
+    };
+    const trip = {
+      id: tripId, title: '서울 여행', destination: '대한민국', timezone: 'Asia/Seoul',
+      regions: [{ name: '서울', address: '대한민국', latitude: 37.56, longitude: 126.98 }],
+      startDate: '2026-11-08', endDate: '2026-11-09', startPoint: null, endPoint: null,
+      latestAiPlanRequest: {
+        density: TravelDensity.Balanced,
+        themes: [TravelTheme.Highlights],
+        transportModes: [AiTransportMode.PublicTransit],
+      },
+    };
+    const planner = { generate: vi.fn().mockResolvedValue({
+      placements: [target, target2, target3].map((place, position) => ({
+        savedPlaceId: place.id, date: '2026-11-08', position,
+        startTime: ['09:00', '10:30', '12:00'][position],
+        durationMinutes: 90, activity: `${place.name} 관람`, travelMethod: '대중교통', travelDurationMinutes: 0,
+      })),
+      unplaced: [],
+      recommendations: [],
+    }) };
+    const replaceDay = vi.fn().mockResolvedValue({
+      status: ItineraryUpdateStatus.Updated,
+      conflicts: [],
+      itinerary: { items: [], unplaced: [] },
+    });
+    const replace = vi.fn();
+    const saveTrip = vi.fn();
+    const remove = vi.fn();
+    const service = new AiPlanningService(
+      { findOneBy: vi.fn().mockResolvedValue(trip), save: saveTrip } as never,
+      { find: vi.fn().mockResolvedValue([target, target2, target3, otherDay, sharedRecommendation]), remove } as never,
+      planner,
+      {
+        get: vi.fn().mockResolvedValue({
+          items: [
+            { savedPlaceId: target.id, date: '2026-11-08', position: 0, locked: false },
+            { savedPlaceId: target2.id, date: '2026-11-08', position: 1, locked: false },
+            { savedPlaceId: target3.id, date: '2026-11-08', position: 2, locked: false },
+            { savedPlaceId: sharedRecommendation.id, date: '2026-11-08', position: 3, locked: false },
+            { savedPlaceId: otherDay.id, date: '2026-11-09', position: 0, locked: false },
+            { savedPlaceId: sharedRecommendation.id, date: '2026-11-09', position: 1, locked: false },
+          ],
+          unplaced: [],
+        }),
+        replace,
+        replaceDay,
+      } as never,
+      { getCurrentUserId: vi.fn().mockReturnValue('user-1') },
+      { assertAllowed: vi.fn() } as never,
+      { assertCanGenerateAiPlan: vi.fn(), recordSuccessfulAiGeneration: vi.fn() } as never,
+      { search: vi.fn(), getCoordinates: vi.fn() },
+      { transit: vi.fn().mockResolvedValue(null) },
+    );
+
+    const result = await service.generateDay(tripId, '2026-11-08');
+
+    expect(result.status).toBe(AiPlanGenerationStatus.Generated);
+    const plannerInput = planner.generate.mock.calls[0]?.[0] as unknown as {
+      places: Array<{ id: string }>;
+      days: Array<{ date: string }>;
+    };
+    expect(plannerInput.places.map((place) => place.id)).toEqual([target.id, target2.id, target3.id]);
+    expect(plannerInput.days.map((day) => day.date)).toEqual(['2026-11-08']);
+    expect(replaceDay).toHaveBeenCalledWith(tripId, '2026-11-08', expect.arrayContaining([
+      expect.objectContaining({ savedPlaceId: target.id, date: '2026-11-08' }),
+      expect.objectContaining({ savedPlaceId: target2.id, date: '2026-11-08' }),
+      expect.objectContaining({ savedPlaceId: target3.id, date: '2026-11-08' }),
+    ]), 'ai');
+    expect(replace).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+    expect(saveTrip).not.toHaveBeenCalled();
   });
 
   it('creates a complete recommendation-only itinerary without saved places or lodging', async () => {
