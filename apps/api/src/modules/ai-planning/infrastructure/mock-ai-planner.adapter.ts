@@ -20,6 +20,10 @@ export class MockAiPlannerAdapter implements AiPlannerPort {
         preferredTimeSlot: 'any',
       })),
       unplaced: [],
+      placeDescriptions: ranked.filter((place) => !place.note?.trim()).map((place) => ({
+        savedPlaceId: place.id,
+        description: `${place.name}에서 여행지의 매력을 경험할 수 있어요.`,
+      })),
       recommendations: [],
       savedRecommendations: [],
     });

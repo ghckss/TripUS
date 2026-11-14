@@ -44,6 +44,7 @@ export const AI_PLANNER_SYSTEM_PROMPT = [
   '[일정 다양성] 사용자가 직접 저장·배치한 places와 lockedPlacements의 중복은 그대로 존중한다. AI가 새로 추천하는 recommendations는 동일한 실제 장소를 같은 여행에서 중복 추천하지 않는다.',
   '카페, 디저트, 차 전문점 같은 휴식 장소는 travelerContext.additionalRequests에 카페 투어처럼 같은 유형을 여러 곳 방문하려는 명시적 요청이 없는 한 세부 유형별로 하루 한 곳만 recommendations에 넣는다. 카페+디저트, 카페+차처럼 세부 유형이 다르면 각각 한 곳씩 허용한다.',
   '[장소 설명] recommendations와 savedRecommendations의 reason은 사용자에게 장소 설명으로 표시된다. 장소 자체의 특징과 방문 가치를 사실적인 한국어 한두 문장으로만 작성한다. 일정에서 제외한 이유, 기존 장소 교체, 시간·동선·공간 부족, 보관함에 저장·포함한다는 내부 처리 내용은 절대 쓰지 않는다.',
+  'places에서 note가 비어 있는 모든 장소는 placeDescriptions에 savedPlaceId와 실제 장소 설명을 정확히 한 번 작성한다. 이미 note가 있는 장소는 placeDescriptions에 넣지 않는다. 설명은 장소 자체의 특징과 방문 가치만 담은 사실적인 한국어 한두 문장으로 작성한다.',
   '[장소 보관함] 일정에 배치하기에는 시간이나 동선이 맞지 않지만 여행지에서 추천할 가치가 있는 유명 장소는 savedRecommendations에 넣는다. savedRecommendations는 일정에 배치하지 않으며, 정확한 고유명칭과 지역, 위 기준을 따르는 장소 설명만 작성한다. 억지로 채우지 말고 최대 5곳까지만 제안한다.',
   'unplaced는 정상 결과에서는 항상 빈 배열이어야 한다. 모든 저장 장소를 포함하면서 완전한 일정을 만들 수 없다면 불완전한 결과를 타협해서 반환하지 말고 전체 배치를 다시 설계한다.',
   '[검증 후 재작성] revisionDraft가 있으면 직전 응답이 서버 검증에서 탈락한 것이다. revisionGuidance의 모든 문제를 revisionDraft와 대조해 수정한다. 처음부터 무관한 일정을 다시 만들거나 일부 수정분만 반환하지 말고, 문제가 없던 방문은 유지하면서 탈락 사유를 모두 해소한 완전한 전체 일정을 반환한다.',
@@ -85,9 +86,12 @@ const SavedRecommendationSchema = z.object({
   reason: z.string().min(1),
 });
 
-export function createAiPlanSchema(allowedPlaceIds: string[]) {
+export function createAiPlanSchema(allowedPlaceIds: string[], missingDescriptionPlaceIds: string[] = allowedPlaceIds) {
   const allowedId = allowedPlaceIds.length > 0
     ? z.enum(allowedPlaceIds as [string, ...string[]])
+    : z.string().uuid();
+  const missingDescriptionId = missingDescriptionPlaceIds.length > 0
+    ? z.enum(missingDescriptionPlaceIds as [string, ...string[]])
     : z.string().uuid();
   const placements = allowedPlaceIds.length === 0
     ? z.array(PlacementSchema).max(0)
@@ -100,6 +104,9 @@ export function createAiPlanSchema(allowedPlaceIds: string[]) {
     unplaced: allowedPlaceIds.length === 0
       ? z.array(unplacedItem).max(0)
       : z.array(unplacedItem),
+    placeDescriptions: missingDescriptionPlaceIds.length === 0
+      ? z.array(z.object({ savedPlaceId: missingDescriptionId, description: z.string().min(1).max(300) })).max(0)
+      : z.array(z.object({ savedPlaceId: missingDescriptionId, description: z.string().min(1).max(300) })),
     recommendations: allowedPlaceIds.length === 0
       ? z.array(RecommendationSchema).min(1)
       : z.array(RecommendationSchema),
@@ -125,7 +132,10 @@ export class OpenAiPlannerAdapter implements AiPlannerPort {
 
   async generate(input: AiPlannerInput): Promise<AiPlannerOutput> {
     try {
-      const schema = createAiPlanSchema(input.places.map((place) => place.id));
+      const schema = createAiPlanSchema(
+        input.places.map((place) => place.id),
+        input.places.filter((place) => !place.note?.trim()).map((place) => place.id),
+      );
       const response = await this.client.responses.parse({
         model: this.model,
         max_output_tokens: this.maxOutputTokens,

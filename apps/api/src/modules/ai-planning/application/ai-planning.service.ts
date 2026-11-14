@@ -520,6 +520,7 @@ export class AiPlanningService {
         : await this.itineraries.replace(tripId, persistedPlacements, ItinerarySource.Ai);
       let finalItinerary = result.itinerary;
       if (result.status === ItineraryUpdateStatus.Updated) {
+        await this.applyMissingPlaceDescriptions(places, output.placeDescriptions ?? []);
         await this.entitlements.recordSuccessfulAiGeneration();
         createdRecommendationEntities = [];
         if (staleAiRecommendations.length > 0) {
@@ -576,6 +577,26 @@ export class AiPlanningService {
         itinerary: await this.itineraries.get(tripId),
         failureReason: reason,
       };
+    }
+  }
+
+  private async applyMissingPlaceDescriptions(
+    existingPlaces: SavedPlaceEntity[],
+    descriptions: NonNullable<AiPlannerOutput['placeDescriptions']>,
+  ): Promise<void> {
+    const descriptionsById = new Map(descriptions.map((item) => [item.savedPlaceId, sanitizePlaceDescription(item.description)]));
+    const updates = existingPlaces.filter((place) => {
+      if (place.note?.trim()) return false;
+      const description = descriptionsById.get(place.id);
+      if (!description) return false;
+      place.note = description;
+      return true;
+    });
+    if (updates.length === 0) return;
+    try {
+      await this.places.save(updates);
+    } catch {
+      this.logger.error('AI place description update failed');
     }
   }
 
@@ -1548,6 +1569,7 @@ function toRevisionDraft(output: AiPlannerOutput): Omit<AiPlannerOutput, 'usage'
   return {
     placements: output.placements,
     unplaced: output.unplaced,
+    placeDescriptions: output.placeDescriptions ?? [],
     recommendations: output.recommendations,
     savedRecommendations: output.savedRecommendations ?? [],
   };
@@ -1572,6 +1594,7 @@ function toMaterializedReviewDraft(
       preferredTimeSlot: placement.preferredTimeSlot ?? 'any',
     })),
     unplaced: source.unplaced,
+    placeDescriptions: source.placeDescriptions ?? [],
     recommendations: recommended.map((placement) => {
       const place = placesById.get(placement.savedPlaceId);
       return {
@@ -1590,6 +1613,12 @@ function toMaterializedReviewDraft(
     }),
     savedRecommendations: source.savedRecommendations ?? [],
   };
+}
+
+function sanitizePlaceDescription(description: string): string {
+  const normalized = description.trim().replace(/\s+/gu, ' ').slice(0, 300);
+  if (/(?:보관함|저장한 장소|저장합니다|일정 보완|일정상|이번 일정|일정에서 제외|일정에는 제외|동선상|시간상|공간 부족|장소 교체 필요)/u.test(normalized)) return '';
+  return normalized;
 }
 
 function isRepairableQualityIssue(issue: string): boolean {

@@ -32,20 +32,32 @@ describe('createAiPlanSchema', () => {
   it('requires recommendation-only output when there are no saved places', () => {
     const schema = createAiPlanSchema([]);
 
-    expect(schema.safeParse({ placements: [placement], unplaced: [], recommendations: [], savedRecommendations: [] }).success).toBe(false);
-    expect(schema.safeParse({ placements: [], unplaced: [], recommendations: [recommendation], savedRecommendations: [] }).success).toBe(true);
+    expect(schema.safeParse({ placements: [placement], unplaced: [], placeDescriptions: [], recommendations: [], savedRecommendations: [] }).success).toBe(false);
+    expect(schema.safeParse({ placements: [], unplaced: [], placeDescriptions: [], recommendations: [recommendation], savedRecommendations: [] }).success).toBe(true);
   });
 
   it('rejects placement IDs that were not supplied by the service', () => {
     const allowedId = '30000000-0000-4000-8000-000000000002';
     const schema = createAiPlanSchema([allowedId]);
 
-    expect(schema.safeParse({ placements: [placement], unplaced: [], recommendations: [], savedRecommendations: [] }).success).toBe(false);
+    expect(schema.safeParse({ placements: [placement], unplaced: [], placeDescriptions: [], recommendations: [], savedRecommendations: [] }).success).toBe(false);
     expect(schema.safeParse({
       placements: [{ ...placement, savedPlaceId: allowedId }],
       unplaced: [],
+      placeDescriptions: [{ savedPlaceId: allowedId, description: '서울의 역사를 볼 수 있는 대표 궁궐' }],
       recommendations: [],
       savedRecommendations: [{ placeName: '덕수궁', regionName: '서울', reason: '시간이 되면 추천' }],
     }).success).toBe(true);
+  });
+
+  it('only accepts descriptions for supplied places that are missing a note', () => {
+    const allowedId = '30000000-0000-4000-8000-000000000002';
+    const describedId = '30000000-0000-4000-8000-000000000003';
+    const schema = createAiPlanSchema([allowedId, describedId], [allowedId]);
+
+    expect(schema.safeParse({
+      placements: [], unplaced: [], recommendations: [], savedRecommendations: [],
+      placeDescriptions: [{ savedPlaceId: describedId, description: '기존 설명을 덮어쓰면 안 됨' }],
+    }).success).toBe(false);
   });
 });

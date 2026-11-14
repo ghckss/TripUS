@@ -1025,6 +1025,7 @@ describe('AiPlanningService', () => {
     expect(retryInput.revisionDraft).toEqual({
       placements: [],
       unplaced: [{ savedPlaceId: visit.id, reason: '선택 도시 밖 장소' }],
+      placeDescriptions: [],
       recommendations: [],
       savedRecommendations: [],
     });
