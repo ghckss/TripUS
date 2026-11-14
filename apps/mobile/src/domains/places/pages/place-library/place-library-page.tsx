@@ -10,6 +10,7 @@ import { Card } from "@/shared/ui/card";
 import { Pill } from "@/shared/ui/pill";
 import { Screen } from "@/shared/ui/screen";
 import { colors, spacing } from "@/shared/design/tokens";
+import { placeDescription } from "./place-description";
 import { usePlaceLibrary } from "./use-place-library";
 import { useAppDialog } from "@/shared/ui/app-dialog";
 
@@ -67,7 +68,7 @@ export default function PlacesScreen() {
             </Pressable>
           </View>
           <View style={styles.managementActions}>
-            <Button label={`선택 장소 제거${selectedCount > 0 ? ` (${selectedCount})` : ""}`} variant="danger" disabled={saving || selectedCount === 0} style={styles.actionButton} onPress={confirmSelectedRemoval} />
+            <Button label={`선택 제거${selectedCount > 0 ? ` (${selectedCount})` : ""}`} variant="danger" disabled={saving || selectedCount === 0} style={styles.actionButton} onPress={confirmSelectedRemoval} />
             <Button label="전체 제거" variant="ghost" disabled={saving} style={styles.actionButton} onPress={confirmAllRemoval} />
           </View>
         </Card>}
@@ -76,6 +77,7 @@ export default function PlacesScreen() {
         {!loading && places.length === 0 && <Card><AppText variant="heading">아직 저장한 장소가 없어요</AppText><AppText color={colors.muted}>가고 싶은 장소를 먼저 저장해 보세요.</AppText></Card>}
         {filteredPlaces.map((place) => {
           const selected = selectedIds.has(place.id);
+          const description = placeDescription(place.note);
           return <Pressable
             key={place.id}
             accessibilityLabel={`${place.name} ${selected ? "선택 해제" : "선택"}`}
@@ -89,7 +91,7 @@ export default function PlacesScreen() {
                 <PlaceCardVisual placeId={place.id} tag={place.tag} tripId={tripId} />
                 <View style={styles.placeIdentity}>
                   <AppText numberOfLines={1} variant="heading" style={styles.placeName}>{place.name}</AppText>
-                  <AppText numberOfLines={3} color={colors.muted} style={styles.placeDescription}>{placeDescription(place.note)}</AppText>
+                  {description && <AppText numberOfLines={3} color={colors.muted} style={styles.placeDescription}>{description}</AppText>}
                 </View>
               </View>
             </Card>
@@ -110,15 +112,6 @@ const tagLabels: Record<string, string> = {
 };
 
 function tagLabel(tag: string) { return tagLabels[tag] ?? tag; }
-
-function placeDescription(note?: string | null) {
-  const description = note
-    ?.replace(/^AI 추천\s*·\s*/u, "")
-    .replace(/^보관함\s*·\s*/u, "")
-    .trim();
-  if (!description || /^(아침|점심|저녁) 일정 보완$/u.test(description)) return "여행 일정에 저장한 장소예요.";
-  return description;
-}
 
 function tagIcon(tag: string) {
   return ({ activity: "🎟", attraction: "📍", cafe: "☕", food: "🍽", lodging: "🛏", shopping: "🛍", transport: "🚉" } as Record<string, string>)[tag] ?? "✦";
@@ -173,7 +166,7 @@ const styles = StyleSheet.create({
   placeCardPressed: { opacity: 0.78 },
   placeCardSelected: { backgroundColor: colors.primarySoft, borderColor: colors.primary, borderWidth: 2 },
   placeDescription: { flexShrink: 1 },
-  placeMediaRow: { flexDirection: "row", gap: spacing.md, alignItems: "center" },
+  placeMediaRow: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
   placeIdentity: { flex: 1, minWidth: 0, gap: spacing.sm },
   placeName: { flexShrink: 1 },
   placePhoto: { width: 120, height: 120, borderRadius: 16, backgroundColor: colors.line },
