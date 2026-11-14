@@ -50,7 +50,7 @@ export default function PlacesScreen() {
   });
   return (
     <View style={styles.page}>
-      <Screen>
+      <Screen contentStyle={styles.libraryContent}>
         <View style={styles.header}>
           <AppText variant="title">저장한 모든 장소</AppText>
           <AppText color={colors.muted}>일정 배치 여부와 관계없이 저장한 장소를 단순하게 모아봐요.</AppText>
@@ -159,6 +159,7 @@ const styles = StyleSheet.create({
   filterScroll: { flexGrow: 0, marginHorizontal: -spacing.lg, paddingLeft: spacing.lg },
   foodVisual: { backgroundColor: "#FCE3DC" },
   header: { gap: spacing.xs },
+  libraryContent: { paddingBottom: 112 },
   managementActions: { flexDirection: "row", gap: spacing.sm },
   page: { flex: 1, backgroundColor: colors.canvas },
   placeMediaRow: { flexDirection: "row", gap: spacing.md, alignItems: "stretch" },
@@ -169,5 +170,5 @@ const styles = StyleSheet.create({
   placeVisualText: { fontSize: 30 },
   photoLink: { width: 84, height: 84 },
   selectionSummary: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  bottomAction: { backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: colors.line, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  bottomAction: { position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 10, backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: colors.line, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
 });
