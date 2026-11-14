@@ -57,4 +57,24 @@ describe('GooglePlaceSearchAdapter photos', () => {
     const options = request.mock.calls[0]?.[1] as RequestInit;
     expect((options.headers as Record<string, string>)['X-Goog-FieldMask']).toBe('primaryType');
   });
+
+  it('loads regular opening hours for itinerary validation', async () => {
+    const regularOpeningHours = {
+      periods: [{ open: { day: 1, hour: 9, minute: 0 }, close: { day: 1, hour: 18, minute: 0 } }],
+      weekdayDescriptions: ['월요일: 오전 9:00~오후 6:00'],
+    };
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      primaryType: 'museum', regularOpeningHours, utcOffsetMinutes: 540,
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', request);
+    const adapter = new GooglePlaceSearchAdapter({
+      getOrThrow: vi.fn().mockReturnValue('server-api-key'),
+    } as unknown as ConfigService);
+
+    await expect(adapter.getSchedulingDetails('google-place-1')).resolves.toEqual({
+      primaryType: 'museum', regularOpeningHours, utcOffsetMinutes: 540,
+    });
+    const options = request.mock.calls[0]?.[1] as RequestInit;
+    expect((options.headers as Record<string, string>)['X-Goog-FieldMask']).toBe('primaryType,regularOpeningHours,utcOffsetMinutes');
+  });
 });

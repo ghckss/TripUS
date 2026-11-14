@@ -17,6 +17,7 @@ export class MockAiPlannerAdapter implements AiPlannerPort {
         activity: `${place.name} 방문`,
         travelMethod: '대중교통',
         travelDurationMinutes: 20,
+        preferredTimeSlot: 'any',
       })),
       unplaced: [],
       recommendations: [],

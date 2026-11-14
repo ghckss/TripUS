@@ -75,26 +75,23 @@ export default function PlacesScreen() {
         {loading && <Card><AppText color={colors.muted}>장소를 불러오는 중이에요…</AppText></Card>}
         {!loading && places.length === 0 && <Card><AppText variant="heading">아직 저장한 장소가 없어요</AppText><AppText color={colors.muted}>가고 싶은 장소를 먼저 저장해 보세요.</AppText></Card>}
         {filteredPlaces.map((place) => <Card key={place.id}>
-          <View style={styles.placeHeaderRow}>
+          <Pressable
+            accessibilityLabel={`${place.name} 선택`}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: selectedIds.has(place.id) }}
+            hitSlop={8}
+            onPress={() => toggleSelection(place.id)}
+            style={[styles.checkbox, selectedIds.has(place.id) && styles.checkboxSelected]}
+          >
+            {selectedIds.has(place.id) && <AppText variant="label" color={colors.white}>✓</AppText>}
+          </Pressable>
+          <View style={styles.placeMediaRow}>
             <PlaceCardVisual placeId={place.id} tag={place.tag} tripId={tripId} />
             <View style={styles.placeIdentity}>
-              <View style={styles.titleRow}>
-                <Pressable
-                  accessibilityLabel={`${place.name} 선택`}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: selectedIds.has(place.id) }}
-                  hitSlop={8}
-                  onPress={() => toggleSelection(place.id)}
-                  style={[styles.checkbox, selectedIds.has(place.id) && styles.checkboxSelected]}
-                >
-                  {selectedIds.has(place.id) && <AppText variant="label" color={colors.white}>✓</AppText>}
-                </Pressable>
-                <AppText variant="heading" style={styles.placeName}>{place.name}</AppText>
-              </View>
+              <AppText numberOfLines={2} variant="heading" style={styles.placeName}>{place.name}</AppText>
               <View style={styles.tagRow}><Pill label={tagLabel(place.tag)} /></View>
             </View>
           </View>
-          <AppText color={colors.muted}>{placeDescription(place.note, place.address)}</AppText>
         </Card>)}
         {message && <Button label="다시 불러오기" variant="ghost" onPress={() => void reload()} />}
       </Screen>
@@ -138,12 +135,8 @@ function PlaceCardVisual({ placeId, tag, tripId }: { placeId: string; tag: strin
       <AppText style={styles.placeVisualText}>{tagIcon(tag)}</AppText>
     </View>;
   }
-  const attribution = photo.authorNames.length > 0
-    ? `Google Maps · ${photo.authorNames.join(", ")}`
-    : "Google Maps에서 사진 보기";
   const sourceUri = photo.googleMapsUri;
-  return <View style={styles.photoColumn}>
-    <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(sourceUri)}>
+  return <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(sourceUri)} style={styles.photoLink}>
       <Image
         accessibilityLabel="장소 대표 사진"
         cachePolicy="none"
@@ -153,16 +146,8 @@ function PlaceCardVisual({ placeId, tag, tripId }: { placeId: string; tag: strin
         style={styles.placePhoto}
         transition={150}
       />
-    </Pressable>
-    <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(sourceUri)}>
-      <AppText variant="caption" color={colors.muted} numberOfLines={2} style={styles.photoAttribution}>{attribution}</AppText>
-    </Pressable>
-  </View>;
-}
-
-export function placeDescription(note: string | null | undefined, address: string | null | undefined) {
-  const cleaned = note?.replace(/^AI 추천\s*·\s*(?:보관함\s*·\s*)?/u, "").trim();
-  return cleaned || address || "추가 설명이 없어요";
+      {photo.authorNames.length > 0 && <AppText numberOfLines={1} style={styles.photoCredit}>© {photo.authorNames.join(", ")}</AppText>}
+  </Pressable>;
 }
 
 const styles = StyleSheet.create({
@@ -178,16 +163,15 @@ const styles = StyleSheet.create({
   header: { gap: spacing.xs },
   managementActions: { flexDirection: "row", gap: spacing.sm },
   page: { flex: 1, backgroundColor: colors.canvas },
-  placeHeaderRow: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
-  placeIdentity: { flex: 1, gap: spacing.sm, paddingTop: spacing.xs },
+  placeMediaRow: { flexDirection: "row", gap: spacing.md, alignItems: "stretch" },
+  placeIdentity: { flex: 1, justifyContent: "space-between", paddingVertical: spacing.xs },
   placeName: { flexShrink: 1 },
-  placePhoto: { width: 84, height: 76, borderRadius: 16, backgroundColor: colors.line },
-  placeVisual: { width: 76, height: 76, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  placePhoto: { width: 84, height: 84, borderRadius: 16, backgroundColor: colors.line },
+  placeVisual: { width: 84, height: 84, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   placeVisualText: { fontSize: 30 },
-  photoAttribution: { fontSize: 12, lineHeight: 16, textAlign: "center" },
-  photoColumn: { width: 84, gap: spacing.xs },
+  photoCredit: { position: "absolute", left: 4, right: 4, bottom: 3, color: colors.white, fontSize: 9, lineHeight: 11, textShadowColor: "rgba(0,0,0,0.8)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  photoLink: { width: 84, height: 84 },
   selectionSummary: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   bottomAction: { backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: colors.line, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  tagRow: { alignSelf: "flex-start", marginLeft: 36 },
-  titleRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  tagRow: { alignSelf: "flex-start" },
 });

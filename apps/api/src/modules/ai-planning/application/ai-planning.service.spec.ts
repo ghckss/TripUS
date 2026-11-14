@@ -15,10 +15,13 @@ import {
   addLodgingEndpoints,
   allowsMultipleOptionalStops,
   applyDailyPlanningTargets,
+  applyVisitTimePreferences,
   assessExplicitRequestCoverage,
+  assessOpeningHours,
   assessPlanQuality,
   assessRawOutputContract,
   assessRawDayCoverage,
+  assessTimeSuitability,
   AiPlanningService,
   buildPlannerDays,
   enumerateTripDates,
@@ -119,23 +122,28 @@ describe('AI plan quality severity', () => {
 describe('explicit activity request coverage', () => {
   it('extracts a named tour as a mandatory activity while leaving general preferences soft', () => {
     expect(extractRequiredActivityRequests('하루는 예스허지 버스투어 예정. 현지 맛집을 좋아해요.')).toEqual([
-      '예스허지 버스투어',
+      { name: '예스허지 버스투어', sourceText: '하루는 예스허지 버스투어 예정', fullDay: true, minimumStops: 2 },
     ]);
     expect(extractRequiredActivityRequests('버스투어는 피하고 싶어요')).toEqual([]);
   });
 
   it('requires the named tour to be present in an itinerary visit', () => {
-    const missing = assessExplicitRequestCoverage(['예스허지 버스투어'], {
+    const request = { name: '예스허지 버스투어', sourceText: '하루는 예스허지 버스투어 예정', fullDay: true, minimumStops: 2 };
+    const missing = assessExplicitRequestCoverage([request], {
       placements: [], unplaced: [], recommendations: [{
         placeName: '예류지질공원', regionName: '신베이', suggestedDate: '2026-11-08', position: 0,
         startTime: '09:00', durationMinutes: 90, activity: '해안 지형 관람', travelMethod: '버스',
         travelDurationMinutes: 50, reason: '대표 명소',
       }],
     });
-    const covered = assessExplicitRequestCoverage(['예스허지 버스투어'], {
+    const covered = assessExplicitRequestCoverage([request], {
       placements: [], unplaced: [], recommendations: [{
         placeName: '예류지질공원', regionName: '신베이', suggestedDate: '2026-11-08', position: 0,
-        startTime: '09:00', durationMinutes: 90, activity: '예스허지 버스투어 첫 코스', travelMethod: '버스',
+        startTime: '09:00', durationMinutes: 180, activity: '예스허지 버스투어 첫 코스', travelMethod: '버스',
+        travelDurationMinutes: 50, reason: '사용자 요청 투어',
+      }, {
+        placeName: '지우펀', regionName: '신베이', suggestedDate: '2026-11-08', position: 1,
+        startTime: '13:00', durationMinutes: 180, activity: '예스허지 버스투어 마지막 코스', travelMethod: '버스',
         travelDurationMinutes: 50, reason: '사용자 요청 투어',
       }],
     });
@@ -169,7 +177,7 @@ describe('daily planning targets', () => {
     ]);
   });
 
-  it('compacts generated visit durations so the final schedule stays inside the available window', () => {
+  it('preserves requested times and durations instead of hiding an impossible schedule through compression', () => {
     const normalized = normalizeVisitSchedule([
       { savedPlaceId: 'place-1', date: '2026-11-08', position: 0, scheduledTime: '16:00', durationMinutes: 300, travelDurationMinutes: 30 },
       { savedPlaceId: 'place-2', date: '2026-11-08', position: 1, scheduledTime: '20:00', durationMinutes: 300, travelDurationMinutes: 30 },
@@ -178,9 +186,43 @@ describe('daily planning targets', () => {
       availableStartTime: '15:00', availableEndTime: '21:00',
     }], new Set(['place-1', 'place-2']));
 
-    expect(normalized[0]?.scheduledTime).toBe('15:30');
+    expect(normalized[0]?.scheduledTime).toBe('16:00');
+    expect(normalized[0]?.durationMinutes).toBe(300);
     const last = normalized[1]!;
-    expect(Number(last.scheduledTime!.slice(0, 2)) * 60 + Number(last.scheduledTime!.slice(3)) + last.durationMinutes!).toBeLessThanOrEqual(21 * 60);
+    expect(last.scheduledTime).toBe('21:30');
+    expect(last.durationMinutes).toBe(300);
+  });
+});
+
+describe('time-aware itinerary optimization', () => {
+  it('moves an observation deck into the evening without shortening its visit', () => {
+    const preferred = applyVisitTimePreferences([{
+      savedPlaceId: 'taipei-101', date: '2026-11-05', position: 0,
+      scheduledTime: '09:35', durationMinutes: 90, travelDurationMinutes: 20,
+      activitySummary: '타이베이101 전망대 방문',
+    }], new Map([['taipei-101', { name: '타이베이101 전망대', tag: PlaceTag.Attraction }]]), []);
+    const normalized = normalizeVisitSchedule(preferred, [{
+      date: '2026-11-05', startLodging: null, endLodging: null,
+      availableStartTime: '09:00', availableEndTime: '21:00',
+    }], new Set(['taipei-101']));
+
+    expect(normalized[0]).toMatchObject({ scheduledTime: '17:00', durationMinutes: 90, preferredTimeSlot: 'evening' });
+    expect(assessTimeSuitability(normalized)).toEqual([]);
+  });
+
+  it('detects visits outside verified regular opening hours', () => {
+    const issues = assessOpeningHours([{
+      savedPlaceId: 'museum', date: '2026-11-05', position: 0,
+      scheduledTime: '18:00', durationMinutes: 60,
+    }], new Map([['museum', {
+      primaryType: 'museum', utcOffsetMinutes: 480,
+      regularOpeningHours: {
+        periods: [{ open: { day: 4, hour: 9, minute: 0 }, close: { day: 4, hour: 17, minute: 0 } }],
+        weekdayDescriptions: [],
+      },
+    }]]));
+
+    expect(issues).toEqual(['closed_place:2026-11-05:museum']);
   });
 });
 
@@ -594,7 +636,7 @@ describe('AiPlanningService', () => {
     });
 
     expect(result.status).toBe(AiPlanGenerationStatus.Generated);
-    expect(planner.generate).toHaveBeenCalledOnce();
+    expect(planner.generate).toHaveBeenCalledTimes(2);
     expect(search).toHaveBeenCalledWith('점심 식사 식당', '대한민국 서울');
     expect(replace).toHaveBeenCalledWith(tripId, expect.arrayContaining([
       expect.objectContaining({
@@ -760,9 +802,17 @@ describe('AiPlanningService', () => {
       conflicts: [],
       itinerary: { items: [], unplaced: [] },
     });
-    let savedIndex = 0;
     const saveTrip = vi.fn((input: Record<string, unknown>) => Promise.resolve(input));
-    const savePlace = vi.fn((input: Record<string, unknown>) => Promise.resolve({ ...input, id: recommendationIds[savedIndex++] }));
+    const idsByName = new Map([
+      ['아침 식당', recommendationIds[0]],
+      ['점심 식당', recommendationIds[1]],
+      ['저녁 식당', recommendationIds[2]],
+      ['서울공예박물관', recommendationIds[3]],
+    ]);
+    const savePlace = vi.fn((input: Record<string, unknown>) => Promise.resolve({
+      ...input,
+      id: idsByName.get(String(input.name)),
+    }));
     const service = new AiPlanningService(
       { findOneBy: vi.fn().mockResolvedValue({
         id: tripId, title: '서울 자유 여행', destination: 'Korea', timezone: 'Asia/Seoul',
@@ -807,7 +857,7 @@ describe('AiPlanningService', () => {
       places: [],
       days: [expect.objectContaining({ startLodging: null, endLodging: null, targetPlannedMinutes: 420 })],
     }));
-    expect(planner.generate).toHaveBeenCalledTimes(3);
+    expect(planner.generate).toHaveBeenCalledTimes(4);
     const revisionInput = planner.generate.mock.calls[1]?.[0] as unknown as { revisionGuidance?: string };
     expect(revisionInput.revisionGuidance).toContain('Return placements as []');
     const secondRevisionInput = planner.generate.mock.calls[2]?.[0] as unknown as { revisionGuidance?: string };
@@ -897,7 +947,10 @@ describe('AiPlanningService', () => {
       {
         find: vi.fn().mockResolvedValue([primary, secondary, visit, previousAiRecommendation]),
         create: vi.fn((input: Record<string, unknown>) => input),
-        save: vi.fn((input: Record<string, unknown>) => Promise.resolve({ ...input, id: recommendedIds.shift()! })),
+        save: vi.fn((input: Record<string, unknown>) => Promise.resolve({
+          ...input,
+          id: String(input.name) === 'Gyeongbokgung' ? recommendedIds[0] : recommendedIds[1],
+        })),
         remove,
       } as never,
       planner,
@@ -948,7 +1001,7 @@ describe('AiPlanningService', () => {
       },
       places: [{
         id: visit.id, name: visit.name, address: visit.address, latitude: visit.latitude, longitude: visit.longitude,
-        tag: visit.tag, preference: visit.preference, note: visit.note,
+        tag: visit.tag, preference: visit.preference, note: visit.note, primaryType: null, regularOpeningHours: null,
       }],
       days: [{
         date: '2026-11-08',
@@ -959,6 +1012,8 @@ describe('AiPlanningService', () => {
         availableStartTime: '09:00',
         availableEndTime: '21:00',
         targetPlannedMinutes: 420,
+        hasStartBoundary: false,
+        hasEndBoundary: false,
       }],
       referenceItinerary: [],
       lockedPlacements: [],

@@ -11,6 +11,7 @@ const placement = {
   activity: '장소 둘러보기',
   travelMethod: '도보',
   travelDurationMinutes: 10,
+  preferredTimeSlot: 'any',
 };
 
 const recommendation = {
@@ -24,6 +25,7 @@ const recommendation = {
   travelMethod: '대중교통',
   travelDurationMinutes: 20,
   reason: '서울의 대표적인 공원',
+  preferredTimeSlot: 'daytime',
 };
 
 describe('createAiPlanSchema', () => {

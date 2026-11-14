@@ -20,6 +20,8 @@ describe('MockAiPlannerAdapter', () => {
       tag: 'sight',
       preference: index === 4 ? 'must_visit' : 'want_to_visit',
       note: null,
+      primaryType: 'tourist_attraction',
+      regularOpeningHours: null,
     }));
 
     const result = await planner.generate({

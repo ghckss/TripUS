@@ -47,7 +47,8 @@ export const AI_PLANNING_TASK = {
     'startLodging과 endLodging이 있으면 그 지점에서 시작하고 끝내며, 없으면 숙소를 만들지 않는다.',
     '가까운 장소를 한 권역으로 묶고 추천 장소 사이의 이동은 30분 이내가 되도록 한다.',
     '여행 밀도, 선택한 여행 방식들, 복수 이동수단, 예산, 추가 요청사항 및 lockedPlacements를 존중한다.',
-    'requiredActivityRequests에 추출된 사용자의 명시 투어·체험·공연 요청은 반드시 일정에 넣고 해당 방문 activity에 요청 문구를 그대로 남긴다.',
+    'requiredActivityRequests에 추출된 사용자의 명시 투어·체험·공연 요청은 반드시 일정에 넣는다. 여러 장소를 뜻하는 투어 약칭은 집결지만 넣지 않고 실제 방문 장소를 풀어 같은 날 배치한다.',
+    '각 장소의 영업시간과 권장 시간대를 지키며 전망대·야경 명소·야시장·아침 전문점처럼 시간대가 경험 품질을 좌우하는 장소를 적합한 시각에 배치한다.',
     'referenceItinerary가 있으면 수정 대상이 아닌 다른 날짜의 읽기 전용 일정이다. 해당 날짜를 변경하거나 응답에 포함하지 말고, 장소·지역·테마 중복과 여행 전체 흐름을 판단하는 참고 자료로만 사용한다.',
     '사용자가 직접 배치한 장소는 여러 날짜에 중복되어도 유지한다. AI 추천 장소는 추가 요청사항에 명시적인 재방문 요청이 없는 한 places, referenceItinerary 또는 같은 응답의 다른 날짜와 중복하지 않는다.',
     '카페, 디저트, 차처럼 관광 명소나 식사 장소가 아닌 휴식 장소는 명시적인 투어 요청이 없는 한 같은 세부 유형을 하루 한 곳만 추천한다. 카페와 디저트, 카페와 차처럼 세부 유형이 다르면 함께 추천할 수 있다.',
@@ -68,7 +69,24 @@ export interface AiPlannerPlace {
   tag: string;
   preference: string;
   note: string | null;
+  primaryType: string | null;
+  regularOpeningHours: {
+    periods: Array<{
+      open: { day: number; hour: number; minute: number };
+      close?: { day: number; hour: number; minute: number };
+    }>;
+    weekdayDescriptions: string[];
+  } | null;
 }
+
+export interface AiPlannerRequiredActivityRequest {
+  name: string;
+  sourceText: string;
+  fullDay: boolean;
+  minimumStops: number;
+}
+
+export type AiVisitTimeSlot = 'any' | 'morning' | 'lunch' | 'daytime' | 'sunset' | 'evening' | 'night';
 
 export interface AiPlannerLodging {
   savedPlaceId: string;
@@ -89,6 +107,8 @@ export interface AiPlannerDay {
   availableEndTime?: string;
   /** Visit and travel minutes that can realistically fit in this date's available window. */
   targetPlannedMinutes?: number;
+  hasStartBoundary?: boolean;
+  hasEndBoundary?: boolean;
 }
 
 export interface AiPlannerReferenceDay {
@@ -128,7 +148,7 @@ export interface AiPlannerInput {
     themes: TravelTheme[];
     additionalRequests: string | null;
     /** Named tours, experiences, performances, or activities that must appear in the itinerary. */
-    requiredActivityRequests: string[];
+    requiredActivityRequests: AiPlannerRequiredActivityRequest[];
   };
   places: AiPlannerPlace[];
   days: AiPlannerDay[];
@@ -158,6 +178,7 @@ export interface AiPlannerPlacement {
   activity?: string;
   travelMethod?: string;
   travelDurationMinutes?: number;
+  preferredTimeSlot?: AiVisitTimeSlot;
 }
 
 export interface AiPlannerOutput {
@@ -174,6 +195,7 @@ export interface AiPlannerOutput {
     travelMethod: string;
     travelDurationMinutes: number;
     reason: string;
+    preferredTimeSlot?: AiVisitTimeSlot;
   }>;
   savedRecommendations?: Array<{
     placeName: string;

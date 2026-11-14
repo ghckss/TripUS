@@ -18,6 +18,7 @@ import {
   type AiPlannerInput,
   type AiPlannerOutput,
   type AiPlannerPort,
+  type AiVisitTimeSlot,
   AI_PLANNING_TASK,
   TRAVEL_DENSITY_POLICIES,
   TravelDensity,
@@ -31,7 +32,13 @@ import {
 import { AiPlanningRateLimiter } from './ai-planning-rate-limiter';
 import { EntitlementsService } from '../../entitlements/application/entitlements.service';
 import { PlacePreference, PlaceTag } from '../../places/domain/entities/saved-place.entity';
-import { PLACE_SEARCH_PORT, type PlaceSearchCandidate, type PlaceSearchPort } from '../../places/domain/place-search.port';
+import {
+  PLACE_SEARCH_PORT,
+  type PlaceOpeningPeriod,
+  type PlaceSchedulingDetails,
+  type PlaceSearchCandidate,
+  type PlaceSearchPort,
+} from '../../places/domain/place-search.port';
 import { ROUTES_PORT, type RoutesPort } from '../../routes/domain/routes.port';
 import { AiBudgetLevel, AiTransportMode, type GenerateAiPlanDto } from './dto/generate-ai-plan.dto';
 import { writeStructuredLog } from '../../../common/http/json-logger';
@@ -46,10 +53,12 @@ type PlannedPlacement = {
   activitySummary?: string;
   travelMethod?: string;
   travelDurationMinutes?: number;
+  preferredTimeSlot?: AiVisitTimeSlot;
+  fixedSchedule?: boolean;
 };
 
 const MAX_PLANNER_ATTEMPTS = 3;
-const MAX_MATERIALIZATION_ATTEMPTS = 3;
+const MAX_MATERIALIZATION_ATTEMPTS = 4;
 const DEFAULT_DAY_START_MINUTES = 9 * 60;
 const DEFAULT_DAY_END_MINUTES = 21 * 60;
 const BOUNDARY_TRANSITION_BUFFER_MINUTES = 60;
@@ -142,6 +151,8 @@ export class AiPlanningService {
       })),
     ];
     if (planningPlaces.length > 100) throw new BadRequestException('AI planning supports at most 100 saved places');
+    const schedulingDetailsCache = new Map<string, PlaceSchedulingDetails | null>();
+    const planningSchedulingDetails = await this.loadSchedulingDetails(planningPlaces, schedulingDetailsCache);
     const days = applyDailyPlanningTargets(
       buildPlannerDays(enumerateTripDates(trip.startDate, trip.endDate), current.items, places, primaryLodging),
       density,
@@ -188,6 +199,8 @@ export class AiPlanningService {
           tag: place.tag,
           preference: place.preference,
           note: place.note,
+          primaryType: planningSchedulingDetails.get(place.id)?.primaryType ?? null,
+          regularOpeningHours: planningSchedulingDetails.get(place.id)?.regularOpeningHours ?? null,
         })),
         days,
         referenceItinerary: targetDate
@@ -265,6 +278,7 @@ export class AiPlanningService {
       let generated: PlannedPlacement[];
       let recommended: PlannedPlacement[];
       let qualityIssues: string[];
+      let finalReviewCompleted = false;
       for (let materializationAttempt = 1; ; materializationAttempt += 1) {
         materialized = await this.materializeRecommendations(
           trip.id,
@@ -325,7 +339,13 @@ export class AiPlanningService {
           placeTagsById = new Map(allPlanningPlaces.map((place) => [place.id, place.tag]));
         }
         const generatedIdsBeforeScheduling = new Set(generated.map((item) => item.savedPlaceId));
-        const scheduledPlacements = reindexPlacementsByTime([...generated, ...materialized.placements]);
+        const scheduleDetailsByPlaceId = await this.loadSchedulingDetails(allPlanningPlaces, schedulingDetailsCache);
+        const preferredPlacements = applyVisitTimePreferences(
+          [...generated, ...materialized.placements],
+          new Map(allPlanningPlaces.map((place) => [place.id, place])),
+          plannerInput.travelerContext.requiredActivityRequests,
+        );
+        const scheduledPlacements = reindexPlacementsByTime(preferredPlacements);
         generated = scheduledPlacements.filter((item) => generatedIdsBeforeScheduling.has(item.savedPlaceId));
         materialized.placements = scheduledPlacements.filter((item) => !generatedIdsBeforeScheduling.has(item.savedPlaceId));
         const routeCheckedPlacements = await this.enrichTravelEstimates(
@@ -358,8 +378,37 @@ export class AiPlanningService {
           placeNamesById,
           lockedPlannerPlaceIds,
         ));
+        qualityIssues.push(...assessTimeSuitability([...generated, ...recommended]));
+        qualityIssues.push(...assessOpeningHours(
+          [...generated, ...recommended],
+          scheduleDetailsByPlaceId,
+        ));
         qualityIssues = [...new Set(qualityIssues)];
         const repairableIssues = qualityIssues.filter(isRepairableQualityIssue);
+        if (repairableIssues.length === 0 && !finalReviewCompleted && materializationAttempt < MAX_MATERIALIZATION_ATTEMPTS) {
+          writeStructuredLog('info', 'ai.generation.final_review_started', { generationId, tripId });
+          const materializedDraft = toMaterializedReviewDraft(
+            generated,
+            recommended,
+            new Map(allPlanningPlaces.map((place) => [place.id, place])),
+            output,
+          );
+          if (createdRecommendationEntities.length > 0) await this.places.remove(createdRecommendationEntities);
+          createdRecommendationEntities = [];
+          output = await this.planner.generate({
+            ...plannerInput,
+            revisionDraft: materializedDraft,
+            revisionGuidance: [
+              '최종 품질 검토 단계다. Google 장소 검증, 실제 이동시간, 영업시간과 서버 시간대 보정까지 반영된 직전 일정 전체가 실제 여행자가 그대로 사용해도 좋은 일정인지 다시 검토하고 필요한 부분을 직접 수정한다.',
+              '사용자가 명시한 투어·장소가 실제 방문지로 충분히 구성됐는지, 장소별 영업시간과 가장 좋은 시간대가 맞는지, 식사 간격이 자연스러운지, 이동시간과 시작·종료 지점 도착이 현실적인지 확인한다.',
+              '전망대·관람차·야경 명소는 일몰 이후, 야시장은 저녁, 아침 전문점은 오전에 배치한다. 시간이 부족하면 체류시간을 비현실적으로 줄이지 말고 중요도가 낮은 AI 추천 장소를 제거한다.',
+              '문제가 없는 항목은 유지하고 수정된 전체 일정을 반환한다.',
+            ].join(' '),
+          });
+          finalReviewCompleted = true;
+          writeStructuredLog('info', 'ai.generation.final_review_completed', { generationId, tripId });
+          continue;
+        }
         if (repairableIssues.length === 0 || materializationAttempt >= MAX_MATERIALIZATION_ATTEMPTS) break;
 
         writeStructuredLog('warn', 'ai.generation.materialization_revision', {
@@ -388,11 +437,17 @@ export class AiPlanningService {
             repairableIssues.some((issue) => issue.startsWith('missing_meal:'))
               ? 'Add a real restaurant for every missing breakfast, lunch, or dinner slot. Cafes and dessert shops do not count as meals.'
               : '',
-            repairableIssues.some((issue) => issue.startsWith('required_activity_missing:'))
+            repairableIssues.some((issue) => issue.startsWith('required_activity_'))
               ? formatExplicitRequestRevisionGuidance(
                 plannerInput.travelerContext.requiredActivityRequests,
                 repairableIssues,
               )
+              : '',
+            repairableIssues.some((issue) => issue.startsWith('time_slot_mismatch:'))
+              ? 'Move each time_slot_mismatch visit into its preferredTimeSlot and reorder nearby visits around that anchor. Night views, observation decks, Ferris wheels, and night markets must not be scheduled in the morning.'
+              : '',
+            repairableIssues.some((issue) => issue.startsWith('closed_place:'))
+              ? 'One or more verified places are closed at the proposed time. Move them inside the supplied regularOpeningHours or replace optional recommendations with open alternatives.'
               : '',
             `Required totals by date are: ${formatCoverageTargets(days, days.map((day) => day.date), density)}.`,
             'Return the complete corrected itinerary. Keep valid saved-place placements, replace unverifiable recommendations, and use chronological non-overlapping times.',
@@ -449,9 +504,20 @@ export class AiPlanningService {
         [...places, ...materialized.created],
         request.transportModes,
       );
+      const persistedPlacements = placements.map((placement) => ({
+        savedPlaceId: placement.savedPlaceId,
+        date: placement.date,
+        position: placement.position,
+        ...(placement.locked !== undefined ? { locked: placement.locked } : {}),
+        ...(placement.scheduledTime !== undefined ? { scheduledTime: placement.scheduledTime } : {}),
+        ...(placement.durationMinutes !== undefined ? { durationMinutes: placement.durationMinutes } : {}),
+        ...(placement.activitySummary !== undefined ? { activitySummary: placement.activitySummary } : {}),
+        ...(placement.travelMethod !== undefined ? { travelMethod: placement.travelMethod } : {}),
+        ...(placement.travelDurationMinutes !== undefined ? { travelDurationMinutes: placement.travelDurationMinutes } : {}),
+      }));
       const result = targetDate
-        ? await this.itineraries.replaceDay(tripId, targetDate, placements, ItinerarySource.Ai)
-        : await this.itineraries.replace(tripId, placements, ItinerarySource.Ai);
+        ? await this.itineraries.replaceDay(tripId, targetDate, persistedPlacements, ItinerarySource.Ai)
+        : await this.itineraries.replace(tripId, persistedPlacements, ItinerarySource.Ai);
       let finalItinerary = result.itinerary;
       if (result.status === ItineraryUpdateStatus.Updated) {
         await this.entitlements.recordSuccessfulAiGeneration();
@@ -473,7 +539,7 @@ export class AiPlanningService {
         tripId,
         status: result.status,
         durationMs: Math.round(performance.now() - startedAt),
-        placementCount: placements.length,
+        placementCount: persistedPlacements.length,
       });
       return {
         status: result.status === ItineraryUpdateStatus.Updated ? AiPlanGenerationStatus.Generated : AiPlanGenerationStatus.Conflict,
@@ -511,6 +577,29 @@ export class AiPlanningService {
         failureReason: reason,
       };
     }
+  }
+
+  private async loadSchedulingDetails(
+    places: SavedPlaceEntity[],
+    cache: Map<string, PlaceSchedulingDetails | null>,
+  ): Promise<Map<string, PlaceSchedulingDetails | null>> {
+    const detailsByPlaceId = new Map<string, PlaceSchedulingDetails | null>();
+    await mapWithConcurrency(places, 6, async (place) => {
+      if (!place.googlePlaceId || !this.placeSearch.getSchedulingDetails) {
+        detailsByPlaceId.set(place.id, null);
+        return;
+      }
+      if (!cache.has(place.googlePlaceId)) {
+        try {
+          cache.set(place.googlePlaceId, await this.placeSearch.getSchedulingDetails(place.googlePlaceId));
+        } catch {
+          cache.set(place.googlePlaceId, null);
+          this.logger.warn(`Place scheduling details unavailable placeId=${place.id}`);
+        }
+      }
+      detailsByPlaceId.set(place.id, cache.get(place.googlePlaceId) ?? null);
+    });
+    return detailsByPlaceId;
   }
 
   private async resolveActualPlaceTags(
@@ -611,6 +700,7 @@ export class AiPlanningService {
           activitySummary: `${mealLabel(parsed.meal)} 식사`,
           travelMethod: preferredTravelMethod(input.transportModes),
           travelDurationMinutes: 0,
+          preferredTimeSlot: parsed.meal === 'breakfast' ? 'morning' : parsed.meal === 'lunch' ? 'lunch' : 'evening',
         });
       } catch {
         this.logger.warn(`Meal supplement failed date=${parsed.date} meal=${parsed.meal}`);
@@ -871,40 +961,56 @@ const REQUIRED_ACTIVITY_MARKER = /(투어|체험|공연|콘서트|뮤지컬|축�
 const NEGATED_ACTIVITY_REQUEST = /(싫|제외|피하|않|말아|금지|빼|취소)/u;
 
 /** Extract only named, schedulable experiences from free-form requests. General tastes remain soft context. */
-export function extractRequiredActivityRequests(additionalRequests: string): string[] {
+export function extractRequiredActivityRequests(
+  additionalRequests: string,
+): AiPlannerInput['travelerContext']['requiredActivityRequests'] {
   const requests = additionalRequests
     .split(/[\n.!?。;,]+/u)
-    .map((value) => value
-      .replace(/^(?:추가\s*요청(?:사항)?|좋아하는\s*것|원하는\s*것)\s*:\s*/u, '')
-      .replace(/^하루(?:는|동안)?\s*/u, '')
-      .trim())
-    .filter((value) => REQUIRED_ACTIVITY_MARKER.test(value) && !NEGATED_ACTIVITY_REQUEST.test(value))
-    .map((value) => value
-      .replace(/\s*(?:은|는|을|를)?\s*(?:할\s*거(?:야|예요|에요|라고.*)?|하려고.*|하고\s*싶.*|하고자.*|(?:할\s*)?예정(?:이에요|예요|입니다)?|예약했.*|신청했.*)$/u, '')
-      .trim())
-    .filter((value) => value.length > 1);
-  return [...new Set(requests)];
+    .map((sourceText) => ({
+      sourceText: sourceText.trim(),
+      fullDay: /^하루(?:는|동안)?\s*/u.test(sourceText.trim()),
+      value: sourceText
+        .replace(/^(?:추가\s*요청(?:사항)?|좋아하는\s*것|원하는\s*것)\s*:\s*/u, '')
+        .replace(/^하루(?:는|동안)?\s*/u, '')
+        .trim(),
+    }))
+    .filter(({ value }) => REQUIRED_ACTIVITY_MARKER.test(value) && !NEGATED_ACTIVITY_REQUEST.test(value))
+    .map(({ value, sourceText, fullDay }) => ({
+      sourceText,
+      fullDay,
+      name: value
+        .replace(/\s*(?:은|는|을|를)?\s*(?:할\s*거(?:야|예요|에요|라고.*)?|하려고.*|하고\s*싶.*|하고자.*|(?:할\s*)?예정(?:이에요|예요|입니다)?|예약했.*|신청했.*)$/u, '')
+        .trim(),
+      minimumStops: fullDay && /투어/u.test(value) ? 2 : 1,
+    }))
+    .filter(({ name }) => name.length > 1);
+  return [...new Map(requests.map((request) => [request.name, request])).values()];
 }
 
 export function assessExplicitRequestCoverage(
-  requiredActivityRequests: string[],
+  requiredActivityRequests: AiPlannerInput['travelerContext']['requiredActivityRequests'],
   output: AiPlannerOutput,
   placeNamesById: Map<string, string> = new Map(),
   lockedPlaceIds: Set<string> = new Set(),
 ): string[] {
   if (requiredActivityRequests.length === 0) return [];
-  const evidence = [
-    ...output.placements.flatMap((item) => [placeNamesById.get(item.savedPlaceId) ?? '', item.activity ?? '']),
-    ...output.recommendations.flatMap((item) => [item.placeName, item.activity, item.reason]),
-    ...[...lockedPlaceIds].map((id) => placeNamesById.get(id) ?? ''),
-  ].join(' ');
-  const normalizedEvidence = normalizeRequestEvidence(evidence);
   return requiredActivityRequests.flatMap((request, index) => {
-    const normalizedRequest = normalizeRequestEvidence(request);
-    const tokens = activityRequestTokens(request);
-    const covered = (normalizedRequest.length > 0 && normalizedEvidence.includes(normalizedRequest))
-      || (tokens.length > 0 && tokens.every((token) => normalizedEvidence.includes(token)));
-    return covered ? [] : [`required_activity_missing:${index}`];
+    const normalizedRequest = normalizeRequestEvidence(request.name);
+    const tokens = activityRequestTokens(request.name);
+    const matchingVisits = [
+      ...output.placements.map((item) => ({ text: `${placeNamesById.get(item.savedPlaceId) ?? ''} ${item.activity ?? ''}`, duration: (item.durationMinutes ?? 0) + (item.travelDurationMinutes ?? 0) })),
+      ...output.recommendations.map((item) => ({ text: `${item.placeName} ${item.activity} ${item.reason}`, duration: item.durationMinutes + item.travelDurationMinutes })),
+    ].filter(({ text }) => {
+      const normalized = normalizeRequestEvidence(text);
+      return normalized.includes(normalizedRequest) || (tokens.length > 0 && tokens.every((token) => normalized.includes(token)));
+    });
+    const lockedCovered = [...lockedPlaceIds].some((id) => normalizeRequestEvidence(placeNamesById.get(id) ?? '').includes(normalizedRequest));
+    if (matchingVisits.length === 0 && !lockedCovered) return [`required_activity_missing:${index}`];
+    if (matchingVisits.length < request.minimumStops && !lockedCovered) return [`required_activity_stops_missing:${index}`];
+    if (request.fullDay && matchingVisits.reduce((total, visit) => total + visit.duration, 0) < 420) {
+      return [`required_activity_duration_short:${index}`];
+    }
+    return [];
   });
 }
 
@@ -920,15 +1026,18 @@ function normalizeRequestEvidence(value: string): string {
   return value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
 }
 
-function formatExplicitRequestRevisionGuidance(requiredRequests: string[], issues: string[]): string {
+function formatExplicitRequestRevisionGuidance(
+  requiredRequests: AiPlannerInput['travelerContext']['requiredActivityRequests'],
+  issues: string[],
+): string {
   const missing = issues.flatMap((issue) => {
-    const match = /^required_activity_missing:(\d+)$/u.exec(issue);
+    const match = /^required_activity_(?:missing|stops_missing|duration_short):(\d+)$/u.exec(issue);
     if (!match) return [];
     const request = requiredRequests[Number(match[1])];
     return request ? [request] : [];
   });
   return missing.length > 0
-    ? `These explicit traveler activities are mandatory and were omitted: ${missing.map((item) => `"${item}"`).join(', ')}. Schedule each one, preserve the exact request text in that visit's activity field, and return the complete itinerary.`
+    ? `These explicit traveler activities are mandatory and incomplete: ${missing.map((item) => `"${item.name}" (${item.sourceText})`).join(', ')}. Expand named tour shorthand into at least minimumStops concrete places, label every related activity with the exact request name, keep fullDay requests at least 420 minutes including travel, and return the complete itinerary.`
     : '';
 }
 
@@ -1054,6 +1163,7 @@ function toRecommendedPlacement(
     activitySummary: recommendation.activity,
     travelMethod: recommendation.travelMethod,
     travelDurationMinutes: recommendation.travelDurationMinutes,
+    preferredTimeSlot: recommendation.preferredTimeSlot,
   };
 }
 
@@ -1199,6 +1309,7 @@ export function normalizeGeneratedPlacements(
     if (placement.activity !== undefined) normalized.activitySummary = placement.activity;
     if (placement.travelMethod !== undefined) normalized.travelMethod = placement.travelMethod;
     if (placement.travelDurationMinutes !== undefined) normalized.travelDurationMinutes = placement.travelDurationMinutes;
+    if (placement.preferredTimeSlot !== undefined) normalized.preferredTimeSlot = placement.preferredTimeSlot;
     return [normalized];
   });
 }
@@ -1230,41 +1341,129 @@ export function normalizeVisitSchedule(
       .filter((item) => item.date === day.date)
       .sort((left, right) => left.position - right.position);
     if (visits.length === 0) continue;
-    const availableStart = day.availableStartTime ? timeToMinutes(day.availableStartTime) : DEFAULT_DAY_START_MINUTES;
-    const availableEnd = day.availableEndTime ? timeToMinutes(day.availableEndTime) : DEFAULT_DAY_END_MINUTES;
-    const availableMinutes = Math.max(0, availableEnd - availableStart);
-    const totalMinutes = () => visits.reduce((total, visit) =>
-      total + (visit.travelDurationMinutes ?? 0) + (visit.durationMinutes ?? 15), 0);
+    const availableStart = (day.availableStartTime ? timeToMinutes(day.availableStartTime) : DEFAULT_DAY_START_MINUTES)
+      + (day.hasStartBoundary ? BOUNDARY_TRANSITION_BUFFER_MINUTES : 0);
+    const availableEnd = (day.availableEndTime ? timeToMinutes(day.availableEndTime) : DEFAULT_DAY_END_MINUTES)
+      - (day.hasEndBoundary ? BOUNDARY_TRANSITION_BUFFER_MINUTES : 0);
 
-    let excess = totalMinutes() - availableMinutes;
-    while (excess > 0) {
-      const reducible = visits.filter((visit) => (visit.durationMinutes ?? 15) > 15);
-      if (reducible.length === 0) break;
-      for (const visit of reducible) {
-        if (excess <= 0) break;
-        const duration = visit.durationMinutes ?? 15;
-        const reduction = Math.min(duration - 15, Math.max(1, Math.ceil(excess / reducible.length)));
-        visit.durationMinutes = duration - reduction;
-        excess -= reduction;
+    while (visits.length > 0) {
+      const scheduled = scheduleVisitsWithoutCompression(visits, availableStart);
+      const finalEnd = scheduled.at(-1)?.end ?? availableStart;
+      if (finalEnd <= availableEnd) {
+        for (const { visit, start } of scheduled) visit.scheduledTime = minutesToTime(start);
+        break;
       }
-    }
-
-    while (totalMinutes() > availableMinutes) {
-      const optionalIndex = visits.findLastIndex((visit) => !requiredPlaceIds.has(visit.savedPlaceId));
-      if (optionalIndex < 0) break;
-      const [removed] = visits.splice(optionalIndex, 1);
+      const removable = visits
+        .map((visit, index) => ({ visit, index }))
+        .filter(({ visit }) => !requiredPlaceIds.has(visit.savedPlaceId) && !visit.fixedSchedule)
+        .sort((left, right) => (right.visit.durationMinutes ?? 15) - (left.visit.durationMinutes ?? 15))[0];
+      if (!removable) {
+        for (const { visit, start } of scheduled) visit.scheduledTime = minutesToTime(start);
+        break;
+      }
+      const [removed] = visits.splice(removable.index, 1);
       const normalizedIndex = normalized.indexOf(removed!);
       if (normalizedIndex >= 0) normalized.splice(normalizedIndex, 1);
-    }
-
-    let cursor = availableStart;
-    for (const visit of visits) {
-      const start = cursor + (visit.travelDurationMinutes ?? 0);
-      visit.scheduledTime = minutesToTime(start);
-      cursor = start + (visit.durationMinutes ?? 15);
+      visits.forEach((visit, index) => { visit.position = index; });
     }
   }
   return normalized;
+}
+
+function scheduleVisitsWithoutCompression(visits: PlannedPlacement[], availableStart: number) {
+  let cursor = availableStart;
+  return visits.map((visit) => {
+    const travel = visit.travelDurationMinutes ?? 0;
+    const requested = visit.scheduledTime ? timeToMinutes(visit.scheduledTime) : availableStart;
+    const preferred = timeSlotWindow(visit.preferredTimeSlot ?? 'any').start;
+    const start = Math.max(cursor + travel, requested, preferred ?? availableStart);
+    const end = start + (visit.durationMinutes ?? 15);
+    cursor = end;
+    return { visit, start, end };
+  });
+}
+
+export function applyVisitTimePreferences(
+  placements: PlannedPlacement[],
+  placesById: Map<string, Pick<SavedPlaceEntity, 'name' | 'tag'>>,
+  requiredRequests: AiPlannerInput['travelerContext']['requiredActivityRequests'],
+): PlannedPlacement[] {
+  return placements.map((placement) => {
+    const place = placesById.get(placement.savedPlaceId);
+    const inferred = inferPreferredTimeSlot(place?.name ?? '', placement.activitySummary ?? '', place?.tag ?? null);
+    const preferredTimeSlot = inferred === 'any' ? placement.preferredTimeSlot ?? 'any' : inferred;
+    const fixedSchedule = requiredRequests.some((request) =>
+      normalizeRequestEvidence(placement.activitySummary ?? '').includes(normalizeRequestEvidence(request.name)),
+    );
+    return { ...placement, preferredTimeSlot, fixedSchedule };
+  });
+}
+
+export function inferPreferredTimeSlot(name: string, activity: string, tag: string | null): AiVisitTimeSlot {
+  const value = `${name} ${activity}`.toLocaleLowerCase();
+  if (/(?:아침|조식|브런치|breakfast)/u.test(value)) return 'morning';
+  if (/(?:점심|중식|lunch)/u.test(value)) return 'lunch';
+  if (/(?:야시장|야경|전망대|관람차|루프탑|night\s*(?:market|view))/u.test(value)) return 'evening';
+  if (/(?:일몰|노을|선셋|sunset)/u.test(value)) return 'sunset';
+  if (/(?:저녁|석식|dinner)/u.test(value)) return 'evening';
+  if (tag === PlaceTag.Cafe && /모닝/u.test(value)) return 'morning';
+  return 'any';
+}
+
+export function assessTimeSuitability(placements: PlannedPlacement[]): string[] {
+  return placements.flatMap((placement) => {
+    if (!placement.scheduledTime || !placement.preferredTimeSlot || placement.preferredTimeSlot === 'any') return [];
+    const start = timeToMinutes(placement.scheduledTime);
+    const window = timeSlotWindow(placement.preferredTimeSlot);
+    return (window.start !== undefined && start < window.start)
+      || (window.end !== undefined && start > window.end)
+      ? [`time_slot_mismatch:${placement.date}:${placement.savedPlaceId}`]
+      : [];
+  });
+}
+
+export function assessOpeningHours(
+  placements: PlannedPlacement[],
+  schedulingDetailsByPlaceId: Map<string, PlaceSchedulingDetails | null>,
+): string[] {
+  return placements.flatMap((placement) => {
+    const periods = schedulingDetailsByPlaceId.get(placement.savedPlaceId)?.regularOpeningHours?.periods;
+    if (!placement.scheduledTime || !periods || periods.length === 0) return [];
+    const open = isWithinOpeningHours(
+      placement.date,
+      placement.scheduledTime,
+      placement.durationMinutes ?? 15,
+      periods,
+    );
+    return open ? [] : [`closed_place:${placement.date}:${placement.savedPlaceId}`];
+  });
+}
+
+function isWithinOpeningHours(date: string, time: string, durationMinutes: number, periods: PlaceOpeningPeriod[]): boolean {
+  const day = new Date(`${date}T00:00:00.000Z`).getUTCDay();
+  const start = day * 24 * 60 + timeToMinutes(time);
+  const end = start + durationMinutes;
+  return periods.some((period) => {
+    const open = period.open.day * 24 * 60 + period.open.hour * 60 + period.open.minute;
+    if (!period.close) return start >= open;
+    let close = period.close.day * 24 * 60 + period.close.hour * 60 + period.close.minute;
+    if (close <= open) close += 7 * 24 * 60;
+    const adjustedStart = start < open && day === 0 ? start + 7 * 24 * 60 : start;
+    return adjustedStart >= open && end + (adjustedStart - start) <= close;
+  });
+}
+
+function timeSlotWindow(slot: AiVisitTimeSlot): { start?: number; end?: number } {
+  switch (slot) {
+    case 'morning': return { start: 7 * 60, end: 10 * 60 + 59 };
+    case 'lunch': return { start: 11 * 60, end: 14 * 60 + 30 };
+    case 'daytime': return { start: 9 * 60, end: 17 * 60 };
+    case 'sunset': return { start: 16 * 60, end: 19 * 60 };
+    case 'evening': return { start: 17 * 60, end: 21 * 60 };
+    case 'night': return { start: 19 * 60, end: 23 * 60 + 59 };
+    case 'any':
+    default: return {};
+  }
 }
 
 type QualityAssessmentInput = {
@@ -1354,6 +1553,45 @@ function toRevisionDraft(output: AiPlannerOutput): Omit<AiPlannerOutput, 'usage'
   };
 }
 
+function toMaterializedReviewDraft(
+  generated: PlannedPlacement[],
+  recommended: PlannedPlacement[],
+  placesById: Map<string, SavedPlaceEntity>,
+  source: AiPlannerOutput,
+): Omit<AiPlannerOutput, 'usage'> {
+  return {
+    placements: generated.map((placement) => ({
+      savedPlaceId: placement.savedPlaceId,
+      date: placement.date,
+      position: placement.position,
+      startTime: placement.scheduledTime ?? '09:00',
+      durationMinutes: placement.durationMinutes ?? 60,
+      activity: placement.activitySummary ?? `${placesById.get(placement.savedPlaceId)?.name ?? '장소'} 방문`,
+      travelMethod: placement.travelMethod ?? '대중교통',
+      travelDurationMinutes: placement.travelDurationMinutes ?? 0,
+      preferredTimeSlot: placement.preferredTimeSlot ?? 'any',
+    })),
+    unplaced: source.unplaced,
+    recommendations: recommended.map((placement) => {
+      const place = placesById.get(placement.savedPlaceId);
+      return {
+        placeName: place?.name ?? '추천 장소',
+        regionName: place?.address ?? '여행 지역',
+        suggestedDate: placement.date,
+        position: placement.position,
+        startTime: placement.scheduledTime ?? '09:00',
+        durationMinutes: placement.durationMinutes ?? 60,
+        activity: placement.activitySummary ?? `${place?.name ?? '추천 장소'} 방문`,
+        travelMethod: placement.travelMethod ?? '대중교통',
+        travelDurationMinutes: placement.travelDurationMinutes ?? 0,
+        reason: place?.note?.replace(/^AI 추천\s*·\s*/u, '') || '동선과 여행 목적에 맞는 검증된 장소',
+        preferredTimeSlot: placement.preferredTimeSlot ?? 'any',
+      };
+    }),
+    savedRecommendations: source.savedRecommendations ?? [],
+  };
+}
+
 function isRepairableQualityIssue(issue: string): boolean {
   if (issue === 'saved_places_missing' || issue === 'saved_places_unplaced' || issue === 'must_visit_missing') return true;
   return [
@@ -1362,6 +1600,10 @@ function isRepairableQualityIssue(issue: string): boolean {
     'invalid_time_window:',
     'outside_available_window:',
     'required_activity_missing:',
+    'required_activity_stops_missing:',
+    'required_activity_duration_short:',
+    'time_slot_mismatch:',
+    'closed_place:',
   ].some((prefix) => issue.startsWith(prefix));
 }
 
@@ -1434,12 +1676,19 @@ function preferredTravelMethod(modes: AiTransportMode[]): string {
 function reindexPlacementsByTime(placements: PlannedPlacement[]): PlannedPlacement[] {
   return [...placements]
     .sort((left, right) => left.date.localeCompare(right.date)
-      || (left.scheduledTime ?? '23:59').localeCompare(right.scheduledTime ?? '23:59')
+      || effectiveScheduleTime(left).localeCompare(effectiveScheduleTime(right))
       || left.position - right.position)
     .map((placement, index, sorted) => ({
       ...placement,
       position: sorted.slice(0, index).filter((item) => item.date === placement.date).length,
     }));
+}
+
+function effectiveScheduleTime(placement: PlannedPlacement): string {
+  const preferredStart = timeSlotWindow(placement.preferredTimeSlot ?? 'any').start;
+  if (preferredStart === undefined) return placement.scheduledTime ?? '23:59';
+  const scheduled = placement.scheduledTime ? timeToMinutes(placement.scheduledTime) : preferredStart;
+  return minutesToTime(Math.max(preferredStart, scheduled));
 }
 
 export function assessRawDayCoverage(
@@ -1549,6 +1798,8 @@ export function applyDailyPlanningTargets(
       availableStartTime: minutesToTime(availableStart),
       availableEndTime: minutesToTime(availableEnd),
       targetPlannedMinutes: Math.min(minimumPlannedMinutes(density), realisticVisitMinutes),
+      hasStartBoundary: index === 0 && Boolean(startPointTime),
+      hasEndBoundary: index === lastIndex && Boolean(endPointTime),
     };
   });
 }
@@ -1610,6 +1861,21 @@ function defaultAiPlanRequest(): GenerateAiPlanDto {
     transportModes: [AiTransportMode.PublicTransit],
     budgetLevel: AiBudgetLevel.Standard,
   };
+}
+
+async function mapWithConcurrency<T>(
+  values: T[],
+  concurrency: number,
+  worker: (value: T) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0;
+  await Promise.all(Array.from({ length: Math.min(concurrency, values.length) }, async () => {
+    while (nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      await worker(values[index]!);
+    }
+  }));
 }
 
 export function findReusableAiRecommendation<T extends Pick<SavedPlaceEntity, 'googlePlaceId' | 'name' | 'note'>>(

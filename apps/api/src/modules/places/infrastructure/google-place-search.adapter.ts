@@ -1,7 +1,12 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { PlacePhoto, PlaceSearchCandidate, PlaceSearchPort } from '../domain/place-search.port';
+import {
+  PlacePhoto,
+  PlaceSearchCandidate,
+  PlaceSchedulingDetails,
+  PlaceSearchPort,
+} from '../domain/place-search.port';
 
 interface GoogleTextSearchResponse {
   places?: Array<{
@@ -10,6 +15,8 @@ interface GoogleTextSearchResponse {
     formattedAddress?: string;
     primaryType?: string;
     location?: { latitude?: number; longitude?: number };
+    regularOpeningHours?: PlaceSchedulingDetails['regularOpeningHours'];
+    utcOffsetMinutes?: number;
   }>;
 }
 
@@ -39,7 +46,7 @@ export class GooglePlaceSearchAdapter implements PlaceSearchPort {
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': this.apiKey,
-        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.primaryType,places.location',
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.primaryType,places.location,places.regularOpeningHours,places.utcOffsetMinutes',
       },
       body: JSON.stringify(requestBody),
       signal: AbortSignal.timeout(8_000),
@@ -55,6 +62,8 @@ export class GooglePlaceSearchAdapter implements PlaceSearchPort {
       primaryType: place.primaryType ?? null,
       latitude: place.location?.latitude ?? null,
       longitude: place.location?.longitude ?? null,
+      regularOpeningHours: place.regularOpeningHours ?? null,
+      utcOffsetMinutes: place.utcOffsetMinutes ?? null,
     }] : []);
   }
 
@@ -83,6 +92,27 @@ export class GooglePlaceSearchAdapter implements PlaceSearchPort {
     if (!response.ok) throw new ServiceUnavailableException(`Google Place Details request failed (${response.status})`);
     const body = await response.json() as { primaryType?: string };
     return body.primaryType ?? null;
+  }
+
+  async getSchedulingDetails(googlePlaceId: string): Promise<PlaceSchedulingDetails | null> {
+    const response = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(googlePlaceId)}?languageCode=ko`, {
+      headers: {
+        'X-Goog-Api-Key': this.apiKey,
+        'X-Goog-FieldMask': 'primaryType,regularOpeningHours,utcOffsetMinutes',
+      },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) throw new ServiceUnavailableException(`Google Place Details request failed (${response.status})`);
+    const body = await response.json() as {
+      primaryType?: string;
+      regularOpeningHours?: PlaceSchedulingDetails['regularOpeningHours'];
+      utcOffsetMinutes?: number;
+    };
+    return {
+      primaryType: body.primaryType ?? null,
+      regularOpeningHours: body.regularOpeningHours ?? null,
+      utcOffsetMinutes: body.utcOffsetMinutes ?? null,
+    };
   }
 
   async getPhoto(googlePlaceId: string): Promise<PlacePhoto | null> {
