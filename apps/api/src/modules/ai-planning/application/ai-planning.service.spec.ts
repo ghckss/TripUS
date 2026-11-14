@@ -5,6 +5,7 @@ import { PlacePreference } from '../../places/domain/entities/saved-place.entity
 import { ItineraryUpdateStatus } from '../../itineraries/application/dto/itinerary.dto';
 import {
   AI_PLANNING_TASK,
+  type AiPlannerInput,
   TRAVEL_DENSITY_POLICIES,
   TravelDensity,
   TravelTheme,
@@ -33,8 +34,8 @@ import {
 } from './ai-planning.service';
 
 describe('AI plan quality severity', () => {
-  it('blocks structural quality issues while allowing recoverable gaps to degrade gracefully', () => {
-    expect(isBlockingQualityIssue('underfilled_day:2026-11-08')).toBe(false);
+  it('blocks incomplete schedules after internal repair attempts while allowing meal fallback repair', () => {
+    expect(isBlockingQualityIssue('underfilled_day:2026-11-08')).toBe(true);
     expect(isBlockingQualityIssue('long_travel_leg:2026-11-08')).toBe(true);
     expect(isBlockingQualityIssue('saved_places_missing')).toBe(true);
     expect(isBlockingQualityIssue('schedule_detail_missing:2026-11-08')).toBe(true);
@@ -42,7 +43,7 @@ describe('AI plan quality severity', () => {
     expect(isBlockingQualityIssue('missing_meal:2026-11-08:lunch')).toBe(false);
   });
 
-  it('keeps invalid time windows blocking while allowing a usable sparse plan', () => {
+  it('blocks both sparse schedules and invalid time windows after repair attempts', () => {
     const issues = assessPlanQuality({
       days: [{
         date: '2026-11-08', startLodging: null, endLodging: null,
@@ -65,7 +66,10 @@ describe('AI plan quality severity', () => {
       'underfilled_day:2026-11-08',
       'outside_available_window:2026-11-08',
     ]));
-    expect(issues.filter(isBlockingQualityIssue)).toEqual(['outside_available_window:2026-11-08']);
+    expect(issues.filter(isBlockingQualityIssue)).toEqual([
+      'underfilled_day:2026-11-08',
+      'outside_available_window:2026-11-08',
+    ]);
   });
 
   it('does not count cafes as a required lunch', () => {
@@ -606,7 +610,7 @@ describe('AiPlanningService', () => {
       placements: [target, target2, target3].map((place, position) => ({
         savedPlaceId: place.id, date: '2026-11-08', position,
         startTime: ['09:00', '12:00', '18:00'][position],
-        durationMinutes: 90, activity: `${place.name} 식사`, travelMethod: '대중교통', travelDurationMinutes: 0,
+        durationMinutes: 150, activity: `${place.name} 식사`, travelMethod: '대중교통', travelDurationMinutes: 0,
       })),
       unplaced: [],
       recommendations: [],
@@ -928,9 +932,15 @@ describe('AiPlanningService', () => {
       lockedPlacements: [],
       priorRecommendations: [previousAiRecommendation.name],
     });
-    const retryInput = planner.generate.mock.calls[1]?.[0] as unknown as { revisionGuidance: string };
+    const retryInput = planner.generate.mock.calls[1]?.[0] as unknown as AiPlannerInput;
     expect(retryInput.revisionGuidance).toContain('explicit traveler-approved exception');
     expect(retryInput.revisionGuidance).toContain(visit.name);
+    expect(retryInput.revisionDraft).toEqual({
+      placements: [],
+      unplaced: [{ savedPlaceId: visit.id, reason: '선택 도시 밖 장소' }],
+      recommendations: [],
+      savedRecommendations: [],
+    });
     expect(replace).toHaveBeenCalledWith(tripId, [
       {
         savedPlaceId: visit.id, date: '2026-11-08', position: 0, locked: false,

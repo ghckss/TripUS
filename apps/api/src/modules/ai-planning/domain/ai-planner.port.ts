@@ -133,6 +133,8 @@ export interface AiPlannerInput {
   referenceItinerary: AiPlannerReferenceDay[];
   lockedPlacements: AiPlannerPlacement[];
   priorRecommendations: string[];
+  /** Previous rejected draft. Present only during a validation-driven revision request. */
+  revisionDraft?: Omit<AiPlannerOutput, 'usage'>;
   revisionGuidance?: string;
 }
 

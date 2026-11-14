@@ -49,7 +49,7 @@ type PlannedPlacement = {
 };
 
 const MAX_PLANNER_ATTEMPTS = 3;
-const MAX_MATERIALIZATION_ATTEMPTS = 2;
+const MAX_MATERIALIZATION_ATTEMPTS = 3;
 const DEFAULT_DAY_START_MINUTES = 9 * 60;
 const DEFAULT_DAY_END_MINUTES = 21 * 60;
 const BOUNDARY_TRANSITION_BUFFER_MINUTES = 60;
@@ -236,6 +236,7 @@ export class AiPlanningService {
         ];
         output = await this.planner.generate({
           ...plannerInput,
+          revisionDraft: toRevisionDraft(output),
           revisionGuidance: revisionGuidance.join(' '),
         });
       }
@@ -349,6 +350,7 @@ export class AiPlanningService {
         createdRecommendationEntities = [];
         output = await this.planner.generate({
           ...plannerInput,
+          revisionDraft: toRevisionDraft(output),
           revisionGuidance: [
             `The verified itinerary still has these issues: ${repairableIssues.join(', ')}.`,
             ...(repairableIssues.includes('saved_places_unplaced')
@@ -1246,8 +1248,16 @@ export function assessPlanQuality(input: QualityAssessmentInput): string[] {
 
 export function isBlockingQualityIssue(issue: string): boolean {
   return issue.length > 0
-    && !issue.startsWith('missing_meal:')
-    && !issue.startsWith('underfilled_day:');
+    && !issue.startsWith('missing_meal:');
+}
+
+function toRevisionDraft(output: AiPlannerOutput): Omit<AiPlannerOutput, 'usage'> {
+  return {
+    placements: output.placements,
+    unplaced: output.unplaced,
+    recommendations: output.recommendations,
+    savedRecommendations: output.savedRecommendations ?? [],
+  };
 }
 
 function isRepairableQualityIssue(issue: string): boolean {
@@ -1412,7 +1422,7 @@ function minimumRequiredVisitCount(day: AiPlannerDay, density: TravelDensity): n
 }
 
 function minimumAcceptablePlannedMinutes(day: AiPlannerDay, density: TravelDensity): number {
-  return Math.min(targetPlannedMinutes(day, density), minimumRequiredVisitCount(day, density) * 90);
+  return targetPlannedMinutes(day, density);
 }
 
 function formatCoverageTargets(days: AiPlannerDay[], dates: string[], density: TravelDensity): string {
