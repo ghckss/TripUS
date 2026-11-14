@@ -37,5 +37,27 @@ describe("trip recap model", () => {
     expect(daySlides.map((slide) => slide.day.date)).toEqual([
       "2026-10-31", "2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04",
     ]);
+    expect(slides.filter((slide) => slide.kind === "route")).toHaveLength(2);
+  });
+
+  it("splits a busy day into additional slides instead of overflowing the fixed canvas", () => {
+    const busyItems = Array.from({ length: 7 }, (_, index) => ({
+      id: `busy-${index}`,
+      savedPlaceId: `busy-place-${index}`,
+      placeName: `긴 이름의 방문 장소 ${index + 1}`,
+      date: "2026-10-31",
+      position: index,
+      locked: false,
+      source: "manual" as const,
+      visitStatus: "rated" as const,
+      rating: 5,
+      review: "아주 긴 후기가 있어도 다음 영역을 침범하지 않아야 한다",
+    }));
+    const slides = buildRecapSlides({ trip: { ...trip, endDate: "2026-10-31" }, itinerary: { unplaced: [], items: busyItems }, photos: [], mode: "route" });
+    const daySlides = slides.filter((slide) => slide.kind === "day");
+
+    expect(daySlides).toHaveLength(3);
+    expect(daySlides.map((slide) => slide.day.items.length)).toEqual([3, 3, 1]);
+    expect(daySlides.map((slide) => [slide.partNumber, slide.partCount])).toEqual([[1, 3], [2, 3], [3, 3]]);
   });
 });
