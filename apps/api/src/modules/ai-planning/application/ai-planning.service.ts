@@ -283,6 +283,8 @@ export class AiPlanningService {
       let recommended: PlannedPlacement[];
       let qualityIssues: string[];
       let finalReviewCompleted = false;
+      let preIntegrationVerifiedDraft: Omit<AiPlannerOutput, 'usage'> | null = null;
+      let preIntegrationFallbackUsed = false;
       for (let materializationAttempt = 1; ; materializationAttempt += 1) {
         materialized = await this.materializeRecommendations(
           trip.id,
@@ -370,6 +372,12 @@ export class AiPlanningService {
         const normalizedSchedule = normalizeVisitSchedule([...generated, ...recommended], days, generatedIds);
         generated = normalizedSchedule.filter((item) => generatedIds.has(item.savedPlaceId));
         recommended = normalizedSchedule.filter((item) => !generatedIds.has(item.savedPlaceId));
+        const verifiedMaterializedDraft = toMaterializedReviewDraft(
+          generated,
+          recommended,
+          new Map(allPlanningPlaces.map((place) => [place.id, place])),
+          output,
+        );
         qualityIssues = assessPlanQuality({
           days,
           density,
@@ -382,7 +390,7 @@ export class AiPlanningService {
         });
         qualityIssues.push(...assessExplicitRequestCoverage(
           plannerInput.travelerContext.requiredActivityRequests,
-          output,
+          verifiedMaterializedDraft,
           placeNamesById,
           lockedPlannerPlaceIds,
         ));
@@ -394,19 +402,31 @@ export class AiPlanningService {
         qualityIssues = [...new Set(qualityIssues)];
         const repairableIssues = qualityIssues.filter(isRepairableQualityIssue);
         if (repairableIssues.length === 0 && !finalReviewCompleted && materializationAttempt < MAX_MATERIALIZATION_ATTEMPTS) {
-          const materializedDraft = toMaterializedReviewDraft(
-            generated,
-            recommended,
-            new Map(allPlanningPlaces.map((place) => [place.id, place])),
-            output,
-          );
           if (createdRecommendationEntities.length > 0) await this.places.remove(createdRecommendationEntities);
           createdRecommendationEntities = [];
-          output = await this.runOrchestratedFinalReview(generationId, tripId, plannerInput, materializedDraft);
+          preIntegrationVerifiedDraft = verifiedMaterializedDraft;
+          output = await this.runOrchestratedFinalReview(generationId, tripId, plannerInput, verifiedMaterializedDraft);
           finalReviewCompleted = true;
           continue;
         }
-        if (repairableIssues.length === 0 || materializationAttempt >= MAX_MATERIALIZATION_ATTEMPTS) break;
+        if (repairableIssues.length === 0) break;
+        if (
+          materializationAttempt >= MAX_MATERIALIZATION_ATTEMPTS
+          && preIntegrationVerifiedDraft
+          && !preIntegrationFallbackUsed
+        ) {
+          if (createdRecommendationEntities.length > 0) await this.places.remove(createdRecommendationEntities);
+          createdRecommendationEntities = [];
+          writeStructuredLog('warn', 'ai.generation.review_output_fallback', {
+            generationId,
+            tripId,
+            issues: repairableIssues,
+          });
+          output = preIntegrationVerifiedDraft;
+          preIntegrationFallbackUsed = true;
+          continue;
+        }
+        if (materializationAttempt >= MAX_MATERIALIZATION_ATTEMPTS) break;
 
         writeStructuredLog('warn', 'ai.generation.materialization_revision', {
           generationId,
@@ -666,6 +686,22 @@ export class AiPlanningService {
         inputTokens: integrated.usage?.inputTokens ?? 0,
         outputTokens: integrated.usage?.outputTokens ?? 0,
       });
+      const draftRequestIssues = assessExplicitRequestCoverage(
+        plannerInput.travelerContext?.requiredActivityRequests ?? [],
+        draft,
+      );
+      const integratedRequestIssues = assessExplicitRequestCoverage(
+        plannerInput.travelerContext?.requiredActivityRequests ?? [],
+        integrated,
+      );
+      if (draftRequestIssues.length === 0 && integratedRequestIssues.length > 0) {
+        writeStructuredLog('warn', 'ai.generation.review_integration_required_activity_fallback', {
+          generationId,
+          tripId,
+          issues: integratedRequestIssues,
+        });
+        return draft;
+      }
       return integrated;
     } catch (error) {
       writeStructuredLog('warn', 'ai.generation.review_integration_fallback', {

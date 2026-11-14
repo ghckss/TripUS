@@ -112,6 +112,54 @@ describe('AI final review orchestration', () => {
     expect(integrationInput?.orchestrationReviews?.map((item) => item.focus)).toEqual(['traveler_intent', 'meal_density']);
     expect(result).toEqual(draft);
   });
+
+  it('keeps a verified draft when integration removes a mandatory activity', async () => {
+    const requiredDraft: Omit<AiPlannerOutput, 'usage'> = {
+      placements: [],
+      unplaced: [],
+      recommendations: [
+        {
+          placeName: '예류지질공원', regionName: '신베이', suggestedDate: '2026-11-08', position: 0,
+          startTime: '09:00', durationMinutes: 210, activity: '예스허지 버스 투어 예류 코스',
+          travelMethod: '버스', travelDurationMinutes: 30, reason: '해안 지질 명소',
+        },
+        {
+          placeName: '지우펀', regionName: '신베이', suggestedDate: '2026-11-08', position: 1,
+          startTime: '13:00', durationMinutes: 210, activity: '예스허지 버스 투어 지우펀 코스',
+          travelMethod: '버스', travelDurationMinutes: 30, reason: '산골 마을',
+        },
+      ],
+      savedRecommendations: [],
+    };
+    const integrationWithoutTour: AiPlannerOutput = {
+      placements: [], unplaced: [], placeDescriptions: [], savedRecommendations: [],
+      recommendations: [{
+        placeName: '타이베이101', regionName: '타이베이', suggestedDate: '2026-11-08', position: 0,
+        startTime: '18:00', durationMinutes: 90, activity: '전망대 관람',
+        travelMethod: '대중교통', travelDurationMinutes: 20, reason: '야경 명소',
+      }],
+    };
+    const generate = vi.fn().mockResolvedValue(integrationWithoutTour);
+    const service = createService({ generate });
+    const input = {
+      travelerContext: {
+        requiredActivityRequests: [{
+          name: '예스허지 버스 투어', sourceText: '예스허지 버스 투어 하루 예정', fullDay: true, minimumStops: 2,
+        }],
+      },
+    } as AiPlannerInput;
+
+    const result = await (service as unknown as {
+      runOrchestratedFinalReview(
+        generationId: string,
+        tripId: string,
+        plannerInput: AiPlannerInput,
+        draft: Omit<AiPlannerOutput, 'usage'>,
+      ): Promise<AiPlannerOutput>;
+    }).runOrchestratedFinalReview('generation-3', 'trip-3', input, requiredDraft);
+
+    expect(result).toEqual(requiredDraft);
+  });
 });
 
 describe('AI plan quality severity', () => {
