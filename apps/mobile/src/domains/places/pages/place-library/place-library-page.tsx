@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
 import { useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getPlacePhoto, type PlacePhoto } from "@/domains/places/api/places.api";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
@@ -48,38 +49,35 @@ export default function PlacesScreen() {
     ],
   });
   return (
-    <Screen stickyHeaderIndices={[1]}>
-      <View style={styles.header}>
-        <AppText variant="title">저장한 모든 장소</AppText>
-        <AppText color={colors.muted}>일정 배치 여부와 관계없이 저장한 장소를 단순하게 모아봐요.</AppText>
-      </View>
-      <View style={styles.stickyAction}>
-        <Button label="＋ 장소 추가" testID="places-add" onPress={() => router.push(`/trips/${tripId}/places/new`)} />
-      </View>
-      {tags.length > 0 && <ScrollView horizontal contentContainerStyle={styles.filters} showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-        <Pill label="전체" selected={effectiveTag === "all"} onPress={() => changeTag("all")} />
-        {tags.map((tag) => <Pill key={tag} label={tagLabel(tag)} selected={effectiveTag === tag} onPress={() => changeTag(tag)} />)}
-      </ScrollView>}
-      {!loading && places.length > 0 && <Card>
-        <View style={styles.selectionSummary}>
-          <AppText variant="label">{selectedCount}개 선택됨</AppText>
-          <Pressable accessibilityRole="button" onPress={allFilteredSelected ? clearSelection : () => selectPlaces(filteredPlaces.map((place) => place.id))}>
-            <AppText variant="label" color={colors.primary}>{allFilteredSelected ? "전체 선택 해제" : "현재 목록 전체 선택"}</AppText>
-          </Pressable>
+    <View style={styles.page}>
+      <Screen>
+        <View style={styles.header}>
+          <AppText variant="title">저장한 모든 장소</AppText>
+          <AppText color={colors.muted}>일정 배치 여부와 관계없이 저장한 장소를 단순하게 모아봐요.</AppText>
         </View>
-        <View style={styles.managementActions}>
-          <Button label={`선택 장소 제거${selectedCount > 0 ? ` (${selectedCount})` : ""}`} variant="danger" disabled={saving || selectedCount === 0} style={styles.actionButton} onPress={confirmSelectedRemoval} />
-          <Button label="전체 제거" variant="ghost" disabled={saving} style={styles.actionButton} onPress={confirmAllRemoval} />
-        </View>
-      </Card>}
-      {message && <AppText color={colors.secondary}>{message}</AppText>}
-      {loading && <Card><AppText color={colors.muted}>장소를 불러오는 중이에요…</AppText></Card>}
-      {!loading && places.length === 0 && <Card><AppText variant="heading">아직 저장한 장소가 없어요</AppText><AppText color={colors.muted}>가고 싶은 장소를 먼저 저장해 보세요.</AppText></Card>}
-      {filteredPlaces.map((place) => <Card key={place.id}>
-        <View style={styles.placeCard}>
-          <PlaceCardVisual placeId={place.id} tag={place.tag} tripId={tripId} />
-          <View style={styles.placeBody}>
-            <View style={styles.row}>
+        {tags.length > 0 && <ScrollView horizontal contentContainerStyle={styles.filters} showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+          <Pill label="전체" selected={effectiveTag === "all"} onPress={() => changeTag("all")} />
+          {tags.map((tag) => <Pill key={tag} label={tagLabel(tag)} selected={effectiveTag === tag} onPress={() => changeTag(tag)} />)}
+        </ScrollView>}
+        {!loading && places.length > 0 && <Card>
+          <View style={styles.selectionSummary}>
+            <AppText variant="label">{selectedCount}개 선택됨</AppText>
+            <Pressable accessibilityRole="button" onPress={allFilteredSelected ? clearSelection : () => selectPlaces(filteredPlaces.map((place) => place.id))}>
+              <AppText variant="label" color={colors.primary}>{allFilteredSelected ? "전체 선택 해제" : "현재 목록 전체 선택"}</AppText>
+            </Pressable>
+          </View>
+          <View style={styles.managementActions}>
+            <Button label={`선택 장소 제거${selectedCount > 0 ? ` (${selectedCount})` : ""}`} variant="danger" disabled={saving || selectedCount === 0} style={styles.actionButton} onPress={confirmSelectedRemoval} />
+            <Button label="전체 제거" variant="ghost" disabled={saving} style={styles.actionButton} onPress={confirmAllRemoval} />
+          </View>
+        </Card>}
+        {message && <AppText color={colors.secondary}>{message}</AppText>}
+        {loading && <Card><AppText color={colors.muted}>장소를 불러오는 중이에요…</AppText></Card>}
+        {!loading && places.length === 0 && <Card><AppText variant="heading">아직 저장한 장소가 없어요</AppText><AppText color={colors.muted}>가고 싶은 장소를 먼저 저장해 보세요.</AppText></Card>}
+        {filteredPlaces.map((place) => <Card key={place.id}>
+          <View style={styles.placeHeaderRow}>
+            <PlaceCardVisual placeId={place.id} tag={place.tag} tripId={tripId} />
+            <View style={styles.placeIdentity}>
               <View style={styles.titleRow}>
                 <Pressable
                   accessibilityLabel={`${place.name} 선택`}
@@ -93,14 +91,17 @@ export default function PlacesScreen() {
                 </Pressable>
                 <AppText variant="heading" style={styles.placeName}>{place.name}</AppText>
               </View>
-              <Pill label={tagLabel(place.tag)} />
+              <View style={styles.tagRow}><Pill label={tagLabel(place.tag)} /></View>
             </View>
-            <AppText color={colors.muted}>{placeDescription(place.note, place.address)}</AppText>
           </View>
-        </View>
-      </Card>)}
-      {message && <Button label="다시 불러오기" variant="ghost" onPress={() => void reload()} />}
-    </Screen>
+          <AppText color={colors.muted}>{placeDescription(place.note, place.address)}</AppText>
+        </Card>)}
+        {message && <Button label="다시 불러오기" variant="ghost" onPress={() => void reload()} />}
+      </Screen>
+      <SafeAreaView edges={["bottom"]} style={styles.bottomAction}>
+        <Button label="＋ 장소 추가" testID="places-add" onPress={() => router.push(`/trips/${tripId}/places/new`)} />
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -176,16 +177,17 @@ const styles = StyleSheet.create({
   foodVisual: { backgroundColor: "#FCE3DC" },
   header: { gap: spacing.xs },
   managementActions: { flexDirection: "row", gap: spacing.sm },
-  placeBody: { flex: 1, gap: spacing.xs },
-  placeCard: { flexDirection: "row", gap: spacing.md, alignItems: "center" },
+  page: { flex: 1, backgroundColor: colors.canvas },
+  placeHeaderRow: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
+  placeIdentity: { flex: 1, gap: spacing.sm, paddingTop: spacing.xs },
   placeName: { flexShrink: 1 },
   placePhoto: { width: 84, height: 76, borderRadius: 16, backgroundColor: colors.line },
   placeVisual: { width: 76, height: 76, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   placeVisualText: { fontSize: 30 },
   photoAttribution: { fontSize: 12, lineHeight: 16, textAlign: "center" },
   photoColumn: { width: 84, gap: spacing.xs },
-  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.sm },
   selectionSummary: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  stickyAction: { backgroundColor: colors.canvas, paddingVertical: spacing.xs },
+  bottomAction: { backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: colors.line, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  tagRow: { alignSelf: "flex-start", marginLeft: 36 },
   titleRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm },
 });

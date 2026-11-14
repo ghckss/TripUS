@@ -41,6 +41,7 @@ describe('MockAiPlannerAdapter', () => {
         budgetLevel: null,
         themes: [TravelTheme.Highlights],
         additionalRequests: null,
+        requiredActivityRequests: [],
       },
       places,
       days: [],

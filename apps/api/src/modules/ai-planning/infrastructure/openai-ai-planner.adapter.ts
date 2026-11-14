@@ -33,6 +33,8 @@ export const AI_PLANNER_SYSTEM_PROMPT = [
   'density guidance로 하루의 일정 밀도를 정하고 travelerContext.themes에 선택된 여행 방식을 함께 반영한다. 여러 themes가 있으면 한 가지만 고집하지 말고 일정 전체에 균형 있게 분배한다.',
   'travelerContext.transportModes는 사용자가 허용한 이동수단의 목록이다. 목록 밖 이동수단을 임의로 사용하지 말고, 복수 수단이 있으면 구간별로 가장 현실적인 수단을 선택한다.',
   'travelerContext.additionalRequests에는 좋아하는 것과 피하고 싶은 것을 포함한 자유 요청이 들어온다. 동행자·예산·추가 요청, must_visit, lockedPlacements를 모두 존중한다.',
+  '[명시 일정 요청] travelerContext.requiredActivityRequests는 사용자가 직접 하겠다고 지정한 투어·체험·공연·활동이다. 선택 취향이 아니라 반드시 일정에 배치해야 하는 확정 조건이며 savedRecommendations로 보내거나 생략하지 않는다.',
+  'requiredActivityRequests의 각 문구는 사용자의 표현을 바꾸거나 축약하지 말고, 해당 방문의 activity에 원문 그대로 포함한다. 하나의 투어가 여러 장소를 포함하면 대표 방문의 activity에 투어 이름을 그대로 쓰고 관련 장소들을 같은 날 연속 배치한다.',
   '[날짜별 업데이트] referenceItinerary는 현재 수정 대상이 아닌 다른 날짜의 확정된 읽기 전용 일정이다. 그 안의 날짜나 장소를 placements 또는 recommendations로 반환하거나 이동·삭제·변경하지 않는다.',
   'referenceItinerary의 장소, 지역, 시간대와 테마를 여행 전체 관점에서 검토해 수정 대상 날짜가 다른 날짜와 겹치지 않고 서로 보완되도록 설계한다. 같은 장소 재방문은 travelerContext.additionalRequests에 다시 방문하거나 여러 번 방문하라는 명시적 요청이 있을 때만 허용한다.',
   '날짜별 업데이트 응답에는 days에 전달된 수정 대상 날짜만 포함한다. referenceItinerary의 날짜는 출력하지 않는다.',
@@ -43,7 +45,7 @@ export const AI_PLANNER_SYSTEM_PROMPT = [
   '[검증 후 재작성] revisionDraft가 있으면 직전 응답이 서버 검증에서 탈락한 것이다. revisionGuidance의 모든 문제를 revisionDraft와 대조해 수정한다. 처음부터 무관한 일정을 다시 만들거나 일부 수정분만 반환하지 말고, 문제가 없던 방문은 유지하면서 탈락 사유를 모두 해소한 완전한 전체 일정을 반환한다.',
   'underfilled_day는 일정이 비거나 너무 짧다는 뜻이다. 해당 날짜의 availableStartTime부터 availableEndTime까지 현실적인 방문·식사·이동으로 채우고 targetPlannedMinutes를 충족한다. outside_available_window 또는 invalid_time_window는 단순히 시간을 앞당기는 방식으로 다른 겹침을 만들지 말고, 방문 수·체류시간·이동시간을 함께 재배치해 해결한다.',
   '영업시간을 확인했다고 단정하거나 장소, 위치, 날짜, 운영시간을 지어내지 않는다. 예약이나 운영시간 확인이 중요한 경우에만 activity에 짧은 확인 안내를 포함한다.',
-  '응답 전 자체 점검: 모든 저장 장소가 정확히 한 번 배치됐는지, 사용 가능한 모든 날짜가 채워졌는지, 날짜별 목표 시간이 충족됐는지, 시간이 겹치지 않는지, 추천 장소가 구체적이고 검색 가능한지 확인한 뒤 완전한 전체 일정만 반환한다.',
+  '응답 전 자체 점검: 모든 저장 장소가 정확히 한 번 배치됐는지, requiredActivityRequests가 activity에 원문 그대로 모두 포함됐는지, 사용 가능한 모든 날짜가 채워졌는지, 날짜별 목표 시간이 충족됐는지, 시간이 겹치지 않는지, 추천 장소가 구체적이고 검색 가능한지 확인한 뒤 완전한 전체 일정만 반환한다.',
 ].join(' ');
 
 const PlacementSchema = z.object({

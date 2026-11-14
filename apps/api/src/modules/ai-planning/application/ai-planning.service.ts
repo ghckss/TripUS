@@ -177,6 +177,7 @@ export class AiPlanningService {
           budgetLevel: request.budgetLevel ?? null,
           themes: request.themes,
           additionalRequests: request.additionalRequests?.trim() || null,
+          requiredActivityRequests: extractRequiredActivityRequests(request.additionalRequests ?? ''),
         },
         places: planningPlaces.map((place) => ({
           id: place.id,
@@ -197,10 +198,18 @@ export class AiPlanningService {
       };
       let output = await this.planner.generate(plannerInput);
       const allowedPlannerPlaceIds = new Set(planningPlaces.map((place) => place.id));
+      const placeNamesById = new Map(places.map((place) => [place.id, place.name]));
+      const lockedPlannerPlaceIds = new Set(locked.map((item) => item.savedPlaceId));
       for (let attempt = 1; attempt < MAX_PLANNER_ATTEMPTS; attempt += 1) {
         const outputContractIssues = assessRawOutputContract(allowedPlannerPlaceIds, output);
         const coverageIssues = assessRawDayCoverage(days, output, density, allowedPlannerPlaceIds);
-        if (outputContractIssues.length === 0 && coverageIssues.length === 0) break;
+        const explicitRequestIssues = assessExplicitRequestCoverage(
+          plannerInput.travelerContext.requiredActivityRequests,
+          output,
+          placeNamesById,
+          lockedPlannerPlaceIds,
+        );
+        if (outputContractIssues.length === 0 && coverageIssues.length === 0 && explicitRequestIssues.length === 0) break;
         writeStructuredLog('warn', 'ai.generation.draft_revision', {
           generationId,
           tripId,
@@ -208,6 +217,7 @@ export class AiPlanningService {
           maxAttempts: MAX_PLANNER_ATTEMPTS,
           contractIssues: outputContractIssues,
           underfilledDates: coverageIssues,
+          explicitRequestIssues,
         });
         const revisionGuidance = [
           ...(outputContractIssues.includes('unknown_placement_ids')
@@ -232,6 +242,12 @@ export class AiPlanningService {
               'Update the entire itinerary by adding nearby recommendations, meals, cafes, and activities so each listed date reaches that total without rushing.',
               'Keep previous recommendations that are still optimal, but add or replace places as needed. Return the complete revised itinerary, not only the added visits.',
             ]
+            : []),
+          ...(explicitRequestIssues.length > 0
+            ? [formatExplicitRequestRevisionGuidance(
+              plannerInput.travelerContext.requiredActivityRequests,
+              explicitRequestIssues,
+            )]
             : []),
         ];
         output = await this.planner.generate({
@@ -336,6 +352,13 @@ export class AiPlanningService {
           placeTagsById,
           output,
         });
+        qualityIssues.push(...assessExplicitRequestCoverage(
+          plannerInput.travelerContext.requiredActivityRequests,
+          output,
+          placeNamesById,
+          lockedPlannerPlaceIds,
+        ));
+        qualityIssues = [...new Set(qualityIssues)];
         const repairableIssues = qualityIssues.filter(isRepairableQualityIssue);
         if (repairableIssues.length === 0 || materializationAttempt >= MAX_MATERIALIZATION_ATTEMPTS) break;
 
@@ -364,6 +387,12 @@ export class AiPlanningService {
               : '',
             repairableIssues.some((issue) => issue.startsWith('missing_meal:'))
               ? 'Add a real restaurant for every missing breakfast, lunch, or dinner slot. Cafes and dessert shops do not count as meals.'
+              : '',
+            repairableIssues.some((issue) => issue.startsWith('required_activity_missing:'))
+              ? formatExplicitRequestRevisionGuidance(
+                plannerInput.travelerContext.requiredActivityRequests,
+                repairableIssues,
+              )
               : '',
             `Required totals by date are: ${formatCoverageTargets(days, days.map((day) => day.date), density)}.`,
             'Return the complete corrected itinerary. Keep valid saved-place placements, replace unverifiable recommendations, and use chronological non-overlapping times.',
@@ -838,6 +867,71 @@ export function hasExplicitRepeatRequest(additionalRequests: string): boolean {
     .test(additionalRequests.toLocaleLowerCase());
 }
 
+const REQUIRED_ACTIVITY_MARKER = /(투어|체험|공연|콘서트|뮤지컬|축제|페스티벌|클래스|강습|크루즈|유람선|트레킹|하이킹)/u;
+const NEGATED_ACTIVITY_REQUEST = /(싫|제외|피하|않|말아|금지|빼|취소)/u;
+
+/** Extract only named, schedulable experiences from free-form requests. General tastes remain soft context. */
+export function extractRequiredActivityRequests(additionalRequests: string): string[] {
+  const requests = additionalRequests
+    .split(/[\n.!?。;,]+/u)
+    .map((value) => value
+      .replace(/^(?:추가\s*요청(?:사항)?|좋아하는\s*것|원하는\s*것)\s*:\s*/u, '')
+      .replace(/^하루(?:는|동안)?\s*/u, '')
+      .trim())
+    .filter((value) => REQUIRED_ACTIVITY_MARKER.test(value) && !NEGATED_ACTIVITY_REQUEST.test(value))
+    .map((value) => value
+      .replace(/\s*(?:은|는|을|를)?\s*(?:할\s*거(?:야|예요|에요|라고.*)?|하려고.*|하고\s*싶.*|하고자.*|(?:할\s*)?예정(?:이에요|예요|입니다)?|예약했.*|신청했.*)$/u, '')
+      .trim())
+    .filter((value) => value.length > 1);
+  return [...new Set(requests)];
+}
+
+export function assessExplicitRequestCoverage(
+  requiredActivityRequests: string[],
+  output: AiPlannerOutput,
+  placeNamesById: Map<string, string> = new Map(),
+  lockedPlaceIds: Set<string> = new Set(),
+): string[] {
+  if (requiredActivityRequests.length === 0) return [];
+  const evidence = [
+    ...output.placements.flatMap((item) => [placeNamesById.get(item.savedPlaceId) ?? '', item.activity ?? '']),
+    ...output.recommendations.flatMap((item) => [item.placeName, item.activity, item.reason]),
+    ...[...lockedPlaceIds].map((id) => placeNamesById.get(id) ?? ''),
+  ].join(' ');
+  const normalizedEvidence = normalizeRequestEvidence(evidence);
+  return requiredActivityRequests.flatMap((request, index) => {
+    const normalizedRequest = normalizeRequestEvidence(request);
+    const tokens = activityRequestTokens(request);
+    const covered = (normalizedRequest.length > 0 && normalizedEvidence.includes(normalizedRequest))
+      || (tokens.length > 0 && tokens.every((token) => normalizedEvidence.includes(token)));
+    return covered ? [] : [`required_activity_missing:${index}`];
+  });
+}
+
+function activityRequestTokens(request: string): string[] {
+  return request
+    .toLocaleLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .map((token) => token.replace(/(?:은|는|을|를|이|가|에서|으로|로|와|과|도|만)$/u, ''))
+    .filter((token) => token.length >= 2);
+}
+
+function normalizeRequestEvidence(value: string): string {
+  return value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+function formatExplicitRequestRevisionGuidance(requiredRequests: string[], issues: string[]): string {
+  const missing = issues.flatMap((issue) => {
+    const match = /^required_activity_missing:(\d+)$/u.exec(issue);
+    if (!match) return [];
+    const request = requiredRequests[Number(match[1])];
+    return request ? [request] : [];
+  });
+  return missing.length > 0
+    ? `These explicit traveler activities are mandatory and were omitted: ${missing.map((item) => `"${item}"`).join(', ')}. Schedule each one, preserve the exact request text in that visit's activity field, and return the complete itinerary.`
+    : '';
+}
+
 export function shouldRejectAiPlaceDuplicate(
   scheduledOnOtherDate: boolean,
   alreadyRecommendedInResponse: boolean,
@@ -1267,6 +1361,7 @@ function isRepairableQualityIssue(issue: string): boolean {
     'schedule_detail_missing:',
     'invalid_time_window:',
     'outside_available_window:',
+    'required_activity_missing:',
   ].some((prefix) => issue.startsWith(prefix));
 }
 

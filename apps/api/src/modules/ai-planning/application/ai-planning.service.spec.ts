@@ -15,12 +15,14 @@ import {
   addLodgingEndpoints,
   allowsMultipleOptionalStops,
   applyDailyPlanningTargets,
+  assessExplicitRequestCoverage,
   assessPlanQuality,
   assessRawOutputContract,
   assessRawDayCoverage,
   AiPlanningService,
   buildPlannerDays,
   enumerateTripDates,
+  extractRequiredActivityRequests,
   findReusableAiRecommendation,
   findTravelerDuplicatePlaceIds,
   isRecommendableCandidate,
@@ -111,6 +113,35 @@ describe('AI plan quality severity', () => {
     const day = { date: '2026-11-08', startLodging: null, endLodging: null };
     expect(requiredMealSlots({ ...day, isFirstDay: true, availableStartTime: '14:01', availableEndTime: '21:00' }, 0, 2)).toEqual(['dinner']);
     expect(requiredMealSlots({ ...day, isLastDay: true, availableStartTime: '09:00', availableEndTime: '11:59' }, 1, 2)).toEqual(['breakfast']);
+  });
+});
+
+describe('explicit activity request coverage', () => {
+  it('extracts a named tour as a mandatory activity while leaving general preferences soft', () => {
+    expect(extractRequiredActivityRequests('하루는 예스허지 버스투어 예정. 현지 맛집을 좋아해요.')).toEqual([
+      '예스허지 버스투어',
+    ]);
+    expect(extractRequiredActivityRequests('버스투어는 피하고 싶어요')).toEqual([]);
+  });
+
+  it('requires the named tour to be present in an itinerary visit', () => {
+    const missing = assessExplicitRequestCoverage(['예스허지 버스투어'], {
+      placements: [], unplaced: [], recommendations: [{
+        placeName: '예류지질공원', regionName: '신베이', suggestedDate: '2026-11-08', position: 0,
+        startTime: '09:00', durationMinutes: 90, activity: '해안 지형 관람', travelMethod: '버스',
+        travelDurationMinutes: 50, reason: '대표 명소',
+      }],
+    });
+    const covered = assessExplicitRequestCoverage(['예스허지 버스투어'], {
+      placements: [], unplaced: [], recommendations: [{
+        placeName: '예류지질공원', regionName: '신베이', suggestedDate: '2026-11-08', position: 0,
+        startTime: '09:00', durationMinutes: 90, activity: '예스허지 버스투어 첫 코스', travelMethod: '버스',
+        travelDurationMinutes: 50, reason: '사용자 요청 투어',
+      }],
+    });
+
+    expect(missing).toEqual(['required_activity_missing:0']);
+    expect(covered).toEqual([]);
   });
 });
 
@@ -913,6 +944,7 @@ describe('AiPlanningService', () => {
         budgetLevel: null,
         themes: [TravelTheme.Highlights],
         additionalRequests: null,
+        requiredActivityRequests: [],
       },
       places: [{
         id: visit.id, name: visit.name, address: visit.address, latitude: visit.latitude, longitude: visit.longitude,
