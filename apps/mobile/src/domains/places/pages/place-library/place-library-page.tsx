@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
 import { useEffect, useMemo, useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getPlacePhoto, type PlacePhoto } from "@/domains/places/api/places.api";
 import { AppText } from "@/shared/ui/app-text";
@@ -74,24 +74,27 @@ export default function PlacesScreen() {
         {message && <AppText color={colors.secondary}>{message}</AppText>}
         {loading && <Card><AppText color={colors.muted}>장소를 불러오는 중이에요…</AppText></Card>}
         {!loading && places.length === 0 && <Card><AppText variant="heading">아직 저장한 장소가 없어요</AppText><AppText color={colors.muted}>가고 싶은 장소를 먼저 저장해 보세요.</AppText></Card>}
-        {filteredPlaces.map((place) => <Card key={place.id}>
-          <Pressable
-            accessibilityLabel={`${place.name} 선택`}
+        {filteredPlaces.map((place) => {
+          const selected = selectedIds.has(place.id);
+          return <Pressable
+            key={place.id}
+            accessibilityLabel={`${place.name} ${selected ? "선택 해제" : "선택"}`}
             accessibilityRole="checkbox"
-            accessibilityState={{ checked: selectedIds.has(place.id) }}
-            hitSlop={8}
+            accessibilityState={{ checked: selected }}
             onPress={() => toggleSelection(place.id)}
-            style={[styles.checkbox, selectedIds.has(place.id) && styles.checkboxSelected]}
+            style={({ pressed }) => pressed && styles.placeCardPressed}
           >
-            {selectedIds.has(place.id) && <AppText variant="label" color={colors.white}>✓</AppText>}
-          </Pressable>
-          <View style={styles.placeMediaRow}>
-            <PlaceCardVisual placeId={place.id} tag={place.tag} tripId={tripId} />
-            <View style={styles.placeIdentity}>
-              <AppText numberOfLines={2} variant="heading" style={styles.placeName}>{place.name}</AppText>
-            </View>
-          </View>
-        </Card>)}
+            <Card style={[styles.placeCard, selected && styles.placeCardSelected]}>
+              <View style={styles.placeMediaRow}>
+                <PlaceCardVisual placeId={place.id} tag={place.tag} tripId={tripId} />
+                <View style={styles.placeIdentity}>
+                  <AppText numberOfLines={1} variant="heading" style={styles.placeName}>{place.name}</AppText>
+                  <AppText numberOfLines={3} color={colors.muted} style={styles.placeDescription}>{placeDescription(place.note)}</AppText>
+                </View>
+              </View>
+            </Card>
+          </Pressable>;
+        })}
         {message && <Button label="다시 불러오기" variant="ghost" onPress={() => void reload()} />}
       </Screen>
       <SafeAreaView edges={["bottom"]} style={styles.bottomAction}>
@@ -107,6 +110,15 @@ const tagLabels: Record<string, string> = {
 };
 
 function tagLabel(tag: string) { return tagLabels[tag] ?? tag; }
+
+function placeDescription(note?: string | null) {
+  const description = note
+    ?.replace(/^AI 추천\s*·\s*/u, "")
+    .replace(/^보관함\s*·\s*/u, "")
+    .trim();
+  if (!description || /^(아침|점심|저녁) 일정 보완$/u.test(description)) return "여행 일정에 저장한 장소예요.";
+  return description;
+}
 
 function tagIcon(tag: string) {
   return ({ activity: "🎟", attraction: "📍", cafe: "☕", food: "🍽", lodging: "🛏", shopping: "🛍", transport: "🚉" } as Record<string, string>)[tag] ?? "✦";
@@ -124,36 +136,31 @@ function PlaceCardVisual({ placeId, tag, tripId }: { placeId: string; tag: strin
   useEffect(() => {
     let active = true;
     void getPlacePhoto(tripId, placeId)
-      .then((nextPhoto) => { if (active) setPhoto(nextPhoto.imageUrl && nextPhoto.googleMapsUri ? nextPhoto : null); })
+      .then((nextPhoto) => { if (active) setPhoto(nextPhoto.imageUrl ? nextPhoto : null); })
       .catch(() => { if (active) setPhoto(null); });
     return () => { active = false; };
   }, [placeId, tripId]);
 
-  if (!photo?.imageUrl || !photo.googleMapsUri) {
+  if (!photo?.imageUrl) {
     return <View style={[styles.placeVisual, tagVisualStyle(tag)]}>
       <AppText style={styles.placeVisualText}>{tagIcon(tag)}</AppText>
     </View>;
   }
-  const sourceUri = photo.googleMapsUri;
-  return <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(sourceUri)} style={styles.photoLink}>
-      <Image
-        accessibilityLabel="장소 대표 사진"
-        cachePolicy="none"
-        contentFit="cover"
-        onError={() => setPhoto(null)}
-        source={{ uri: photo.imageUrl }}
-        style={styles.placePhoto}
-        transition={150}
-      />
-  </Pressable>;
+  return <Image
+    accessibilityLabel="장소 대표 사진"
+    cachePolicy="none"
+    contentFit="cover"
+    onError={() => setPhoto(null)}
+    source={{ uri: photo.imageUrl }}
+    style={styles.placePhoto}
+    transition={150}
+  />;
 }
 
 const styles = StyleSheet.create({
   actionButton: { flex: 1 },
   attractionVisual: { backgroundColor: colors.primarySoft },
   cafeVisual: { backgroundColor: "#F6E8D5" },
-  checkbox: { width: 28, height: 28, borderWidth: 2, borderColor: colors.line, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
-  checkboxSelected: { borderColor: colors.primary, backgroundColor: colors.primary },
   defaultVisual: { backgroundColor: colors.secondarySoft },
   filters: { gap: spacing.xs, paddingRight: spacing.lg },
   filterScroll: { flexGrow: 0, marginHorizontal: -spacing.lg, paddingLeft: spacing.lg },
@@ -162,13 +169,16 @@ const styles = StyleSheet.create({
   libraryContent: { paddingBottom: 112 },
   managementActions: { flexDirection: "row", gap: spacing.sm },
   page: { flex: 1, backgroundColor: colors.canvas },
-  placeMediaRow: { flexDirection: "row", gap: spacing.md, alignItems: "stretch" },
-  placeIdentity: { flex: 1, justifyContent: "center", paddingVertical: spacing.xs },
+  placeCard: { padding: spacing.md },
+  placeCardPressed: { opacity: 0.78 },
+  placeCardSelected: { backgroundColor: colors.primarySoft, borderColor: colors.primary, borderWidth: 2 },
+  placeDescription: { flexShrink: 1 },
+  placeMediaRow: { flexDirection: "row", gap: spacing.md, alignItems: "center" },
+  placeIdentity: { flex: 1, minWidth: 0, gap: spacing.sm },
   placeName: { flexShrink: 1 },
-  placePhoto: { width: 84, height: 84, borderRadius: 16, backgroundColor: colors.line },
-  placeVisual: { width: 84, height: 84, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  placePhoto: { width: 120, height: 120, borderRadius: 16, backgroundColor: colors.line },
+  placeVisual: { width: 120, height: 120, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   placeVisualText: { fontSize: 30 },
-  photoLink: { width: 84, height: 84 },
   selectionSummary: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   bottomAction: { position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 10, backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: colors.line, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
 });
