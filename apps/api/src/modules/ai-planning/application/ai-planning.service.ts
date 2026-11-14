@@ -27,6 +27,8 @@ import {
   TravelTheme,
 } from '../domain/ai-planner.port';
 import {
+  AiPlanExecutionStatus,
+  type AiPlanExecutionStatusResponseDto,
   AiPlanGenerationStatus,
   GenerateAiPlanResponseDto,
   LatestAiPlanRequestResponseDto,
@@ -69,6 +71,7 @@ const FINAL_REVIEW_FOCUSES: AiPlannerReviewFocus[] = ['route_time', 'traveler_in
 
 @Injectable()
 export class AiPlanningService {
+  private readonly executionStatuses = new Map<string, AiPlanExecutionStatusResponseDto>();
   private readonly logger = new Logger(AiPlanningService.name);
   constructor(
     @InjectRepository(TripEntity) private readonly trips: Repository<TripEntity>,
@@ -90,6 +93,20 @@ export class AiPlanningService {
     });
     if (!trip) throw new NotFoundException('Trip not found');
     return { request: normalizeLatestAiPlanRequest(trip.latestAiPlanRequest) };
+  }
+
+  async getStatus(tripId: string): Promise<AiPlanExecutionStatusResponseDto> {
+    const trip = await this.trips.findOneBy({
+      id: tripId,
+      ownerId: this.identity.getCurrentUserId(),
+      active: true,
+    });
+    if (!trip) throw new NotFoundException('Trip not found');
+    return this.executionStatuses.get(tripId) ?? {
+      generationId: null,
+      status: AiPlanExecutionStatus.Idle,
+      failureReason: null,
+    };
   }
 
   async generateDay(tripId: string, date: string): Promise<GenerateAiPlanResponseDto> {
@@ -164,6 +181,11 @@ export class AiPlanningService {
       trip.endPoint?.time ?? null,
     ).filter((day) => !targetDate || day.date === targetDate);
     let createdRecommendationEntities: SavedPlaceEntity[] = [];
+    this.executionStatuses.set(tripId, {
+      generationId,
+      status: AiPlanExecutionStatus.Running,
+      failureReason: null,
+    });
     try {
       writeStructuredLog('info', 'ai.generation.started', {
         generationId,
@@ -567,6 +589,13 @@ export class AiPlanningService {
         durationMs: Math.round(performance.now() - startedAt),
         placementCount: persistedPlacements.length,
       });
+      this.executionStatuses.set(tripId, {
+        generationId,
+        status: result.status === ItineraryUpdateStatus.Updated
+          ? AiPlanExecutionStatus.Generated
+          : AiPlanExecutionStatus.Conflict,
+        failureReason: null,
+      });
       return {
         status: result.status === ItineraryUpdateStatus.Updated ? AiPlanGenerationStatus.Generated : AiPlanGenerationStatus.Conflict,
         density,
@@ -593,6 +622,11 @@ export class AiPlanningService {
           errorName: error instanceof Error ? error.name : typeof error,
           errorMessage: error instanceof Error ? error.message.slice(0, 500) : undefined,
         }),
+      });
+      this.executionStatuses.set(tripId, {
+        generationId,
+        status: AiPlanExecutionStatus.Unavailable,
+        failureReason: reason,
       });
       return {
         status: AiPlanGenerationStatus.Unavailable,

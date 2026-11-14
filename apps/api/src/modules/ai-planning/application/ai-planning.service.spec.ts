@@ -659,6 +659,29 @@ describe('isWithinSelectedRegions', () => {
 });
 
 describe('AiPlanningService', () => {
+  it('returns an idle execution status before a trip starts generating', async () => {
+    const tripId = '10000000-0000-4000-8000-000000000019';
+    const findOneBy = vi.fn().mockResolvedValue({ id: tripId });
+    const service = new AiPlanningService(
+      { findOneBy } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      { getCurrentUserId: vi.fn().mockReturnValue('user-1') },
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.getStatus(tripId)).resolves.toEqual({
+      generationId: null,
+      status: 'idle',
+      failureReason: null,
+    });
+    expect(findOneBy).toHaveBeenCalledWith({ id: tripId, ownerId: 'user-1', active: true });
+  });
+
   it('loads the latest AI request only from the current user trip', async () => {
     const tripId = '10000000-0000-4000-8000-000000000020';
     const latestAiPlanRequest = {
@@ -791,6 +814,10 @@ describe('AiPlanningService', () => {
     });
 
     expect(result.status).toBe(AiPlanGenerationStatus.Generated);
+    const executionStatus = await service.getStatus(tripId);
+    expect(typeof executionStatus.generationId).toBe('string');
+    expect(executionStatus.status).toBe('generated');
+    expect(executionStatus.failureReason).toBeNull();
     expect(planner.generate).toHaveBeenCalledTimes(2);
     expect(search).toHaveBeenCalledWith('점심 식사 식당', '대한민국 서울');
     expect(replace).toHaveBeenCalledWith(tripId, expect.arrayContaining([

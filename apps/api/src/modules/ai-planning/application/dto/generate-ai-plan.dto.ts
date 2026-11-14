@@ -83,3 +83,22 @@ export class LatestAiPlanRequestResponseDto {
   @ApiPropertyOptional({ type: GenerateAiPlanDto, nullable: true })
   request!: GenerateAiPlanDto | null;
 }
+
+export enum AiPlanExecutionStatus {
+  Idle = 'idle',
+  Running = 'running',
+  Generated = 'generated',
+  Conflict = 'conflict',
+  Unavailable = 'unavailable',
+}
+
+export class AiPlanExecutionStatusResponseDto {
+  @ApiPropertyOptional({ type: String, format: 'uuid', nullable: true })
+  generationId!: string | null;
+
+  @ApiProperty({ enum: AiPlanExecutionStatus, enumName: 'AiPlanExecutionStatus' })
+  status!: AiPlanExecutionStatus;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  failureReason!: string | null;
+}

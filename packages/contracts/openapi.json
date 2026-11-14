@@ -181,6 +181,37 @@
         ]
       }
     },
+    "/v1/trips/{tripId}/ai-plans/status": {
+      "get": {
+        "operationId": "AiPlanningController_getStatus",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiPlanExecutionStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ai-planning"
+        ]
+      }
+    },
     "/v1/trips/{tripId}/ai-plans": {
       "post": {
         "operationId": "AiPlanningController_generate",
@@ -1431,6 +1462,40 @@
             ]
           }
         }
+      },
+      "AiPlanExecutionStatus": {
+        "type": "string",
+        "enum": [
+          "idle",
+          "running",
+          "generated",
+          "conflict",
+          "unavailable"
+        ]
+      },
+      "AiPlanExecutionStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "generationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AiPlanExecutionStatus"
+              }
+            ]
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status"
+        ]
       },
       "AiPlanGenerationStatus": {
         "type": "string",

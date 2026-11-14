@@ -3,6 +3,7 @@ import { ApiBody, ApiOkResponse, ApiParam, ApiTags } from '@nestjs/swagger';
 
 import { AiPlanningService } from '../application/ai-planning.service';
 import {
+  AiPlanExecutionStatusResponseDto,
   GenerateAiPlanDto,
   GenerateAiPlanResponseDto,
   LatestAiPlanRequestResponseDto,
@@ -20,6 +21,15 @@ export class AiPlanningController {
     @Param('tripId', new ParseUUIDPipe()) tripId: string,
   ): Promise<LatestAiPlanRequestResponseDto> {
     return this.planning.getLatestRequest(tripId);
+  }
+
+  @Get('status')
+  @ApiParam({ name: 'tripId', type: String, format: 'uuid' })
+  @ApiOkResponse({ type: AiPlanExecutionStatusResponseDto })
+  getStatus(
+    @Param('tripId', new ParseUUIDPipe()) tripId: string,
+  ): Promise<AiPlanExecutionStatusResponseDto> {
+    return this.planning.getStatus(tripId);
   }
 
   @Post()

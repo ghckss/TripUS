@@ -116,6 +116,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trips/{tripId}/ai-plans/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AiPlanningController_getStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trips/{tripId}/ai-plans": {
         parameters: {
             query?: never;
@@ -484,6 +500,14 @@ export interface components {
         };
         LatestAiPlanRequestResponseDto: {
             request?: components["schemas"]["GenerateAiPlanDto"] | null;
+        };
+        /** @enum {string} */
+        AiPlanExecutionStatus: "idle" | "running" | "generated" | "conflict" | "unavailable";
+        AiPlanExecutionStatusResponseDto: {
+            /** Format: uuid */
+            generationId?: string | null;
+            status: components["schemas"]["AiPlanExecutionStatus"];
+            failureReason?: string | null;
         };
         /** @enum {string} */
         AiPlanGenerationStatus: "generated" | "conflict" | "unavailable";
@@ -937,6 +961,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LatestAiPlanRequestResponseDto"];
+                };
+            };
+        };
+    };
+    AiPlanningController_getStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiPlanExecutionStatusResponseDto"];
                 };
             };
         };
