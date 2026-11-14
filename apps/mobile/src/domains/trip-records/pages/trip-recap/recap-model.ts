@@ -26,12 +26,6 @@ export function recommendedRecapMode(photoCount: number): RecapMode {
   return "route";
 }
 
-export function recapModeLabel(mode: RecapMode): string {
-  if (mode === "photo-diary") return "사진 일기형";
-  if (mode === "mixed") return "사진 + 동선형";
-  return "기록 카드형";
-}
-
 function photoUri(photo: TripPhoto): string | undefined {
   return photo.optimizedUrl ?? photo.originalUrl ?? photo.thumbnailUrl ?? undefined;
 }
