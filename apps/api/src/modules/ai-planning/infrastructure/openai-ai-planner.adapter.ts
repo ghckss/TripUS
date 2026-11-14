@@ -5,7 +5,14 @@ import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 
 import { writeStructuredLog } from '../../../common/http/json-logger';
-import { AiPlannerError, AiPlannerInput, AiPlannerOutput, AiPlannerPort } from '../domain/ai-planner.port';
+import {
+  AiPlannerError,
+  AiPlannerInput,
+  AiPlannerOutput,
+  AiPlannerPort,
+  type AiPlannerReview,
+  type AiPlannerReviewFocus,
+} from '../domain/ai-planner.port';
 
 export const AI_PLANNER_SYSTEM_PROMPT = [
   '너는 해당 여행지에서 10년 이상 활동한 현지 전문 가이드이자 실제 이동 가능한 일정을 설계하는 여행 플래너다.',
@@ -48,6 +55,7 @@ export const AI_PLANNER_SYSTEM_PROMPT = [
   '[장소 보관함] 일정에 배치하기에는 시간이나 동선이 맞지 않지만 여행지에서 추천할 가치가 있는 유명 장소는 savedRecommendations에 넣는다. savedRecommendations는 일정에 배치하지 않으며, 정확한 고유명칭과 지역, 위 기준을 따르는 장소 설명만 작성한다. 억지로 채우지 말고 최대 5곳까지만 제안한다.',
   'unplaced는 정상 결과에서는 항상 빈 배열이어야 한다. 모든 저장 장소를 포함하면서 완전한 일정을 만들 수 없다면 불완전한 결과를 타협해서 반환하지 말고 전체 배치를 다시 설계한다.',
   '[검증 후 재작성] revisionDraft가 있으면 직전 응답이 서버 검증에서 탈락한 것이다. revisionGuidance의 모든 문제를 revisionDraft와 대조해 수정한다. 처음부터 무관한 일정을 다시 만들거나 일부 수정분만 반환하지 말고, 문제가 없던 방문은 유지하면서 탈락 사유를 모두 해소한 완전한 전체 일정을 반환한다.',
+  '[병렬 검토 통합] orchestrationReviews가 있으면 서로 독립적인 전문 검토 결과다. 모든 blocking 문제를 반드시 해결하고 warning도 일정 품질을 높이는 범위에서 반영한다. 검토 의견이 충돌하면 사용자 명시 요청, 저장 장소 포함, 실제 이동 가능성, 영업시간, 식사를 우선순위로 판단한다. 검토 문구를 출력하지 말고 수정된 전체 일정만 반환한다.',
   'revisionGuidance가 최종 품질 검토를 요구하면 revisionDraft 전체를 전문 여행 가이드 관점에서 다시 검토한다. 장소별 최적 시간대, 영업시간, 식사 간격, 이동 동선, 시작·종료 지점 도착 가능성, 사용자 명시 요청 충족 여부를 확인하고 어색한 부분을 직접 고친 완전한 일정만 반환한다.',
   'underfilled_day는 일정이 비거나 너무 짧다는 뜻이다. 해당 날짜의 availableStartTime부터 availableEndTime까지 현실적인 방문·식사·이동으로 채우고 targetPlannedMinutes를 충족한다. outside_available_window 또는 invalid_time_window는 단순히 시간을 앞당기는 방식으로 다른 겹침을 만들지 말고, 방문 수·체류시간·이동시간을 함께 재배치해 해결한다.',
   '영업시간을 확인했다고 단정하거나 장소, 위치, 날짜, 운영시간을 지어내지 않는다. 예약이나 운영시간 확인이 중요한 경우에만 activity에 짧은 확인 안내를 포함한다.',
@@ -85,6 +93,37 @@ const SavedRecommendationSchema = z.object({
   regionName: z.string().min(1),
   reason: z.string().min(1),
 });
+
+export const PlannerReviewSchema = z.object({
+  verdict: z.enum(['pass', 'revise']),
+  summary: z.string().min(1).max(1000),
+  issues: z.array(z.object({
+    severity: z.enum(['warning', 'blocking']),
+    code: z.string().min(1).max(100),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+    placeNames: z.array(z.string().min(1)).max(10),
+    finding: z.string().min(1).max(1000),
+    requiredChange: z.string().min(1).max(1000),
+  })).max(30),
+});
+
+const REVIEWER_PROMPTS: Record<AiPlannerReviewFocus, string> = {
+  route_time: [
+    '너는 여행 일정의 동선·시간·영업시간만 검토하는 독립 검토자다.',
+    '장소 순서, 이동시간, 역주행, 도시 간 왕복, 시작·종료 지점 도착 가능성, 영업시간, 장소별 적합 시간대를 확인한다.',
+    '일정을 직접 다시 작성하지 말고 구체적인 문제와 필요한 수정만 구조화해 반환한다.',
+  ].join(' '),
+  traveler_intent: [
+    '너는 여행자의 의도와 장소 구성을 검토하는 독립 검토자다.',
+    '저장 장소와 필수 투어 누락, 다른 날짜와의 AI 중복, 선택 지역, 현지성, 여행 테마, 추가 요청사항, 장소 설명 품질을 확인한다.',
+    '사용자가 직접 넣은 중복은 허용하고 AI가 만든 불필요한 중복만 지적한다. 일정을 직접 다시 작성하지 말고 구체적인 문제와 필요한 수정만 구조화해 반환한다.',
+  ].join(' '),
+  meal_density: [
+    '너는 식사와 하루 일정 완성도를 검토하는 독립 검토자다.',
+    '첫날·마지막 날 예외를 포함한 아침·점심·저녁, 식사 간격, 카페의 식사 대체 여부, 하루 밀도, 비현실적인 체류시간, 휴식 균형을 확인한다.',
+    '일정을 직접 다시 작성하지 말고 구체적인 문제와 필요한 수정만 구조화해 반환한다.',
+  ].join(' '),
+};
 
 export function createAiPlanSchema(allowedPlaceIds: string[], missingDescriptionPlaceIds: string[] = allowedPlaceIds) {
   const allowedId = allowedPlaceIds.length > 0
@@ -158,6 +197,39 @@ export class OpenAiPlannerAdapter implements AiPlannerPort {
       if (error instanceof AiPlannerError) throw error;
       const details = providerErrorDetails(error);
       writeStructuredLog('error', 'ai.planner.provider_failure', details);
+      throw new AiPlannerError('provider_failure', details);
+    }
+  }
+
+  async review(
+    input: AiPlannerInput,
+    draft: Omit<AiPlannerOutput, 'usage'>,
+    focus: AiPlannerReviewFocus,
+  ): Promise<AiPlannerReview> {
+    try {
+      const response = await this.client.responses.parse({
+        model: this.model,
+        max_output_tokens: Math.min(this.maxOutputTokens, 4_000),
+        input: [
+          { role: 'system', content: REVIEWER_PROMPTS[focus] },
+          { role: 'user', content: JSON.stringify({ input, draft }) },
+        ],
+        text: { format: zodTextFormat(PlannerReviewSchema, `trip_itinerary_review_${focus}`) },
+      });
+      if (response.status === 'incomplete') throw new AiPlannerError('incomplete');
+      if (response.output.some((item) => item.type === 'message' && item.content.some((content) => content.type === 'refusal'))) {
+        throw new AiPlannerError('refused');
+      }
+      if (!response.output_parsed) throw new AiPlannerError('invalid_output');
+      return {
+        focus,
+        ...response.output_parsed,
+        usage: { inputTokens: response.usage?.input_tokens ?? 0, outputTokens: response.usage?.output_tokens ?? 0 },
+      };
+    } catch (error) {
+      if (error instanceof AiPlannerError) throw error;
+      const details = providerErrorDetails(error);
+      writeStructuredLog('error', 'ai.planner.review_provider_failure', { focus, ...details });
       throw new AiPlannerError('provider_failure', details);
     }
   }

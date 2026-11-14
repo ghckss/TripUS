@@ -18,6 +18,8 @@ import {
   type AiPlannerInput,
   type AiPlannerOutput,
   type AiPlannerPort,
+  type AiPlannerReview,
+  type AiPlannerReviewFocus,
   type AiVisitTimeSlot,
   AI_PLANNING_TASK,
   TRAVEL_DENSITY_POLICIES,
@@ -62,6 +64,7 @@ const MAX_MATERIALIZATION_ATTEMPTS = 4;
 const DEFAULT_DAY_START_MINUTES = 9 * 60;
 const DEFAULT_DAY_END_MINUTES = 21 * 60;
 const BOUNDARY_TRANSITION_BUFFER_MINUTES = 60;
+const FINAL_REVIEW_FOCUSES: AiPlannerReviewFocus[] = ['route_time', 'traveler_intent', 'meal_density'];
 
 @Injectable()
 export class AiPlanningService {
@@ -386,7 +389,6 @@ export class AiPlanningService {
         qualityIssues = [...new Set(qualityIssues)];
         const repairableIssues = qualityIssues.filter(isRepairableQualityIssue);
         if (repairableIssues.length === 0 && !finalReviewCompleted && materializationAttempt < MAX_MATERIALIZATION_ATTEMPTS) {
-          writeStructuredLog('info', 'ai.generation.final_review_started', { generationId, tripId });
           const materializedDraft = toMaterializedReviewDraft(
             generated,
             recommended,
@@ -395,18 +397,8 @@ export class AiPlanningService {
           );
           if (createdRecommendationEntities.length > 0) await this.places.remove(createdRecommendationEntities);
           createdRecommendationEntities = [];
-          output = await this.planner.generate({
-            ...plannerInput,
-            revisionDraft: materializedDraft,
-            revisionGuidance: [
-              '최종 품질 검토 단계다. Google 장소 검증, 실제 이동시간, 영업시간과 서버 시간대 보정까지 반영된 직전 일정 전체가 실제 여행자가 그대로 사용해도 좋은 일정인지 다시 검토하고 필요한 부분을 직접 수정한다.',
-              '사용자가 명시한 투어·장소가 실제 방문지로 충분히 구성됐는지, 장소별 영업시간과 가장 좋은 시간대가 맞는지, 식사 간격이 자연스러운지, 이동시간과 시작·종료 지점 도착이 현실적인지 확인한다.',
-              '전망대·관람차·야경 명소는 일몰 이후, 야시장은 저녁, 아침 전문점은 오전에 배치한다. 시간이 부족하면 체류시간을 비현실적으로 줄이지 말고 중요도가 낮은 AI 추천 장소를 제거한다.',
-              '문제가 없는 항목은 유지하고 수정된 전체 일정을 반환한다.',
-            ].join(' '),
-          });
+          output = await this.runOrchestratedFinalReview(generationId, tripId, plannerInput, materializedDraft);
           finalReviewCompleted = true;
-          writeStructuredLog('info', 'ai.generation.final_review_completed', { generationId, tripId });
           continue;
         }
         if (repairableIssues.length === 0 || materializationAttempt >= MAX_MATERIALIZATION_ATTEMPTS) break;
@@ -597,6 +589,79 @@ export class AiPlanningService {
       await this.places.save(updates);
     } catch {
       this.logger.error('AI place description update failed');
+    }
+  }
+
+  private async runOrchestratedFinalReview(
+    generationId: string,
+    tripId: string,
+    plannerInput: AiPlannerInput,
+    draft: Omit<AiPlannerOutput, 'usage'>,
+  ): Promise<AiPlannerOutput> {
+    const startedAt = performance.now();
+    writeStructuredLog('info', 'ai.generation.parallel_review_started', {
+      generationId,
+      tripId,
+      focuses: FINAL_REVIEW_FOCUSES,
+    });
+
+    let reviews: AiPlannerReview[] = [];
+    let failedFocuses: AiPlannerReviewFocus[] = [];
+    if (this.planner.review) {
+      const review = this.planner.review.bind(this.planner);
+      const settled = await Promise.allSettled(
+        FINAL_REVIEW_FOCUSES.map((focus) => review(plannerInput, draft, focus)),
+      );
+      reviews = settled.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
+      failedFocuses = settled.flatMap((result, index) =>
+        result.status === 'rejected' ? [FINAL_REVIEW_FOCUSES[index]!] : [],
+      );
+    }
+
+    writeStructuredLog(failedFocuses.length > 0 ? 'warn' : 'info', 'ai.generation.parallel_review_completed', {
+      generationId,
+      tripId,
+      completedFocuses: reviews.map((review) => review.focus),
+      failedFocuses,
+      issueCount: reviews.reduce((count, review) => count + review.issues.length, 0),
+      blockingIssueCount: reviews.reduce(
+        (count, review) => count + review.issues.filter((issue) => issue.severity === 'blocking').length,
+        0,
+      ),
+      inputTokens: reviews.reduce((count, review) => count + (review.usage?.inputTokens ?? 0), 0),
+      outputTokens: reviews.reduce((count, review) => count + (review.usage?.outputTokens ?? 0), 0),
+      durationMs: Math.round(performance.now() - startedAt),
+    });
+
+    try {
+      writeStructuredLog('info', 'ai.generation.review_integration_started', { generationId, tripId });
+      const integrated = await this.planner.generate({
+        ...plannerInput,
+        revisionDraft: draft,
+        orchestrationReviews: reviews,
+        revisionGuidance: [
+          '최종 통합 단계다. Google 장소 검증, 실제 이동시간, 영업시간과 서버 시간대 보정까지 반영된 직전 일정과 병렬 전문 검토 결과를 함께 검토한다.',
+          '모든 blocking 문제를 해결하고, 사용자 명시 요청과 저장 장소는 유지하며, 문제가 없는 일정은 불필요하게 바꾸지 않는다.',
+          '전망대·관람차·야경 명소는 일몰 이후, 야시장은 저녁, 아침 전문점은 오전에 배치한다. 시간이 부족하면 체류시간을 비현실적으로 줄이지 말고 중요도가 낮은 AI 추천 장소를 제거한다.',
+          '검토 의견이 없거나 일부 검토가 실패했더라도 직전 일정 전체를 직접 확인하고 수정된 완전한 일정만 반환한다.',
+        ].join(' '),
+      });
+      writeStructuredLog('info', 'ai.generation.review_integration_completed', {
+        generationId,
+        tripId,
+        reviewCount: reviews.length,
+        inputTokens: integrated.usage?.inputTokens ?? 0,
+        outputTokens: integrated.usage?.outputTokens ?? 0,
+      });
+      return integrated;
+    } catch (error) {
+      writeStructuredLog('warn', 'ai.generation.review_integration_fallback', {
+        generationId,
+        tripId,
+        reviewCount: reviews.length,
+        reason: error instanceof AiPlannerError ? error.reason : 'provider_failure',
+      });
+      return draft;
     }
   }
 

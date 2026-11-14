@@ -89,6 +89,25 @@ export interface AiPlannerRequiredActivityRequest {
 
 export type AiVisitTimeSlot = 'any' | 'morning' | 'lunch' | 'daytime' | 'sunset' | 'evening' | 'night';
 
+export type AiPlannerReviewFocus = 'route_time' | 'traveler_intent' | 'meal_density';
+
+export interface AiPlannerReviewIssue {
+  severity: 'warning' | 'blocking';
+  code: string;
+  date: string | null;
+  placeNames: string[];
+  finding: string;
+  requiredChange: string;
+}
+
+export interface AiPlannerReview {
+  focus: AiPlannerReviewFocus;
+  verdict: 'pass' | 'revise';
+  summary: string;
+  issues: AiPlannerReviewIssue[];
+  usage?: { inputTokens: number; outputTokens: number };
+}
+
 export interface AiPlannerLodging {
   savedPlaceId: string;
   name: string;
@@ -160,6 +179,8 @@ export interface AiPlannerInput {
   /** Previous rejected draft. Present only during a validation-driven revision request. */
   revisionDraft?: Omit<AiPlannerOutput, 'usage'>;
   revisionGuidance?: string;
+  /** Independent specialist reviews to reconcile during the integration pass. */
+  orchestrationReviews?: AiPlannerReview[];
 }
 
 export interface AiPlannerBoundaryPoint {
@@ -222,4 +243,9 @@ export class AiPlannerError extends Error {
 
 export interface AiPlannerPort {
   generate(input: AiPlannerInput): Promise<AiPlannerOutput>;
+  review?(
+    input: AiPlannerInput,
+    draft: Omit<AiPlannerOutput, 'usage'>,
+    focus: AiPlannerReviewFocus,
+  ): Promise<AiPlannerReview>;
 }

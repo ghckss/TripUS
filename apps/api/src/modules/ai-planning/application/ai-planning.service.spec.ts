@@ -6,6 +6,9 @@ import { ItineraryUpdateStatus } from '../../itineraries/application/dto/itinera
 import {
   AI_PLANNING_TASK,
   type AiPlannerInput,
+  type AiPlannerOutput,
+  type AiPlannerReview,
+  type AiPlannerReviewFocus,
   TRAVEL_DENSITY_POLICIES,
   TravelDensity,
   TravelTheme,
@@ -37,6 +40,78 @@ import {
   requiredMealSlots,
   shouldRejectAiPlaceDuplicate,
 } from './ai-planning.service';
+
+describe('AI final review orchestration', () => {
+  const draft: Omit<AiPlannerOutput, 'usage'> = {
+    placements: [],
+    unplaced: [],
+    placeDescriptions: [],
+    recommendations: [],
+    savedRecommendations: [],
+  };
+
+  function createService(planner: object) {
+    return new AiPlanningService(
+      {} as never, {} as never, planner as never, {} as never, {} as never,
+      {} as never, {} as never, {} as never, {} as never,
+    );
+  }
+
+  it('runs three specialist reviews and gives every result to the integrator', async () => {
+    const reviewedFocuses: AiPlannerReviewFocus[] = [];
+    const review = vi.fn((_input: AiPlannerInput, _draft: Omit<AiPlannerOutput, 'usage'>, focus: AiPlannerReviewFocus): Promise<AiPlannerReview> => {
+      reviewedFocuses.push(focus);
+      return Promise.resolve({ focus, verdict: 'pass', summary: `${focus} 검토 완료`, issues: [] });
+    });
+    const integrated: AiPlannerOutput = { ...draft, usage: { inputTokens: 100, outputTokens: 50 } };
+    let integrationInput: AiPlannerInput | undefined;
+    const generate = vi.fn((input: AiPlannerInput): Promise<AiPlannerOutput> => {
+      integrationInput = input;
+      return Promise.resolve(integrated);
+    });
+    const service = createService({ review, generate });
+
+    const result = await (service as unknown as {
+      runOrchestratedFinalReview(
+        generationId: string,
+        tripId: string,
+        input: AiPlannerInput,
+        reviewDraft: Omit<AiPlannerOutput, 'usage'>,
+      ): Promise<AiPlannerOutput>;
+    }).runOrchestratedFinalReview('generation-1', 'trip-1', {} as AiPlannerInput, draft);
+
+    expect(review).toHaveBeenCalledTimes(3);
+    expect(reviewedFocuses).toEqual(['route_time', 'traveler_intent', 'meal_density']);
+    expect(integrationInput?.orchestrationReviews?.map((item) => item.focus)).toEqual(['route_time', 'traveler_intent', 'meal_density']);
+    expect(integrationInput?.revisionDraft).toBe(draft);
+    expect(result).toBe(integrated);
+  });
+
+  it('keeps the verified draft when specialist or integration calls fail', async () => {
+    const review = vi.fn((_input: AiPlannerInput, _draft: Omit<AiPlannerOutput, 'usage'>, focus: AiPlannerReviewFocus): Promise<AiPlannerReview> => {
+      if (focus === 'route_time') return Promise.reject(new Error('review unavailable'));
+      return Promise.resolve({ focus, verdict: 'pass', summary: '검토 완료', issues: [] });
+    });
+    let integrationInput: AiPlannerInput | undefined;
+    const generate = vi.fn((input: AiPlannerInput): Promise<AiPlannerOutput> => {
+      integrationInput = input;
+      return Promise.reject(new Error('integration unavailable'));
+    });
+    const service = createService({ review, generate });
+
+    const result = await (service as unknown as {
+      runOrchestratedFinalReview(
+        generationId: string,
+        tripId: string,
+        input: AiPlannerInput,
+        reviewDraft: Omit<AiPlannerOutput, 'usage'>,
+      ): Promise<AiPlannerOutput>;
+    }).runOrchestratedFinalReview('generation-2', 'trip-2', {} as AiPlannerInput, draft);
+
+    expect(integrationInput?.orchestrationReviews?.map((item) => item.focus)).toEqual(['traveler_intent', 'meal_density']);
+    expect(result).toEqual(draft);
+  });
+});
 
 describe('AI plan quality severity', () => {
   it('blocks incomplete schedules after internal repair attempts while allowing meal fallback repair', () => {
