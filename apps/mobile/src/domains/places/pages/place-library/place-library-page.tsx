@@ -89,7 +89,6 @@ export default function PlacesScreen() {
             <PlaceCardVisual placeId={place.id} tag={place.tag} tripId={tripId} />
             <View style={styles.placeIdentity}>
               <AppText numberOfLines={2} variant="heading" style={styles.placeName}>{place.name}</AppText>
-              <View style={styles.tagRow}><Pill label={tagLabel(place.tag)} /></View>
             </View>
           </View>
         </Card>)}
@@ -146,7 +145,6 @@ function PlaceCardVisual({ placeId, tag, tripId }: { placeId: string; tag: strin
         style={styles.placePhoto}
         transition={150}
       />
-      {photo.authorNames.length > 0 && <AppText numberOfLines={1} style={styles.photoCredit}>© {photo.authorNames.join(", ")}</AppText>}
   </Pressable>;
 }
 
@@ -164,14 +162,12 @@ const styles = StyleSheet.create({
   managementActions: { flexDirection: "row", gap: spacing.sm },
   page: { flex: 1, backgroundColor: colors.canvas },
   placeMediaRow: { flexDirection: "row", gap: spacing.md, alignItems: "stretch" },
-  placeIdentity: { flex: 1, justifyContent: "space-between", paddingVertical: spacing.xs },
+  placeIdentity: { flex: 1, justifyContent: "center", paddingVertical: spacing.xs },
   placeName: { flexShrink: 1 },
   placePhoto: { width: 84, height: 84, borderRadius: 16, backgroundColor: colors.line },
   placeVisual: { width: 84, height: 84, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   placeVisualText: { fontSize: 30 },
-  photoCredit: { position: "absolute", left: 4, right: 4, bottom: 3, color: colors.white, fontSize: 9, lineHeight: 11, textShadowColor: "rgba(0,0,0,0.8)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   photoLink: { width: 84, height: 84 },
   selectionSummary: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   bottomAction: { backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: colors.line, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  tagRow: { alignSelf: "flex-start" },
 });
