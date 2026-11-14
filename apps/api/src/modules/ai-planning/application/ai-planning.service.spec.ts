@@ -18,6 +18,7 @@ import {
   addLodgingEndpoints,
   allowsMultipleOptionalStops,
   applyDailyPlanningTargets,
+  applyOpeningHoursPreferences,
   applyVisitTimePreferences,
   assessExplicitRequestCoverage,
   assessOpeningHours,
@@ -114,8 +115,10 @@ describe('AI final review orchestration', () => {
 });
 
 describe('AI plan quality severity', () => {
-  it('blocks incomplete schedules after internal repair attempts while allowing meal fallback repair', () => {
-    expect(isBlockingQualityIssue('underfilled_day:2026-11-08')).toBe(true);
+  it('returns the best verified schedule for degradable quality issues after internal repair attempts', () => {
+    expect(isBlockingQualityIssue('underfilled_day:2026-11-08')).toBe(false);
+    expect(isBlockingQualityIssue('time_slot_mismatch:2026-11-08:observatory')).toBe(false);
+    expect(isBlockingQualityIssue('closed_place:2026-11-08:museum')).toBe(false);
     expect(isBlockingQualityIssue('long_travel_leg:2026-11-08')).toBe(true);
     expect(isBlockingQualityIssue('saved_places_missing')).toBe(true);
     expect(isBlockingQualityIssue('schedule_detail_missing:2026-11-08')).toBe(true);
@@ -146,10 +149,7 @@ describe('AI plan quality severity', () => {
       'underfilled_day:2026-11-08',
       'outside_available_window:2026-11-08',
     ]));
-    expect(issues.filter(isBlockingQualityIssue)).toEqual([
-      'underfilled_day:2026-11-08',
-      'outside_available_window:2026-11-08',
-    ]);
+    expect(issues.filter(isBlockingQualityIssue)).toEqual(['outside_available_window:2026-11-08']);
   });
 
   it('does not count cafes as a required lunch', () => {
@@ -237,10 +237,10 @@ describe('daily planning targets', () => {
   it('reduces the first and last day targets around arrival and departure times', () => {
     expect(applyDailyPlanningTargets(days, TravelDensity.Balanced, '15:30', '12:00')).toEqual([
       expect.objectContaining({
-        date: '2026-11-08', availableStartTime: '15:30', availableEndTime: '21:00', targetPlannedMinutes: 270,
+        date: '2026-11-08', availableStartTime: '15:30', availableEndTime: '21:00', targetPlannedMinutes: 225,
       }),
       expect.objectContaining({
-        date: '2026-11-09', availableStartTime: '09:00', availableEndTime: '12:00', targetPlannedMinutes: 120,
+        date: '2026-11-09', availableStartTime: '09:00', availableEndTime: '12:00', targetPlannedMinutes: 90,
       }),
     ]);
   });
@@ -283,6 +283,38 @@ describe('time-aware itinerary optimization', () => {
 
     expect(normalized[0]).toMatchObject({ scheduledTime: '17:00', durationMinutes: 90, preferredTimeSlot: 'evening' });
     expect(assessTimeSuitability(normalized)).toEqual([]);
+  });
+
+  it('resets an AI-provided time that is later than the preferred slot', () => {
+    const preferred = applyVisitTimePreferences([{
+      savedPlaceId: 'breakfast', date: '2026-11-05', position: 0,
+      scheduledTime: '18:00', durationMinutes: 60, travelDurationMinutes: 10,
+      activitySummary: '현지 아침 식사',
+    }], new Map([['breakfast', { name: '아침 전문점', tag: PlaceTag.Food }]]), []);
+
+    expect(preferred[0]).toMatchObject({ scheduledTime: '07:00', preferredTimeSlot: 'morning' });
+  });
+
+  it('moves a visit into verified opening hours inside its preferred slot', () => {
+    const adjusted = applyOpeningHoursPreferences([{
+      savedPlaceId: 'museum', date: '2026-11-05', position: 0,
+      scheduledTime: '08:00', durationMinutes: 60, preferredTimeSlot: 'daytime',
+    }], new Map([['museum', {
+      primaryType: 'museum', utcOffsetMinutes: 480,
+      regularOpeningHours: {
+        periods: [{ open: { day: 4, hour: 10, minute: 0 }, close: { day: 4, hour: 18, minute: 0 } }],
+        weekdayDescriptions: [],
+      },
+    }]]));
+
+    expect(adjusted[0]?.scheduledTime).toBe('10:00');
+    expect(assessOpeningHours(adjusted, new Map([['museum', {
+      primaryType: 'museum', utcOffsetMinutes: 480,
+      regularOpeningHours: {
+        periods: [{ open: { day: 4, hour: 10, minute: 0 }, close: { day: 4, hour: 18, minute: 0 } }],
+        weekdayDescriptions: [],
+      },
+    }]]))).toEqual([]);
   });
 
   it('detects visits outside verified regular opening hours', () => {

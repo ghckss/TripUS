@@ -64,6 +64,7 @@ const MAX_MATERIALIZATION_ATTEMPTS = 4;
 const DEFAULT_DAY_START_MINUTES = 9 * 60;
 const DEFAULT_DAY_END_MINUTES = 21 * 60;
 const BOUNDARY_TRANSITION_BUFFER_MINUTES = 60;
+const PARTIAL_DAY_TARGET_UTILIZATION = 0.85;
 const FINAL_REVIEW_FOCUSES: AiPlannerReviewFocus[] = ['route_time', 'traveler_intent', 'meal_density'];
 
 @Injectable()
@@ -348,7 +349,11 @@ export class AiPlanningService {
           new Map(allPlanningPlaces.map((place) => [place.id, place])),
           plannerInput.travelerContext.requiredActivityRequests,
         );
-        const scheduledPlacements = reindexPlacementsByTime(preferredPlacements);
+        const openingHoursAdjustedPlacements = applyOpeningHoursPreferences(
+          preferredPlacements,
+          scheduleDetailsByPlaceId,
+        );
+        const scheduledPlacements = reindexPlacementsByTime(openingHoursAdjustedPlacements);
         generated = scheduledPlacements.filter((item) => generatedIdsBeforeScheduling.has(item.savedPlaceId));
         materialized.placements = scheduledPlacements.filter((item) => !generatedIdsBeforeScheduling.has(item.savedPlaceId));
         const routeCheckedPlacements = await this.enrichTravelEstimates(
@@ -461,6 +466,14 @@ export class AiPlanningService {
         rejected: materialized.rejected,
       });
       const blockingQualityIssues = qualityIssues.filter(isBlockingQualityIssue);
+      const nonBlockingQualityIssues = qualityIssues.filter((issue) => !isBlockingQualityIssue(issue));
+      if (nonBlockingQualityIssues.length > 0) {
+        writeStructuredLog('warn', 'ai.generation.accepted_with_warnings', {
+          generationId,
+          tripId,
+          issues: nonBlockingQualityIssues,
+        });
+      }
       if (blockingQualityIssues.length > 0) {
         if (createdRecommendationEntities.length > 0) await this.places.remove(createdRecommendationEntities);
         createdRecommendationEntities = [];
@@ -1481,7 +1494,57 @@ export function applyVisitTimePreferences(
     const fixedSchedule = requiredRequests.some((request) =>
       normalizeRequestEvidence(placement.activitySummary ?? '').includes(normalizeRequestEvidence(request.name)),
     );
-    return { ...placement, preferredTimeSlot, fixedSchedule };
+    const preferredWindow = timeSlotWindow(preferredTimeSlot);
+    const scheduledMinutes = placement.scheduledTime ? timeToMinutes(placement.scheduledTime) : undefined;
+    const scheduledOutsidePreferredWindow = scheduledMinutes !== undefined && (
+      (preferredWindow.start !== undefined && scheduledMinutes < preferredWindow.start)
+      || (preferredWindow.end !== undefined && scheduledMinutes > preferredWindow.end)
+    );
+    return {
+      ...placement,
+      preferredTimeSlot,
+      fixedSchedule,
+      ...(scheduledOutsidePreferredWindow && preferredWindow.start !== undefined
+        ? { scheduledTime: minutesToTime(preferredWindow.start) }
+        : {}),
+    };
+  });
+}
+
+/** Move a visit into a verified opening interval when that can be done without violating its preferred slot. */
+export function applyOpeningHoursPreferences(
+  placements: PlannedPlacement[],
+  schedulingDetailsByPlaceId: Map<string, PlaceSchedulingDetails | null>,
+): PlannedPlacement[] {
+  return placements.map((placement) => {
+    const periods = schedulingDetailsByPlaceId.get(placement.savedPlaceId)?.regularOpeningHours?.periods;
+    if (!placement.scheduledTime || !periods || periods.length === 0) return placement;
+    const duration = placement.durationMinutes ?? 15;
+    if (isWithinOpeningHours(placement.date, placement.scheduledTime, duration, periods)) return placement;
+    const day = new Date(`${placement.date}T00:00:00.000Z`).getUTCDay();
+    const dayStart = day * 24 * 60;
+    const preferred = timeSlotWindow(placement.preferredTimeSlot ?? 'any');
+    const current = timeToMinutes(placement.scheduledTime);
+    const candidates = periods.flatMap((period) => {
+      let open = period.open.day * 24 * 60 + period.open.hour * 60 + period.open.minute;
+      let close = period.close
+        ? period.close.day * 24 * 60 + period.close.hour * 60 + period.close.minute
+        : open + 24 * 60;
+      if (close <= open) close += 7 * 24 * 60;
+      return [-7 * 24 * 60, 0, 7 * 24 * 60].flatMap((weekOffset) => {
+        open += weekOffset;
+        close += weekOffset;
+        const earliest = Math.max(0, open - dayStart, preferred.start ?? 0);
+        const latest = Math.min(24 * 60 - duration, close - dayStart - duration, preferred.end ?? 24 * 60 - duration);
+        open -= weekOffset;
+        close -= weekOffset;
+        if (earliest > latest) return [];
+        return [Math.min(Math.max(current, earliest), latest)];
+      });
+    });
+    if (candidates.length === 0) return placement;
+    const closest = candidates.sort((left, right) => Math.abs(left - current) - Math.abs(right - current))[0]!;
+    return { ...placement, scheduledTime: minutesToTime(closest) };
   });
 }
 
@@ -1627,7 +1690,12 @@ export function assessPlanQuality(input: QualityAssessmentInput): string[] {
 
 export function isBlockingQualityIssue(issue: string): boolean {
   return issue.length > 0
-    && !issue.startsWith('missing_meal:');
+    && ![
+      'missing_meal:',
+      'underfilled_day:',
+      'time_slot_mismatch:',
+      'closed_place:',
+    ].some((prefix) => issue.startsWith(prefix));
 }
 
 function toRevisionDraft(output: AiPlannerOutput): Omit<AiPlannerOutput, 'usage'> {
@@ -1887,11 +1955,14 @@ export function applyDailyPlanningTargets(
       : DEFAULT_DAY_END_MINUTES;
     const availableMinutes = Math.max(0, availableEnd - availableStart);
     const realisticVisitMinutes = Math.max(0, availableMinutes - BOUNDARY_TRANSITION_BUFFER_MINUTES);
+    const partialDayTarget = Math.floor(
+      (realisticVisitMinutes * PARTIAL_DAY_TARGET_UTILIZATION) / 15,
+    ) * 15;
     return {
       ...day,
       availableStartTime: minutesToTime(availableStart),
       availableEndTime: minutesToTime(availableEnd),
-      targetPlannedMinutes: Math.min(minimumPlannedMinutes(density), realisticVisitMinutes),
+      targetPlannedMinutes: Math.min(minimumPlannedMinutes(density), partialDayTarget),
       hasStartBoundary: index === 0 && Boolean(startPointTime),
       hasEndBoundary: index === lastIndex && Boolean(endPointTime),
     };
