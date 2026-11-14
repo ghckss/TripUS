@@ -18,7 +18,24 @@ describe("trip recap model", () => {
 
   it("builds cover, route, daily and favorites slides", () => {
     const slides = buildRecapSlides({ trip, itinerary, photos: [], mode: "route" });
-    expect(slides.map((slide) => slide.kind)).toEqual(["cover", "route", "day", "day", "favorites"]);
+    expect(slides.map((slide) => slide.kind)).toEqual(["cover", "route", "day", "day", "day", "favorites"]);
     expect(slides[2]).toMatchObject({ kind: "day", day: { memory: "골목이 좋았다", rating: 5 } });
+    expect(slides[4]).toMatchObject({ kind: "day", day: { date: "2026-11-02", dayNumber: 3, items: [] } });
+    expect(slides[0]).toMatchObject({ kind: "cover", dayCount: 3, placeCount: 2 });
+  });
+
+  it("keeps every date in a four-night, five-day trip even when only two dates have visits", () => {
+    const slides = buildRecapSlides({
+      trip: { ...trip, endDate: "2026-11-04" },
+      itinerary,
+      photos: [],
+      mode: "route",
+    });
+
+    const daySlides = slides.filter((slide) => slide.kind === "day");
+    expect(daySlides).toHaveLength(5);
+    expect(daySlides.map((slide) => slide.day.date)).toEqual([
+      "2026-10-31", "2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04",
+    ]);
   });
 });

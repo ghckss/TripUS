@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 
 import { getItinerary, type Itinerary } from "@/domains/itineraries";
+import { getTrip, type Trip } from "@/domains/trips";
 import { apiErrorMessage } from "@/shared/api/trip-us-api";
 import { completeTrip, type CompleteTripItem } from "../../api/trip-records.api";
 import * as ImagePicker from "expo-image-picker";
@@ -9,6 +10,7 @@ import { confirmPhoto, createPhotoUpload, listPhotos, uploadPhotoBytes, type Tri
 
 export function useCompleteTrip(tripId: string) {
   const [itinerary, setItinerary] = useState<Itinerary>();
+  const [trip, setTrip] = useState<Trip>();
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [photos, setPhotos] = useState<TripPhoto[]>([]);
@@ -16,7 +18,8 @@ export function useCompleteTrip(tripId: string) {
   const reload = useCallback(async () => {
     setError(undefined);
     try {
-      const nextItinerary = await getItinerary(tripId);
+      const [nextTrip, nextItinerary] = await Promise.all([getTrip(tripId), getItinerary(tripId)]);
+      setTrip(nextTrip);
       setItinerary(nextItinerary);
       setPhotos(await listPhotos(tripId).catch(() => []));
     } catch (caught) { setError(apiErrorMessage(caught)); }
@@ -49,5 +52,5 @@ export function useCompleteTrip(tripId: string) {
     finally { setUploadingItemId(undefined); }
   };
 
-  return { addPhoto, complete, error, itinerary, photos, reload, saving, uploadingItemId };
+  return { addPhoto, complete, error, itinerary, photos, reload, saving, trip, uploadingItemId };
 }
