@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
+import { KeyboardAvoidingContainer } from "@/shared/ui/keyboard-avoiding-container";
 import { searchTravelCountries, type TravelCountry } from "./country-options";
 
 type CountrySelectProps = {
@@ -39,7 +40,7 @@ export function CountrySelect({ value, onChange, testID }: CountrySelectProps) {
       <AppText color={colors.muted}>⌄</AppText>
     </Pressable>
     <Modal animationType="slide" presentationStyle="pageSheet" visible={open} onRequestClose={close}>
-      <SafeAreaView style={styles.modal}>
+      <KeyboardAvoidingContainer><SafeAreaView style={styles.modal}>
         <View style={styles.header}>
           <AppText variant="title">여행 국가 선택</AppText>
           <Button label="닫기" variant="ghost" onPress={close} />
@@ -75,7 +76,7 @@ export function CountrySelect({ value, onChange, testID }: CountrySelectProps) {
             </View>
           </Pressable>}
         />
-      </SafeAreaView>
+      </SafeAreaView></KeyboardAvoidingContainer>
     </Modal>
   </>;
 }

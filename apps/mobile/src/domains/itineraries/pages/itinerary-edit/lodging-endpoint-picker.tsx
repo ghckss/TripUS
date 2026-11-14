@@ -8,6 +8,7 @@ import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { KeyboardAvoidingContainer } from "@/shared/ui/keyboard-avoiding-container";
 import { isLodgingPlace, type LodgingEdge } from "./itinerary-lodging-endpoints";
 
 type Props = {
@@ -75,7 +76,7 @@ export function LodgingEndpointPicker({ current, date, dayIndex, edge, places, t
   };
 
   return <Modal animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen" visible>
-    <SafeAreaView style={styles.safeArea}>
+    <KeyboardAvoidingContainer><SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <View style={styles.heading}>
           <AppText variant="title">Day {dayIndex + 1} {edgeLabel}</AppText>
@@ -143,7 +144,7 @@ export function LodgingEndpointPicker({ current, date, dayIndex, edge, places, t
           </Pressable>)}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </SafeAreaView></KeyboardAvoidingContainer>
   </Modal>;
 }
 

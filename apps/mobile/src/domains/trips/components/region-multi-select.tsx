@@ -8,6 +8,7 @@ import { safeErrorMessage } from "@/shared/api/trip-us-api";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
+import { KeyboardAvoidingContainer } from "@/shared/ui/keyboard-avoiding-container";
 
 export type SelectedRegion = {
   googlePlaceId: string | null;
@@ -137,7 +138,7 @@ export function RegionMultiSelect({ country, value, onChange }: RegionMultiSelec
     </Pressable>
 
     <Modal animationType="slide" presentationStyle="pageSheet" visible={open} onRequestClose={close}>
-      <SafeAreaView style={styles.modal}>
+      <KeyboardAvoidingContainer><SafeAreaView style={styles.modal}>
         <View style={styles.header}>
           <AppText variant="title" style={styles.headerTitle}>{country.flag} {country.name} 도시 선택</AppText>
           <Button label="닫기" variant="ghost" onPress={close} />
@@ -198,7 +199,7 @@ export function RegionMultiSelect({ country, value, onChange }: RegionMultiSelec
           ListFooterComponent={<AppText variant="caption" color={colors.muted} style={styles.attribution}>도시 데이터: GeoNames (CC BY 4.0)</AppText>}
         />
         <Button label={`${draftRegions.length}개 도시 적용`} disabled={resolving} testID="region-selection-apply" onPress={apply} />
-      </SafeAreaView>
+      </SafeAreaView></KeyboardAvoidingContainer>
     </Modal>
   </View>;
 }

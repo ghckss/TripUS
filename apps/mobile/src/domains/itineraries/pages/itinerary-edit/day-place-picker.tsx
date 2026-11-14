@@ -8,6 +8,7 @@ import { safeErrorMessage } from "@/shared/api/trip-us-api";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
+import { KeyboardAvoidingContainer } from "@/shared/ui/keyboard-avoiding-container";
 import type { ItineraryItem } from "../../api/itineraries.api";
 import { isLodgingPlace } from "./itinerary-lodging-endpoints";
 
@@ -80,7 +81,7 @@ export function DayPlacePicker({ tripId, date, dayIndex, items, places, onApply,
   };
 
   return <Modal animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen" visible>
-    <SafeAreaView style={styles.safeArea}>
+    <KeyboardAvoidingContainer><SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <View style={styles.heading}>
           <AppText variant="title">Day {dayIndex + 1} 장소</AppText>
@@ -111,7 +112,7 @@ export function DayPlacePicker({ tripId, date, dayIndex, items, places, onApply,
           </View>)}
         </>}
       </View>
-      <ScrollView contentContainerStyle={styles.list}>
+      <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
         {displayedPlaces.length === 0 && <View style={styles.empty}>
           <AppText variant="heading">{selectablePlaces.length === 0 ? "저장한 여행 장소가 없어요" : "미배치 장소가 없어요"}</AppText>
           <AppText color={colors.muted}>{selectablePlaces.length === 0 ? "위의 검색으로 새 장소를 바로 추가해 보세요." : "전체 장소 탭에서 이미 배치한 장소를 다시 추가할 수 있어요."}</AppText>
@@ -141,7 +142,7 @@ export function DayPlacePicker({ tripId, date, dayIndex, items, places, onApply,
       <View style={styles.footer}>
         <Button label={`${selected.size}곳 선택 적용`} testID="itinerary-place-picker-apply" onPress={() => { onApply(date, [...selected], availablePlaces); onClose(); }} />
       </View>
-    </SafeAreaView>
+    </SafeAreaView></KeyboardAvoidingContainer>
   </Modal>;
 }
 
