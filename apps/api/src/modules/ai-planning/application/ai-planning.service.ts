@@ -1516,9 +1516,15 @@ export function normalizeVisitSchedule(
       - (day.hasEndBoundary ? BOUNDARY_TRANSITION_BUFFER_MINUTES : 0);
 
     while (visits.length > 0) {
-      const scheduled = scheduleVisitsWithoutCompression(visits, availableStart);
+      let scheduled = scheduleVisitsWithoutCompression(visits, availableStart);
       const finalEnd = scheduled.at(-1)?.end ?? availableStart;
       if (finalEnd <= availableEnd) {
+        for (const { visit, start } of scheduled) visit.scheduledTime = minutesToTime(start);
+        break;
+      }
+      scheduled = scheduleVisitsCompactly(visits, availableStart);
+      const compactEnd = scheduled.at(-1)?.end ?? availableStart;
+      if (compactEnd <= availableEnd) {
         for (const { visit, start } of scheduled) visit.scheduledTime = minutesToTime(start);
         break;
       }
@@ -1527,6 +1533,8 @@ export function normalizeVisitSchedule(
         .filter(({ visit }) => !requiredPlaceIds.has(visit.savedPlaceId) && !visit.fixedSchedule)
         .sort((left, right) => (right.visit.durationMinutes ?? 15) - (left.visit.durationMinutes ?? 15))[0];
       if (!removable) {
+        shrinkVisitDurations(visits, compactEnd - availableEnd);
+        scheduled = scheduleVisitsCompactly(visits, availableStart);
         for (const { visit, start } of scheduled) visit.scheduledTime = minutesToTime(start);
         break;
       }
@@ -1537,6 +1545,40 @@ export function normalizeVisitSchedule(
     }
   }
   return normalized;
+}
+
+function scheduleVisitsCompactly(visits: PlannedPlacement[], availableStart: number) {
+  let cursor = availableStart;
+  return visits.map((visit) => {
+    const travel = visit.travelDurationMinutes ?? 0;
+    const preferred = timeSlotWindow(visit.preferredTimeSlot ?? 'any').start;
+    const start = Math.max(cursor + travel, preferred ?? availableStart);
+    const end = start + (visit.durationMinutes ?? 15);
+    cursor = end;
+    return { visit, start, end };
+  });
+}
+
+function shrinkVisitDurations(visits: PlannedPlacement[], overflowMinutes: number): void {
+  let remaining = Math.max(0, overflowMinutes);
+  const candidates = [
+    ...visits.filter((visit) => !visit.fixedSchedule),
+    ...visits.filter((visit) => visit.fixedSchedule),
+  ];
+  while (remaining > 0) {
+    let reducedThisRound = false;
+    for (const visit of candidates) {
+      const duration = visit.durationMinutes ?? 15;
+      const reducible = Math.max(0, duration - 30);
+      if (reducible === 0) continue;
+      const reduction = Math.min(15, reducible, remaining);
+      visit.durationMinutes = duration - reduction;
+      remaining -= reduction;
+      reducedThisRound = true;
+      if (remaining === 0) break;
+    }
+    if (!reducedThisRound) break;
+  }
 }
 
 function scheduleVisitsWithoutCompression(visits: PlannedPlacement[], availableStart: number) {
@@ -1765,6 +1807,7 @@ export function isBlockingQualityIssue(issue: string): boolean {
       'underfilled_day:',
       'time_slot_mismatch:',
       'closed_place:',
+      'outside_available_window:',
     ].some((prefix) => issue.startsWith(prefix));
 }
 

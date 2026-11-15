@@ -170,7 +170,7 @@ describe('AI plan quality severity', () => {
     expect(isBlockingQualityIssue('long_travel_leg:2026-11-08')).toBe(true);
     expect(isBlockingQualityIssue('saved_places_missing')).toBe(true);
     expect(isBlockingQualityIssue('schedule_detail_missing:2026-11-08')).toBe(true);
-    expect(isBlockingQualityIssue('outside_available_window:2026-11-08')).toBe(true);
+    expect(isBlockingQualityIssue('outside_available_window:2026-11-08')).toBe(false);
     expect(isBlockingQualityIssue('missing_meal:2026-11-08:lunch')).toBe(false);
   });
 
@@ -197,7 +197,7 @@ describe('AI plan quality severity', () => {
       'underfilled_day:2026-11-08',
       'outside_available_window:2026-11-08',
     ]));
-    expect(issues.filter(isBlockingQualityIssue)).toEqual(['outside_available_window:2026-11-08']);
+    expect(issues.filter(isBlockingQualityIssue)).toEqual([]);
   });
 
   it('does not count cafes as a required lunch', () => {
@@ -300,7 +300,7 @@ describe('daily planning targets', () => {
     ]);
   });
 
-  it('preserves requested times and durations instead of hiding an impossible schedule through compression', () => {
+  it('fits required visits inside the available window when their requested schedule is impossible', () => {
     const normalized = normalizeVisitSchedule([
       { savedPlaceId: 'place-1', date: '2026-11-08', position: 0, scheduledTime: '16:00', durationMinutes: 300, travelDurationMinutes: 30 },
       { savedPlaceId: 'place-2', date: '2026-11-08', position: 1, scheduledTime: '20:00', durationMinutes: 300, travelDurationMinutes: 30 },
@@ -309,11 +309,26 @@ describe('daily planning targets', () => {
       availableStartTime: '15:00', availableEndTime: '21:00',
     }], new Set(['place-1', 'place-2']));
 
-    expect(normalized[0]?.scheduledTime).toBe('16:00');
-    expect(normalized[0]?.durationMinutes).toBe(300);
+    expect(normalized[0]?.scheduledTime).toBe('15:30');
+    expect(normalized[0]?.durationMinutes).toBeLessThan(300);
     const last = normalized[1]!;
-    expect(last.scheduledTime).toBe('21:30');
-    expect(last.durationMinutes).toBe(300);
+    expect(last.scheduledTime).toBe('18:30');
+    expect(last.durationMinutes).toBeLessThan(300);
+  });
+
+  it('removes avoidable idle gaps before shortening visit durations', () => {
+    const normalized = normalizeVisitSchedule([
+      { savedPlaceId: 'place-1', date: '2026-11-08', position: 0, scheduledTime: '18:00', durationMinutes: 60, travelDurationMinutes: 30 },
+      { savedPlaceId: 'place-2', date: '2026-11-08', position: 1, scheduledTime: '20:00', durationMinutes: 120, travelDurationMinutes: 30 },
+    ], [{
+      date: '2026-11-08', startLodging: null, endLodging: null,
+      availableStartTime: '09:00', availableEndTime: '21:00',
+    }], new Set(['place-1', 'place-2']));
+
+    expect(normalized).toEqual([
+      expect.objectContaining({ savedPlaceId: 'place-1', scheduledTime: '09:30', durationMinutes: 60 }),
+      expect.objectContaining({ savedPlaceId: 'place-2', scheduledTime: '11:00', durationMinutes: 120 }),
+    ]);
   });
 });
 
