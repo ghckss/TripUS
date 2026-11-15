@@ -15,9 +15,8 @@ export type ReplaceItineraryItem = components["schemas"]["ReplaceItineraryItemDt
 export type TransitRoute = components["schemas"]["TransitRouteResponseDto"];
 type AiPlanExecutionStatus = components["schemas"]["AiPlanExecutionStatusResponseDto"];
 
-const GENERATION_RECOVERY_POLL_MS = 2_000;
-const GENERATION_RECOVERY_TIMEOUT_MS = 4 * 60_000;
-const GENERATION_START_TIMEOUT_MS = 15_000;
+const GENERATION_POLL_MS = 2_000;
+const GENERATION_TIMEOUT_MS = 30 * 60_000;
 
 export function isItineraryBoundary(item: ItineraryItem): boolean {
   return item.boundaryType === "start_point" || item.boundaryType === "end_point";
@@ -45,109 +44,59 @@ async function getAiPlanExecutionStatus(tripId: string): Promise<AiPlanExecution
   return data;
 }
 
-async function recoverDisconnectedGeneration(
+async function waitForGeneration(
   tripId: string,
-  previousGenerationId: string | null,
+  generationId: string,
   previousItinerary: Itinerary,
-): Promise<Itinerary | undefined> {
+): Promise<Itinerary> {
   const startedAt = Date.now();
-  let observedNewGeneration = false;
-  while (Date.now() - startedAt < GENERATION_RECOVERY_TIMEOUT_MS) {
+  while (Date.now() - startedAt < GENERATION_TIMEOUT_MS) {
     try {
       const execution = await getAiPlanExecutionStatus(tripId);
-      const isNewGeneration = execution.generationId !== null && execution.generationId !== previousGenerationId;
-      observedNewGeneration ||= isNewGeneration;
-      if (isNewGeneration && execution.status === "generated") {
+      if (execution.generationId === generationId && execution.status === "generated") {
         const itinerary = await getFreshItinerary(tripId);
         await deleteCache(cacheKeys.places(tripId));
         await writeCache(cacheKeys.itinerary(tripId), itinerary);
         await writeCache(cacheKeys.aiUndo(tripId), previousItinerary);
-        trackEvent("ai_plan.recovered_after_disconnect", { tripId, generationId: execution.generationId ?? "" });
+        trackEvent("ai_plan.generated", { tripId, generationId, itemCount: itinerary.items.length });
         return itinerary;
       }
-      if (isNewGeneration && (execution.status === "unavailable" || execution.status === "conflict")) {
-        return undefined;
+      if (execution.generationId === generationId && execution.status === "conflict") {
+        throw new Error("AI 일정에 충돌이 있어요. 일정 편집에서 다시 배치해 주세요.");
       }
-    } catch {
-      // A transient polling failure should not turn a still-running generation into a user-visible failure.
+      if (execution.generationId === generationId && execution.status === "unavailable") {
+        throw new Error("일정을 구성하지 못했어요. 잠시 후 다시 시도해 주세요.");
+      }
+    } catch (error) {
+      if (error instanceof Error && (error.message.startsWith("AI 일정에 충돌") || error.message.startsWith("일정을 구성하지 못했어요"))) {
+        throw error;
+      }
+      // Keep the loading state through transient status polling failures.
     }
-    if (!observedNewGeneration && Date.now() - startedAt >= GENERATION_START_TIMEOUT_MS) return undefined;
-    await new Promise((resolve) => setTimeout(resolve, GENERATION_RECOVERY_POLL_MS));
+    await new Promise((resolve) => setTimeout(resolve, GENERATION_POLL_MS));
   }
-  return undefined;
+  throw new Error("일정 생성이 예상보다 오래 걸리고 있어요. 잠시 후 다시 확인해 주세요.");
 }
 
 export async function generateAiPlan(tripId: string, request: AiPlanRequest): Promise<Itinerary> {
   const previous = await getItinerary(tripId);
-  const previousGenerationId = await getAiPlanExecutionStatus(tripId)
-    .then((status) => status.generationId ?? null)
-    .catch(() => null);
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    let response: Awaited<ReturnType<typeof tripUsApi.POST>>;
-    try {
-      response = await tripUsApi.POST("/v1/trips/{tripId}/ai-plans", {
-        params: { path: { tripId } },
-        body: request,
-      });
-    } catch (error) {
-      const recovered = await recoverDisconnectedGeneration(tripId, previousGenerationId, previous);
-      if (recovered) return recovered;
-      throw error;
-    }
-    const { data, error } = response;
-    if (error) {
-      const recovered = await recoverDisconnectedGeneration(tripId, previousGenerationId, previous);
-      if (recovered) return recovered;
-      throw new Error(apiErrorMessage(error));
-    }
-    if (data.status === "conflict") throw new Error("AI 일정에 충돌이 있어요. 일정 편집에서 다시 배치해 주세요.");
-    if (data.status === "unavailable") {
-      trackEvent("ai_plan.internal_retry", { tripId, attempt, reason: data.failureReason ?? "unknown" });
-      continue;
-    }
-    await deleteCache(cacheKeys.places(tripId));
-    await writeCache(cacheKeys.itinerary(tripId), data.itinerary);
-    await writeCache(cacheKeys.aiUndo(tripId), previous);
-    trackEvent("ai_plan.generated", { tripId, density: request.density, themes: request.themes.join(","), itemCount: data.itinerary.items.length });
-    return data.itinerary;
-  }
-  throw new Error("일정을 구성하는 데 시간이 더 필요해요. 잠시 후 자동으로 다시 시도해 주세요.");
+  const { data, error } = await tripUsApi.POST("/v1/trips/{tripId}/ai-plans", {
+    params: { path: { tripId } },
+    body: request,
+  });
+  if (error) throw new Error(apiErrorMessage(error));
+  trackEvent("ai_plan.accepted", { tripId, generationId: data.generationId });
+  return waitForGeneration(tripId, data.generationId, previous);
 }
 
 export async function generateAiPlanDay(tripId: string, date: string): Promise<Itinerary> {
   const previous = await getItinerary(tripId);
-  const previousGenerationId = await getAiPlanExecutionStatus(tripId)
-    .then((status) => status.generationId ?? null)
-    .catch(() => null);
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    let response: Awaited<ReturnType<typeof tripUsApi.POST>>;
-    try {
-      response = await tripUsApi.POST("/v1/trips/{tripId}/ai-plans/days/{date}", {
-        params: { path: { tripId, date } },
-      });
-    } catch (error) {
-      const recovered = await recoverDisconnectedGeneration(tripId, previousGenerationId, previous);
-      if (recovered) return recovered;
-      throw error;
-    }
-    const { data, error } = response;
-    if (error) {
-      const recovered = await recoverDisconnectedGeneration(tripId, previousGenerationId, previous);
-      if (recovered) return recovered;
-      throw new Error(apiErrorMessage(error));
-    }
-    if (data.status === "conflict") throw new Error("해당 날짜 일정을 다시 구성하지 못했어요.");
-    if (data.status === "unavailable") {
-      trackEvent("ai_plan.day_internal_retry", { tripId, date, attempt, reason: data.failureReason ?? "unknown" });
-      continue;
-    }
-    await deleteCache(cacheKeys.places(tripId));
-    await writeCache(cacheKeys.itinerary(tripId), data.itinerary);
-    await writeCache(cacheKeys.aiUndo(tripId), previous);
-    trackEvent("ai_plan.day_generated", { tripId, date, itemCount: data.itinerary.items.length });
-    return data.itinerary;
-  }
-  throw new Error("해당 날짜 일정을 구성하는 데 시간이 더 필요해요. 잠시 후 다시 시도해 주세요.");
+  const { data, error } = await tripUsApi.POST("/v1/trips/{tripId}/ai-plans/days/{date}", {
+    params: { path: { tripId, date } },
+  });
+  if (error) throw new Error(apiErrorMessage(error));
+  trackEvent("ai_plan.day_accepted", { tripId, date, generationId: data.generationId });
+  return waitForGeneration(tripId, data.generationId, previous);
 }
 
 export async function getLatestAiPlanRequest(tripId: string): Promise<AiPlanRequest | null> {

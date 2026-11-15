@@ -31,7 +31,7 @@ describe("generateAiPlan", () => {
     jest.clearAllMocks();
   });
 
-  it("recovers a completed server generation after the long HTTP request disconnects", async () => {
+  it("waits for an accepted generation job and loads the completed itinerary", async () => {
     const previous = { items: [], unplaced: [] } as Itinerary;
     const generated = {
       items: [{
@@ -51,14 +51,11 @@ describe("generateAiPlan", () => {
         return Promise.resolve({ data });
       }
       if (path.endsWith("/status")) {
-        const statusCalls = mockGet.mock.calls.filter(([calledPath]) => String(calledPath).endsWith("/status")).length;
-        return Promise.resolve({ data: statusCalls === 1
-          ? { generationId: "old-generation", status: "generated", failureReason: null }
-          : { generationId: "new-generation", status: "generated", failureReason: null } });
+        return Promise.resolve({ data: { generationId: "new-generation", status: "generated", failureReason: null } });
       }
       throw new Error(`Unexpected path: ${path}`);
     });
-    mockPost.mockRejectedValue(new TypeError("Network request failed"));
+    mockPost.mockResolvedValue({ data: { generationId: "new-generation", status: "running" } });
 
     const result = await generateAiPlan("trip-1", {
       density: "balanced",

@@ -13,15 +13,18 @@ import { MockAiPlannerAdapter } from './infrastructure/mock-ai-planner.adapter';
 import { OpenAiPlannerAdapter } from './infrastructure/openai-ai-planner.adapter';
 import { AiPlanningController } from './presentation/ai-planning.controller';
 import { AiPlanningRateLimiter } from './application/ai-planning-rate-limiter';
+import { AiPlanningJobsService } from './application/ai-planning-jobs.service';
+import { AiPlanGenerationEntity } from './domain/entities/ai-plan-generation.entity';
 import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { PlacesModule } from '../places/places.module';
 import { RoutesModule } from '../routes/routes.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([TripEntity, SavedPlaceEntity]), IdentityModule, ItinerariesModule, EntitlementsModule, PlacesModule, RoutesModule],
+  imports: [TypeOrmModule.forFeature([TripEntity, SavedPlaceEntity, AiPlanGenerationEntity]), IdentityModule, ItinerariesModule, EntitlementsModule, PlacesModule, RoutesModule],
   controllers: [AiPlanningController],
   providers: [
     AiPlanningService,
+    AiPlanningJobsService,
     AiPlanningRateLimiter,
     MockAiPlannerAdapter,
     {

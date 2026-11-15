@@ -509,8 +509,11 @@ export interface components {
             status: components["schemas"]["AiPlanExecutionStatus"];
             failureReason?: string | null;
         };
-        /** @enum {string} */
-        AiPlanGenerationStatus: "generated" | "conflict" | "unavailable";
+        StartAiPlanGenerationResponseDto: {
+            /** Format: uuid */
+            generationId: string;
+            status: components["schemas"]["AiPlanExecutionStatus"];
+        };
         /** @enum {string} */
         ItinerarySource: "manual" | "ai";
         /** @enum {string} */
@@ -549,14 +552,6 @@ export interface components {
         ItineraryResponseDto: {
             items: components["schemas"]["ItineraryItemResponseDto"][];
             unplaced: components["schemas"]["UnplacedPlaceResponseDto"][];
-        };
-        GenerateAiPlanResponseDto: {
-            status: components["schemas"]["AiPlanGenerationStatus"];
-            density: components["schemas"]["TravelDensity"];
-            themes: components["schemas"]["TravelTheme"][];
-            conflicts: string[];
-            itinerary: components["schemas"]["ItineraryResponseDto"];
-            failureReason?: string | null;
         };
         ReplaceItineraryItemDto: {
             /** Format: uuid */
@@ -1001,12 +996,12 @@ export interface operations {
             };
         };
         responses: {
-            200: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GenerateAiPlanResponseDto"];
+                    "application/json": components["schemas"]["StartAiPlanGenerationResponseDto"];
                 };
             };
         };
@@ -1023,12 +1018,12 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GenerateAiPlanResponseDto"];
+                    "application/json": components["schemas"]["StartAiPlanGenerationResponseDto"];
                 };
             };
         };

@@ -92,6 +92,14 @@ export enum AiPlanExecutionStatus {
   Unavailable = 'unavailable',
 }
 
+export class StartAiPlanGenerationResponseDto {
+  @ApiProperty({ type: String, format: 'uuid' })
+  generationId!: string;
+
+  @ApiProperty({ enum: AiPlanExecutionStatus, enumName: 'AiPlanExecutionStatus' })
+  status!: AiPlanExecutionStatus;
+}
+
 export class AiPlanExecutionStatusResponseDto {
   @ApiPropertyOptional({ type: String, format: 'uuid', nullable: true })
   generationId!: string | null;

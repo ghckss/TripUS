@@ -237,12 +237,12 @@
           }
         },
         "responses": {
-          "200": {
+          "202": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenerateAiPlanResponseDto"
+                  "$ref": "#/components/schemas/StartAiPlanGenerationResponseDto"
                 }
               }
             }
@@ -277,12 +277,12 @@
           }
         ],
         "responses": {
-          "200": {
+          "202": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenerateAiPlanResponseDto"
+                  "$ref": "#/components/schemas/StartAiPlanGenerationResponseDto"
                 }
               }
             }
@@ -1497,12 +1497,24 @@
           "status"
         ]
       },
-      "AiPlanGenerationStatus": {
-        "type": "string",
-        "enum": [
-          "generated",
-          "conflict",
-          "unavailable"
+      "StartAiPlanGenerationResponseDto": {
+        "type": "object",
+        "properties": {
+          "generationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AiPlanExecutionStatus"
+              }
+            ]
+          }
+        },
+        "required": [
+          "generationId",
+          "status"
         ]
       },
       "ItinerarySource": {
@@ -1660,51 +1672,6 @@
         "required": [
           "items",
           "unplaced"
-        ]
-      },
-      "GenerateAiPlanResponseDto": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/AiPlanGenerationStatus"
-              }
-            ]
-          },
-          "density": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/TravelDensity"
-              }
-            ]
-          },
-          "themes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TravelTheme"
-            }
-          },
-          "conflicts": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "itinerary": {
-            "$ref": "#/components/schemas/ItineraryResponseDto"
-          },
-          "failureReason": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "status",
-          "density",
-          "themes",
-          "conflicts",
-          "itinerary"
         ]
       },
       "ReplaceItineraryItemDto": {
