@@ -10,6 +10,7 @@ const config: StageConfig = {
   aiPlannerProvider: 'mock',
   applicationDatabaseRotation: false,
   authMode: 'development',
+  billingProvider: 'mock',
   mapsProvider: 'mock',
   maxApiEnvironments: 2,
   maxApiRequestsPerSecond: 100,
@@ -58,6 +59,8 @@ describe('TripUS infrastructure', () => {
       ServiceConfig: Match.objectLike({
         EnvironmentVariables: Match.objectLike({
           AWS_LAMBDA_NODEJS_ENTRYPOINT: 'dist/web-main.mjs',
+          BILLING_PROVIDER: 'mock',
+          DEPLOYMENT_STAGE: 'test',
         }),
         MaxConcurrencyPerEnvironment: 8,
         TimeoutSeconds: 60,
@@ -91,7 +94,7 @@ describe('TripUS infrastructure', () => {
 
   it('uses application-managed JWT authentication only outside development auth mode', () => {
     const app = new App();
-    const jwtConfig: StageConfig = { ...config, authMode: 'jwt', production: true, stage: 'prod' };
+    const jwtConfig: StageConfig = { ...config, authMode: 'jwt', billingProvider: 'disabled', production: true, stage: 'prod' };
     const data = new DataStack(app, 'Data', { config: jwtConfig });
     const stack = new ApiStack(app, 'Api', {
       apiArtifactPath: new URL('fixtures/api.zip', import.meta.url).pathname,

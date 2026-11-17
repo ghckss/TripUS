@@ -4,6 +4,7 @@ export interface StageConfig {
   readonly aiPlannerProvider: 'mock' | 'openai';
   readonly applicationDatabaseRotation: boolean;
   readonly authMode: 'development' | 'jwt';
+  readonly billingProvider: 'disabled' | 'mock';
   readonly mapsProvider: 'google' | 'mock';
   readonly maxApiEnvironments: number;
   readonly maxApiRequestsPerSecond: number;
@@ -19,6 +20,7 @@ export function loadStageConfig(app: App): StageConfig {
     aiPlannerProvider: contextProvider(app, 'aiPlannerProvider', production ? 'openai' : 'mock', ['mock', 'openai']),
     applicationDatabaseRotation: contextBoolean(app, 'applicationDatabaseRotation', false),
     authMode: contextProvider(app, 'authMode', production ? 'jwt' : 'development', ['development', 'jwt']),
+    billingProvider: production ? 'disabled' : 'mock',
     mapsProvider: contextProvider(app, 'mapsProvider', production ? 'google' : 'mock', ['mock', 'google']),
     maxApiEnvironments: contextInteger(app, 'maxApiEnvironments', production ? 20 : 2),
     maxApiRequestsPerSecond: contextInteger(app, 'maxApiRequestsPerSecond', production ? 1000 : 100),

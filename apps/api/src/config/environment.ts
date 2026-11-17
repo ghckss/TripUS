@@ -114,8 +114,13 @@ export function validateEnvironment(
   if (!Object.values(BillingProvider).includes(billingProvider as BillingProvider)) {
     throw new Error('BILLING_PROVIDER must be disabled or mock');
   }
-  if (environment.NODE_ENV === 'production' && billingProvider === BillingProvider.Mock) {
-    throw new Error('BILLING_PROVIDER=mock is not allowed in production');
+  const deploymentStage = environment.DEPLOYMENT_STAGE ??
+    (environment.NODE_ENV === 'production' ? 'prod' : 'local');
+  if (typeof deploymentStage !== 'string' || deploymentStage.length === 0) {
+    throw new Error('DEPLOYMENT_STAGE must be a non-empty string');
+  }
+  if (deploymentStage === 'prod' && billingProvider === BillingProvider.Mock) {
+    throw new Error('BILLING_PROVIDER=mock is not allowed in prod');
   }
 
   return {
@@ -136,6 +141,7 @@ export function validateEnvironment(
     OPENAI_MAX_OUTPUT_TOKENS: openAiMaxOutputTokens,
     PHOTO_STORAGE_PROVIDER: photoStorageProvider,
     BILLING_PROVIDER: billingProvider,
+    DEPLOYMENT_STAGE: deploymentStage,
     PHOTO_LOCAL_DIRECTORY: environment.PHOTO_LOCAL_DIRECTORY ?? '.data/photos',
     API_PUBLIC_URL: environment.API_PUBLIC_URL ?? `http://localhost:${port}`,
     PORT: port,

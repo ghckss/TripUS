@@ -18,9 +18,21 @@ describe('validateEnvironment', () => {
     );
   });
 
-  it('never enables mock upgrades in production', () => {
+  it('allows mock upgrades in a deployed dev runtime', () => {
+    expect(validateEnvironment({
+      BILLING_PROVIDER: BillingProvider.Mock,
+      DEPLOYMENT_STAGE: 'dev',
+      NODE_ENV: 'production',
+    }).BILLING_PROVIDER).toBe(BillingProvider.Mock);
+  });
+
+  it('never enables mock upgrades in prod', () => {
     expect(() => validateEnvironment({ BILLING_PROVIDER: BillingProvider.Mock, NODE_ENV: 'production' })).toThrow(
-      'BILLING_PROVIDER=mock is not allowed in production',
+      'BILLING_PROVIDER=mock is not allowed in prod',
     );
+    expect(() => validateEnvironment({
+      BILLING_PROVIDER: BillingProvider.Mock,
+      DEPLOYMENT_STAGE: 'prod',
+    })).toThrow('BILLING_PROVIDER=mock is not allowed in prod');
   });
 });

@@ -90,7 +90,7 @@ GOOGLE_MAPS_ANDROID_API_KEY=<Android 앱 제한 키>
 
 ## 실제 외부 서비스 활성화
 
-`BILLING_PROVIDER=mock`은 스토어 결제 없이 Plus 권한 전환 흐름을 확인하는 로컬 테스트 전용 값이다. 기본값과 AWS 배포값은 `disabled`이며, 실제 출시 전 App Store·Google Play 영수증 검증 공급자로 교체해야 한다.
+`BILLING_PROVIDER=mock`은 스토어 결제 없이 Plus 권한 전환 흐름을 확인하는 로컬·AWS dev 테스트 전용 값이다. AWS dev는 자동으로 `mock`, prod는 `disabled`를 사용한다. 서버는 `DEPLOYMENT_STAGE=prod`에서 mock 결제를 거부하며, 실제 출시 전 App Store·Google Play 영수증 검증 공급자로 교체해야 한다.
 
 OpenAI 일정 생성을 켤 때는 API에만 다음 값을 둔다. `OPENAI_API_KEY`를 모바일 환경 변수에 넣으면 안 된다.
 

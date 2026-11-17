@@ -233,11 +233,12 @@ export class ApiStack extends Stack {
         environmentVariables: {
           AI_PLANNER_PROVIDER: config.aiPlannerProvider,
           AUTH_MODE: config.authMode,
-          BILLING_PROVIDER: 'disabled',
+          BILLING_PROVIDER: config.billingProvider,
           AWS_LAMBDA_NODEJS_ENTRYPOINT: 'dist/web-main.mjs',
           DATABASE_NAME: 'tripus',
           DATABASE_PROXY_HOST: data.databaseProxy.endpoint,
           DATABASE_SECRET_ARN: data.applicationDatabaseSecret.secretArn,
+          DEPLOYMENT_STAGE: config.stage,
           MAPS_PROVIDER: config.mapsProvider,
           NODE_ENV: 'production',
           PHOTO_S3_BUCKET: data.photoBucket.bucketName,
