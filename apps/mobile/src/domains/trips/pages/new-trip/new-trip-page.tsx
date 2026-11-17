@@ -100,7 +100,7 @@ export default function NewTripScreen() {
     <AppText color={colors.muted}>국가와 여러 도시·지역을 선택해 여행 범위를 정해보세요.</AppText>
     <View style={styles.form}>
       <AppText variant="label">여행 이름</AppText>
-      <TextInput testID="new-trip-title" value={title} onChangeText={setTitle} placeholder="예: 일본 단풍 여행" placeholderTextColor={colors.muted} style={styles.input} />
+      <TextInput testID="new-trip-title" value={title} onChangeText={setTitle} placeholder="예: 한국 여행" placeholderTextColor={colors.muted} style={styles.input} />
       <AppText variant="label">여행 국가</AppText>
       <CountrySelect testID="new-trip-destination" value={country} onChange={changeCountry} />
       <AppText variant="caption" color={colors.muted}>시간대 · {country.timezone} (자동 설정)</AppText>

@@ -60,6 +60,7 @@ describe("NewTripScreen", () => {
       googlePlaceId: "region-tokyo", name: "도쿄", address: "일본 도쿄도", latitude: 35.6762, longitude: 139.6503,
     }]);
     const screen = await render(<NewTripScreen />);
+    expect(screen.getByPlaceholderText("예: 한국 여행")).toBeTruthy();
 
     await fireEvent.changeText(screen.getByTestId("new-trip-title"), "일본 단풍 여행");
     await fireEvent.press(screen.getByTestId("new-trip-destination"));
