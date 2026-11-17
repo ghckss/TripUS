@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { Repository } from 'typeorm';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -51,6 +51,28 @@ function createService() {
 }
 
 describe('PlacesService', () => {
+  it('passes a complete viewport to place search and keeps the existing unbounded search', async () => {
+    const { trips, placeSearchSearch, service } = createService();
+    trips.findOneBy.mockResolvedValue({ id: tripId, destination: '대한민국', active: true });
+    placeSearchSearch.mockResolvedValue([]);
+    const bounds = { north: 38, south: 37, east: 128, west: 126 };
+    await service.search(tripId, '카페', bounds);
+    expect(placeSearchSearch).toHaveBeenLastCalledWith('카페', '대한민국', bounds);
+    await service.search(tripId, '카페');
+    expect(placeSearchSearch).toHaveBeenLastCalledWith('카페', '대한민국');
+  });
+
+  it.each([
+    { north: 38 }, { north: 36, south: 37, east: 128, west: 126 },
+    { north: 91, south: 37, east: 128, west: 126 },
+    { north: 38, south: 37, east: 126, west: 126 },
+  ])('rejects invalid or incomplete map bounds %j', async (bounds) => {
+    const { trips, placeSearchSearch, service } = createService();
+    trips.findOneBy.mockResolvedValue({ id: tripId, destination: '대한민국', active: true });
+    await expect(service.search(tripId, '카페', bounds)).rejects.toBeInstanceOf(BadRequestException);
+    expect(placeSearchSearch).not.toHaveBeenCalled();
+  });
+
   it('searches a destination before a trip is created', async () => {
     const { placeSearchSearch, service } = createService();
     placeSearchSearch.mockResolvedValue([]);

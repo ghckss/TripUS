@@ -1,7 +1,7 @@
-import { useCallback, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import { useApiQuery } from "@/shared/query/use-resource";
 
-import { deletePlaces, listTravelPlaces, type SavedPlace } from "@/domains/places/api/places.api";
+import { deletePlaces, filterTravelPlaces, listPlaces, type SavedPlace } from "@/domains/places/api/places.api";
 import { safeErrorMessage } from "@/shared/api/trip-us-api";
 
 export function togglePlaceSelection(current: Set<string>, placeId: string): Set<string> {
@@ -16,25 +16,18 @@ export function allPlaceIds(places: Pick<SavedPlace, "id">[]): Set<string> {
 }
 
 export function usePlaceLibrary(tripId: string) {
-  const [places, setPlaces] = useState<SavedPlace[]>([]);
-  const [loading, setLoading] = useState(true);
+  const query = useApiQuery(`trips:${tripId}:places`, listPlaces, tripId);
+  const places = useMemo(() => filterTravelPlaces(query.data ?? []), [query.data]);
+  const loading = query.loading;
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string>();
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [selection, setSelectedIds] = useState<Set<string>>(() => new Set());
 
-  const reload = useCallback(async () => {
-    setLoading(true);
-    try {
-      const nextPlaces = await listTravelPlaces(tripId);
-      setPlaces(nextPlaces);
-      const availableIds = new Set(nextPlaces.map((place) => place.id));
-      setSelectedIds((current) => new Set([...current].filter((id) => availableIds.has(id))));
-    } catch (caught) {
-      setMessage(safeErrorMessage(caught, "장소를 불러오지 못했어요."));
-    } finally {
-      setLoading(false);
-    }
-  }, [tripId]);
+  const reload = query.refetch;
+  const selectedIds = useMemo(() => {
+    const available = new Set(places.map((place) => place.id));
+    return new Set([...selection].filter((id) => available.has(id)));
+  }, [places, selection]);
 
   const toggleSelection = useCallback((placeId: string) => {
     setSelectedIds((current) => togglePlaceSelection(current, placeId));
@@ -48,8 +41,7 @@ export function usePlaceLibrary(tripId: string) {
     setSaving(true); setMessage(undefined);
     try {
       await deletePlaces(tripId, placeIds);
-      const removed = new Set(placeIds);
-      setPlaces((current) => current.filter((place) => !removed.has(place.id)));
+
       setSelectedIds(new Set());
       setMessage(`${placeIds.length}개의 장소를 삭제했어요.`);
       return true;
@@ -61,15 +53,11 @@ export function usePlaceLibrary(tripId: string) {
     }
   }, [tripId]);
 
-  useFocusEffect(useCallback(() => {
-    void reload();
-  }, [reload]));
-
   return {
     clearSelection,
     places,
     loading,
-    message,
+    message: message ?? (query.error ? safeErrorMessage(query.error, "장소를 불러오지 못했어요.") : undefined),
     reload,
     removePlaces,
     saving,

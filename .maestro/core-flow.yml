@@ -89,7 +89,7 @@ name: TripUS core journey
 - tapOn:
     id: ai-plan-generate
 - extendedWaitUntil:
-    visible: 일정을 다듬어 보세요
+    visible: 하루를, 천천히.
     timeout: 30000
 - scrollUntilVisible:
     element:
@@ -107,7 +107,7 @@ name: TripUS core journey
 - tapOn:
     id: trip-open-complete
 - extendedWaitUntil:
-    visible: 다녀온 장소를 정리해요
+    visible: KEEP A MOMENT
     timeout: 15000
 - tapOn:
     id: "complete-rating-.*-5"
@@ -118,7 +118,7 @@ name: TripUS core journey
 - tapOn:
     id: complete-trip-submit
 - extendedWaitUntil:
-    visible: TRIP COMPLETE
+    visible: PAGES FROM YOUR JOURNEY
     timeout: 15000
 - assertVisible: 평가 완료
 - assertVisible: 5점

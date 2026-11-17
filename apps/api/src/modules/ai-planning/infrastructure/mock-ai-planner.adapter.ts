@@ -5,40 +5,23 @@ import { AiPlannerInput, AiPlannerOutput, AiPlannerPort } from '../domain/ai-pla
 @Injectable()
 export class MockAiPlannerAdapter implements AiPlannerPort {
   generate(input: AiPlannerInput): Promise<AiPlannerOutput> {
-    const dates = enumerateDates(input.trip.startDate, input.trip.endDate);
     const ranked = [...input.places].sort((a, b) => preferenceScore(b.preference) - preferenceScore(a.preference));
-    return Promise.resolve({
-      placements: ranked.map((place, index) => ({
+    const days: AiPlannerOutput['days'] = input.days.map(({ date }) => ({ date, visits: [] }));
+    ranked.forEach((place, index) => {
+      const day = days[index % days.length];
+      if (!day) return;
+      day.visits.push({
         savedPlaceId: place.id,
-        date: dates[index % dates.length]!,
-        position: Math.floor(index / dates.length),
-        startTime: `${String(9 + Math.floor(index / dates.length) * 2).padStart(2, '0')}:00`,
+        placeName: place.name,
+        regionName: input.trip.regions[0]?.name ?? input.trip.destination,
+        startTime: `${String(9 + day.visits.length * 2).padStart(2, '0')}:00`,
         durationMinutes: 90,
-        activity: `${place.name} 방문`,
-        travelMethod: '대중교통',
-        travelDurationMinutes: 20,
-        preferredTimeSlot: 'any',
-      })),
-      unplaced: [],
-      placeDescriptions: ranked.filter((place) => !place.note?.trim()).map((place) => ({
-        savedPlaceId: place.id,
         description: `${place.name}에서 여행지의 매력을 경험할 수 있어요.`,
-      })),
-      recommendations: [],
-      savedRecommendations: [],
+        mealType: null,
+      });
     });
+    return Promise.resolve({ days });
   }
-}
-
-function enumerateDates(startDate: string, endDate: string): string[] {
-  const dates: string[] = [];
-  const current = new Date(`${startDate}T00:00:00Z`);
-  const end = new Date(`${endDate}T00:00:00Z`);
-  while (current <= end) {
-    dates.push(current.toISOString().slice(0, 10));
-    current.setUTCDate(current.getUTCDate() + 1);
-  }
-  return dates;
 }
 
 function preferenceScore(preference: string): number {

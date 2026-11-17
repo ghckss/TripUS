@@ -1,3 +1,4 @@
+import { defineQuery, getAccountScope, setResource } from "@/shared/query/query-client";
 import type { components } from "@tripus/api-client";
 
 import { apiErrorMessage, authenticatedFetch, tripUsApi, tripUsApiBaseUrl } from "@/shared/api/trip-us-api";
@@ -22,15 +23,21 @@ export async function uploadPhotoBytes(target: UploadTarget, uri: string): Promi
 }
 
 export async function confirmPhoto(tripId: string, photoId: string): Promise<TripPhoto> {
+  const account = getAccountScope();
   const { data, error } = await tripUsApi.POST("/v1/trips/{tripId}/photos/{photoId}/confirm", {
     params: { path: { tripId, photoId } },
   });
   if (error) throw new Error(apiErrorMessage(error));
+  if (account !== getAccountScope()) throw new Error("Session changed during request");
+  setResource<TripPhoto[]>(`trips:${tripId}:photos`, (current) => current ? [...current.filter((photo) => photo.id !== data.id), data] : undefined);
   return data;
 }
 
-export async function listPhotos(tripId: string): Promise<TripPhoto[]> {
-  const { data, error } = await tripUsApi.GET("/v1/trips/{tripId}/photos", { params: { path: { tripId } } });
-  if (error) throw new Error(apiErrorMessage(error));
-  return data.filter((photo) => photo.status === "ready");
-}
+export const listPhotos = defineQuery((tripId: string) => ({
+  key: `trips:${tripId}:photos`, staleTime: 60000,
+  request: async (): Promise<TripPhoto[]> => {
+    const { data, error } = await tripUsApi.GET("/v1/trips/{tripId}/photos", { params: { path: { tripId } } });
+    if (error) throw new Error(apiErrorMessage(error));
+    return data.filter((photo) => photo.status === "ready");
+  },
+}));

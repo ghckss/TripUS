@@ -78,3 +78,33 @@ describe('GooglePlaceSearchAdapter photos', () => {
     expect((options.headers as Record<string, string>)['X-Goog-FieldMask']).toBe('primaryType,regularOpeningHours,utcOffsetMinutes');
   });
 });
+
+
+describe('GooglePlaceSearchAdapter map search', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('restricts text search to the viewport and removes out-of-area named matches', async () => {
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ places: [
+      { id: 'inside', displayName: { text: '영역 안 카페' }, location: { latitude: 37.5, longitude: 127 } },
+      { id: 'outside', displayName: { text: '영역 밖 카페' }, location: { latitude: 35, longitude: 129 } },
+    ] })));
+    vi.stubGlobal('fetch', request);
+    const adapter = new GooglePlaceSearchAdapter({ getOrThrow: () => 'key' } as unknown as ConfigService);
+    const results = await adapter.search('카페', '대한민국', { north: 38, south: 37, east: 128, west: 126 });
+    expect(results.map((place) => place.googlePlaceId)).toEqual(['inside']);
+    const body: unknown = JSON.parse((request.mock.calls[0]?.[1] as RequestInit).body as string);
+    expect(body).toMatchObject({ textQuery: '카페', locationRestriction: { rectangle: {
+      low: { latitude: 37, longitude: 126 }, high: { latitude: 38, longitude: 128 },
+    } } });
+  });
+
+  it('handles a viewport that crosses the international date line', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ places: [
+      { id: 'east', displayName: { text: 'East' }, location: { latitude: 0, longitude: 179 } },
+      { id: 'west', displayName: { text: 'West' }, location: { latitude: 0, longitude: -179 } },
+      { id: 'outside', displayName: { text: 'Outside' }, location: { latitude: 0, longitude: 0 } },
+    ] }))));
+    const adapter = new GooglePlaceSearchAdapter({ getOrThrow: () => 'key' } as unknown as ConfigService);
+    expect((await adapter.search('카페', '피지', { north: 5, south: -5, west: 170, east: -170 })).map((place) => place.googlePlaceId)).toEqual(['east', 'west']);
+  });
+});

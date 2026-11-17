@@ -21,6 +21,6 @@ export class ItinerariesController {
   @ApiBody({ type: ReplaceItineraryDto })
   @ApiOkResponse({ type: ItineraryUpdateResultDto })
   replace(@Param('tripId', new ParseUUIDPipe()) tripId: string, @Body() input: ReplaceItineraryDto): Promise<ItineraryUpdateResultDto> {
-    return this.itineraries.replace(tripId, input.items);
+    return this.itineraries.replace(tripId, input.items, undefined, input.activities);
   }
 }

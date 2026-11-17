@@ -2,6 +2,7 @@ import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import {
+  PlaceSearchBounds,
   PlacePhoto,
   PlaceSearchCandidate,
   PlaceSchedulingDetails,
@@ -36,8 +37,19 @@ export class GooglePlaceSearchAdapter implements PlaceSearchPort {
     this.apiKey = config.getOrThrow<string>('GOOGLE_MAPS_API_KEY');
   }
 
-  async search(query: string, destination: string): Promise<PlaceSearchCandidate[]> {
-    return this.textSearch({ textQuery: `${query} ${destination}`, languageCode: 'ko', pageSize: 10 });
+  async search(query: string, destination: string, bounds?: PlaceSearchBounds): Promise<PlaceSearchCandidate[]> {
+    const candidates = await this.textSearch({
+      textQuery: bounds ? query : `${query} ${destination}`,
+      languageCode: 'ko', pageSize: 10,
+      ...(bounds ? { locationRestriction: { rectangle: {
+        low: { latitude: bounds.south, longitude: bounds.west },
+        high: { latitude: bounds.north, longitude: bounds.east },
+      } } } : {}),
+    });
+    // Specific address queries can ignore Google's restriction. Keep map results inside the viewport.
+    return bounds ? candidates.filter(({ latitude, longitude }) => latitude != null && longitude != null &&
+      latitude >= bounds.south && latitude <= bounds.north &&
+      (bounds.west <= bounds.east ? longitude >= bounds.west && longitude <= bounds.east : longitude >= bounds.west || longitude <= bounds.east)) : candidates;
   }
 
   private async textSearch(requestBody: Record<string, unknown>): Promise<PlaceSearchCandidate[]> {
@@ -115,7 +127,7 @@ export class GooglePlaceSearchAdapter implements PlaceSearchPort {
     };
   }
 
-  async getPhoto(googlePlaceId: string): Promise<PlacePhoto | null> {
+  async getPhoto(googlePlaceId: string, dimensions = { maxWidthPx: 320, maxHeightPx: 240 }): Promise<PlacePhoto | null> {
     const detailsResponse = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(googlePlaceId)}?languageCode=ko`, {
       headers: {
         'X-Goog-Api-Key': this.apiKey,
@@ -129,8 +141,8 @@ export class GooglePlaceSearchAdapter implements PlaceSearchPort {
     if (!photo?.name || !photo.googleMapsUri) return null;
 
     const mediaUrl = new URL(`https://places.googleapis.com/v1/${photo.name}/media`);
-    mediaUrl.searchParams.set('maxWidthPx', '320');
-    mediaUrl.searchParams.set('maxHeightPx', '240');
+    mediaUrl.searchParams.set('maxWidthPx', String(dimensions.maxWidthPx));
+    mediaUrl.searchParams.set('maxHeightPx', String(dimensions.maxHeightPx));
     mediaUrl.searchParams.set('skipHttpRedirect', 'true');
     mediaUrl.searchParams.set('key', this.apiKey);
     const mediaResponse = await fetch(mediaUrl, { signal: AbortSignal.timeout(8_000) });

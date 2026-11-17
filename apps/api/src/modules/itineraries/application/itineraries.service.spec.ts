@@ -18,7 +18,7 @@ describe('trip boundary itinerary items', () => {
       endDate: '2026-11-10',
       startPoint: { googlePlaceId: 'airport-1', name: '인천공항 제1터미널', address: '인천', latitude: 37.46, longitude: 126.44, time: '09:30' },
       endPoint: { googlePlaceId: 'airport-2', name: '인천공항 제2터미널', address: '인천', latitude: 37.46, longitude: 126.43, time: '18:00' },
-    }, 37);
+    });
 
     expect(result.filter((item) => item.date === '2026-11-08').map((item) => [item.boundaryType, item.placeName, item.position])).toEqual([
       ['start_point', '인천공항 제1터미널', 0],
@@ -28,12 +28,12 @@ describe('trip boundary itinerary items', () => {
       [undefined, '서울숲', 0],
       ['end_point', '인천공항 제2터미널', 1],
     ]);
-    expect(result.at(-1)?.travelDurationMinutes).toBe(37);
+    expect(result.at(-1)?.travelDurationMinutes).toBeNull();
   });
 });
 
 describe('ItinerariesService', () => {
-  it('recalculates travel time between user-reordered or newly added places', async () => {
+  it('does not expose old model travel times or invoke route APIs during itinerary reads', async () => {
     const tripId = '10000000-0000-4000-8000-000000000001';
     const makeVisit = (id: string, position: number, googlePlaceId: string) => ({
       id, tripId, savedPlaceId: `place-${id}`, date: '2026-11-08', position,
@@ -53,15 +53,14 @@ describe('ItinerariesService', () => {
       }) } as unknown as Repository<TripEntity>,
       {} as DataSource,
       { getCurrentUserId: vi.fn().mockReturnValue('user-1') },
-      { transit: vi.fn().mockResolvedValue({ durationMinutes: 23, distanceMeters: 5_000 }) },
     );
 
     const result = await service.get(tripId);
 
-    expect(result.items[1]).toMatchObject({ placeName: 'second', travelMethod: '대중교통', travelDurationMinutes: 23 });
+    expect(result.items[1]).toMatchObject({ placeName: 'second', travelMethod: null, travelDurationMinutes: null });
   });
 
-  it('calculates travel time from the final visit to the configured end point', async () => {
+  it('leaves boundary leg durations to explicit route requests', async () => {
     const tripId = '10000000-0000-4000-8000-000000000001';
     const visit = {
       id: '30000000-0000-4000-8000-000000000001',
@@ -92,26 +91,20 @@ describe('ItinerariesService', () => {
       endPoint: { googlePlaceId: 'end-google-id', name: '인천공항', time: '18:00' },
     }) };
     const identity = { getCurrentUserId: vi.fn().mockReturnValue('user-1') };
-    const routes = { transit: vi.fn()
-      .mockResolvedValueOnce({ durationMinutes: 14, distanceMeters: 3_000 })
-      .mockResolvedValueOnce({ durationMinutes: 61, distanceMeters: 58_000 }) };
     const service = new ItinerariesService(
       items as unknown as Repository<ItineraryItemEntity>,
       places as unknown as Repository<SavedPlaceEntity>,
       trips as unknown as Repository<TripEntity>,
       {} as DataSource,
       identity,
-      routes,
     );
 
     const result = await service.get(tripId);
 
-    expect(routes.transit).toHaveBeenNthCalledWith(1, { originGooglePlaceId: 'start-google-id', destinationGooglePlaceId: 'visit-google-id' });
-    expect(routes.transit).toHaveBeenNthCalledWith(2, { originGooglePlaceId: 'visit-google-id', destinationGooglePlaceId: 'end-google-id' });
     expect(result.items.map((item) => [item.boundaryType, item.travelDurationMinutes])).toEqual([
       ['start_point', null],
-      [null, 14],
-      ['end_point', 61],
+      [null, null],
+      ['end_point', null],
     ]);
   });
 
@@ -126,7 +119,6 @@ describe('ItinerariesService', () => {
       id: tripId, active: true, startDate: '2026-11-08', endDate: '2026-11-10', startPoint: null, endPoint: null,
     }) };
     const identity = { getCurrentUserId: vi.fn().mockReturnValue('user-1') };
-    const routes = { transit: vi.fn() };
 
     const service = new ItinerariesService(
       items as unknown as Repository<ItineraryItemEntity>,
@@ -134,10 +126,10 @@ describe('ItinerariesService', () => {
       trips as unknown as Repository<TripEntity>,
       {} as DataSource,
       identity,
-      routes,
     );
 
     await expect(service.get(tripId)).resolves.toEqual({
+      activities: [],
       items: [],
       unplaced: [{ savedPlaceId: '20000000-0000-4000-8000-000000000001', placeName: '감천문화마을' }],
     });
@@ -161,14 +153,12 @@ describe('ItinerariesService', () => {
     };
     const dataSource = { transaction: vi.fn(async (callback: (transactionManager: typeof manager) => Promise<void>) => callback(manager)) };
     const identity = { getCurrentUserId: vi.fn().mockReturnValue('user-1') };
-    const routes = { transit: vi.fn() };
     const service = new ItinerariesService(
       items as unknown as Repository<ItineraryItemEntity>,
       places as unknown as Repository<SavedPlaceEntity>,
       trips as unknown as Repository<TripEntity>,
       dataSource as unknown as DataSource,
       identity,
-      routes,
     );
 
     const result = await service.replace(tripId, [
@@ -204,7 +194,6 @@ describe('ItinerariesService', () => {
       trips as unknown as Repository<TripEntity>,
       dataSource as unknown as DataSource,
       { getCurrentUserId: vi.fn().mockReturnValue('user-1') },
-      { transit: vi.fn() },
     );
 
     const result = await service.replaceDay(tripId, '2026-11-09', [
@@ -216,5 +205,70 @@ describe('ItinerariesService', () => {
     expect(manager.save).toHaveBeenCalledWith(ItineraryItemEntity, [
       expect.objectContaining({ savedPlaceId, date: '2026-11-09', scheduledTime: '10:30' }),
     ]);
+  });
+});
+
+describe('independent itinerary activities', () => {
+  const activity = {
+    id: '40000000-0000-4000-8000-000000000001', date: '2026-11-08', position: 0,
+    type: 'arrival' as const, title: '입국 심사 및 수하물 수령', startTime: '12:00', durationMinutes: 90,
+    locationType: 'start_point' as const, savedPlaceId: null, locationName: 'CDG',
+    fromLocation: null, toLocation: null, travelMethod: null,
+  };
+  function setup() {
+    const trip = { id: 'trip', startDate: '2026-11-08', endDate: '2026-11-10', startPoint: null, endPoint: null,
+      itineraryActivities: [activity, { ...activity, id: 'other', date: '2026-11-09' }] };
+    const manager = { delete: vi.fn(), update: vi.fn().mockResolvedValue({ affected: 1 }) };
+    const transit = vi.fn();
+    const items = { find: vi.fn().mockResolvedValue([]) };
+    const service = new ItinerariesService(
+      items as never,
+      { find: vi.fn().mockResolvedValue([]), countBy: vi.fn().mockResolvedValue(0) } as never,
+      { findOneBy: vi.fn().mockResolvedValue(trip) } as never,
+      { transaction: vi.fn(async (fn: (m: typeof manager) => Promise<void>) => fn(manager)) } as never,
+      { getCurrentUserId: () => 'user' },
+    );
+    return { service, trip, manager, transit, items };
+  }
+  it('persists non-place activities atomically with a replacement and returns them after reload', async () => {
+    const { service, manager } = setup();
+    const result = await service.replace('trip', [], undefined, [activity]);
+    expect(result.itinerary.activities).toEqual([activity]);
+    expect(manager.update).toHaveBeenCalledWith(expect.anything(), { id: 'trip' }, { itineraryActivities: [activity] });
+    expect((await service.get('trip')).activities).toEqual([activity]);
+  });
+  it('does not expose retired explanation fields from stored activity JSON', async () => {
+    const { service, trip } = setup();
+    const legacyActivity = { ...activity, reason: 'old generated explanation' };
+    trip.itineraryActivities = [legacyActivity];
+    expect((await service.get('trip')).activities).toEqual([activity]);
+    expect(trip.itineraryActivities[0]).toHaveProperty('reason');
+  });
+  it('replaces only the selected day activities and preserves the other dates', async () => {
+    const { service } = setup();
+    const result = await service.replaceDay('trip', '2026-11-08', [], undefined, []);
+    expect(result.itinerary.activities?.map((item) => item.date)).toEqual(['2026-11-09']);
+  });
+  it('preserves activities for older manual clients that omit the activities field; explicit [] clears them', async () => {
+    const { service, manager } = setup();
+    expect((await service.replace('trip', [])).itinerary.activities).toHaveLength(2);
+    expect(manager.update).not.toHaveBeenCalled();
+    expect((await service.replace('trip', [], undefined, [])).itinerary.activities).toEqual([]);
+  });
+  it('does not add direct place-to-place route estimates on a date with explicit activities', async () => {
+    const { service, items, transit } = setup();
+    items.find.mockResolvedValue(['first', 'second'].map((id, position) => ({
+      id, savedPlaceId: id, date: activity.date, position, scheduledTime: '17:00', travelDurationMinutes: 0,
+      savedPlace: { name: id, googlePlaceId: id, address: null, latitude: null, longitude: null },
+    })));
+    const result = await service.get('trip');
+    expect(result.items[1]?.travelDurationMinutes).toBeNull();
+    expect(transit).not.toHaveBeenCalled();
+  });
+  it('rejects out-of-scope activity dates without changing stored activities', async () => {
+    const { service, manager } = setup();
+    const result = await service.replaceDay('trip', '2026-11-08', [], undefined, [{ ...activity, date: '2026-11-09' }]);
+    expect(result.conflicts).toEqual(['DATE_SCOPE_MISMATCH']);
+    expect(manager.update).not.toHaveBeenCalled();
   });
 });

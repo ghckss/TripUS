@@ -1,5 +1,6 @@
 import { AppText } from "@/shared/ui/app-text";
 import { Card } from "@/shared/ui/card";
+import { EditorialHeading } from "@/shared/ui/field-notes";
 import { Screen } from "@/shared/ui/screen";
 import { colors } from "@/shared/design/tokens";
 import { Button } from "@/shared/ui/button";
@@ -11,7 +12,7 @@ export default function ProfileScreen() {
   const { entitlements, loading, user } = useProfile();
   const tierLabel = entitlements?.tier === "plus" ? "Plus" : entitlements?.tier === "free" ? "Free" : undefined;
   return <Screen contentStyle={{ paddingTop: 64 }}>
-    <AppText variant="title">프로필</AppText>
+    <EditorialHeading eyebrow="MY NOTEBOOK" title="나의 여행 수첩" />
     <Card>
       <AppText variant="heading">{user?.displayName ?? "여행자"}</AppText>
       <AppText color={colors.muted}>{user?.email ?? "로그인 정보를 불러오는 중이에요."}</AppText>

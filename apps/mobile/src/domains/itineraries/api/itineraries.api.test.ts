@@ -1,10 +1,10 @@
 import { tripUsApi } from "@/shared/api/trip-us-api";
-import { deleteCache, writeCache } from "@/shared/offline/cache";
-import { generateAiPlan, type AiPlanRequest, type Itinerary } from "./itineraries.api";
+import { deleteCache, readCache, writeCache } from "@/shared/offline/cache";
+import { generateAiPlan, undoAiPlan, type AiPlanRequest, type Itinerary } from "./itineraries.api";
 
 jest.mock("@/shared/api/trip-us-api", () => ({
   apiErrorMessage: (error: unknown) => String(error),
-  tripUsApi: { GET: jest.fn(), POST: jest.fn() },
+  tripUsApi: { GET: jest.fn(), POST: jest.fn(), PUT: jest.fn() },
 }));
 
 jest.mock("@/shared/offline/cache", () => ({
@@ -27,6 +27,26 @@ const mockWriteCache = writeCache as jest.Mock;
 const mockDeleteCache = deleteCache as jest.Mock;
 
 describe("generateAiPlan", () => {
+  it("reports output exhaustion separately and keeps the old itinerary", async () => {
+    mockGet.mockImplementation((path: string) => Promise.resolve({ data: path.endsWith("/status")
+      ? { generationId: "limit-job", status: "unavailable", failureReason: "output_limit" }
+      : { items: [], unplaced: [] } }));
+    mockPost.mockResolvedValue({ data: { generationId: "limit-job", status: "running" } });
+    await expect(generateAiPlan("trip-1", { themes: ["highlights"] } as AiPlanRequest))
+      .rejects.toThrow("AI 응답 분량 제한으로 생성이 중단됐어요");
+    expect(mockWriteCache).not.toHaveBeenCalled();
+  });
+
+  it("shows a timeout reason without replacing the previous itinerary", async () => {
+    mockGet.mockImplementation((path: string) => Promise.resolve({ data: path.endsWith("/status")
+      ? { generationId: "timeout-job", status: "unavailable", failureReason: "timeout" }
+      : { items: [], unplaced: [] } }));
+    mockPost.mockResolvedValue({ data: { generationId: "timeout-job", status: "running" } });
+    await expect(generateAiPlan("trip-1", { themes: ["highlights"] } as AiPlanRequest))
+      .rejects.toThrow("AI 응답 대기 시간을 초과했어요");
+    expect(mockWriteCache).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -58,7 +78,6 @@ describe("generateAiPlan", () => {
     mockPost.mockResolvedValue({ data: { generationId: "new-generation", status: "running" } });
 
     const result = await generateAiPlan("trip-1", {
-      density: "balanced",
       themes: ["highlights"],
       transportModes: ["public_transit"],
     } as AiPlanRequest);
@@ -67,5 +86,18 @@ describe("generateAiPlan", () => {
     expect(mockWriteCache).toHaveBeenCalledWith("itinerary:trip-1", generated);
     expect(mockWriteCache).toHaveBeenCalledWith("undo:trip-1", previous);
     expect(mockDeleteCache).toHaveBeenCalledWith("places:trip-1");
+  });
+});
+
+
+describe("undoAiPlan activities", () => {
+  it("restores activities from an old offline snapshot without retired explanation fields", async () => {
+    const activities = [{ id: "arrival", date: "2026-12-01", type: "arrival", startTime: "12:00", durationMinutes: 90 }];
+    (readCache as jest.Mock).mockResolvedValue({ items: [], unplaced: [], activities: activities.map((item) => ({ ...item, reason: "old generated explanation" })) });
+    (tripUsApi.PUT as jest.Mock).mockResolvedValue({ data: { status: "updated", itinerary: { items: [], unplaced: [], activities } } });
+    await undoAiPlan("trip-1");
+    expect(tripUsApi.PUT).toHaveBeenCalledWith("/v1/trips/{tripId}/itinerary", {
+      params: { path: { tripId: "trip-1" } }, body: { items: [], activities },
+    });
   });
 });

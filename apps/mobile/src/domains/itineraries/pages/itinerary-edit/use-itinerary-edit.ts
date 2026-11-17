@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useEffect, useEffectEvent, useState } from "react";
+import { useApiQuery } from "@/shared/query/use-resource";
 
 import { apiErrorMessage } from "@/shared/api/trip-us-api";
 import { getTrip } from "@/domains/trips";
@@ -46,24 +46,31 @@ function applySavedPlaceCoordinates(itinerary: Itinerary, places: SavedPlace[]):
 
 export function useItineraryEdit(tripId: string) {
   const [itinerary, setItinerary] = useState<Itinerary>();
+  const [savedItems, setSavedItems] = useState<string>();
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [dates, setDates] = useState<string[]>([]);
+  const [timezone, setTimezone] = useState<string>();
   const [places, setPlaces] = useState<SavedPlace[]>([]);
   const [updatingDate, setUpdatingDate] = useState<string>();
 
-  const reload = useCallback(async () => {
-    setError(undefined);
-    try {
-      const [nextItinerary, trip, nextPlaces] = await Promise.all([getItinerary(tripId), getTrip(tripId), listPlaces(tripId)]);
-      const nextDates = enumerateDates(trip.startDate, trip.endDate);
-      setItinerary(ensureLodgingEndpoints(applySavedPlaceCoordinates(nextItinerary, nextPlaces), nextDates, nextPlaces));
-      setDates(nextDates);
-      setPlaces(nextPlaces);
-    } catch (caught) { setError(apiErrorMessage(caught)); }
-  }, [tripId]);
-
-  useFocusEffect(useCallback(() => { void reload(); }, [reload]));
+  const tripQuery = useApiQuery(`trips:${tripId}`, getTrip, tripId);
+  const placesQuery = useApiQuery(`trips:${tripId}:places`, listPlaces, tripId);
+  const itineraryQuery = useApiQuery(`trips:${tripId}:itinerary`, getItinerary, tripId);
+  const dirty = Boolean(itinerary && savedItems !== undefined && JSON.stringify(serializeItineraryItems(itinerary)) !== savedItems);
+  const acceptServerSnapshot = useEffectEvent(() => {
+    const trip = tripQuery.data; const nextPlaces = placesQuery.data; const nextItinerary = itineraryQuery.data;
+    if (!trip || !nextPlaces || !nextItinerary || (dirty || saving || Boolean(updatingDate))) return;
+    const nextDates = enumerateDates(trip.startDate, trip.endDate);
+    const prepared = ensureLodgingEndpoints(applySavedPlaceCoordinates(nextItinerary, nextPlaces), nextDates, nextPlaces);
+    setItinerary(prepared);
+    setSavedItems(JSON.stringify(serializeItineraryItems(prepared)));
+    setDates(nextDates); setTimezone(trip.timezone); setPlaces(nextPlaces);
+  });
+  // A server snapshot initializes/rebases a separate editable draft only while it is clean.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { acceptServerSnapshot(); }, [tripQuery.data, placesQuery.data, itineraryQuery.data]);
+  const reload = () => Promise.all([tripQuery.refetch(), placesQuery.refetch(), itineraryQuery.refetch()]);
 
   const setPlacesForDate = (date: string, selectedPlaceIds: string[], availablePlaces = places) => {
     if (!itinerary) return;
@@ -101,6 +108,7 @@ export function useItineraryEdit(tripId: string) {
     const placedIds = new Set(nextItems.map((item) => item.savedPlaceId));
     setPlaces(availablePlaces);
     setItinerary(ensureLodgingEndpoints({
+      ...itinerary,
       items: nextItems,
       unplaced: availablePlaces.filter((place) => !isLodgingPlace(place) && !placedIds.has(place.id)).map((place) => ({ savedPlaceId: place.id, placeName: place.name })),
     }, dates, availablePlaces));
@@ -140,7 +148,7 @@ export function useItineraryEdit(tripId: string) {
     if (!item || isItineraryBoundary(item)) return;
     const nextItems = itinerary.items.filter((candidate) => candidate.id !== itemId);
     const stillPlaced = nextItems.some((candidate) => candidate.savedPlaceId === item.savedPlaceId);
-    setItinerary(normalizePositions({ items: nextItems, unplaced: stillPlaced ? itinerary.unplaced : [...itinerary.unplaced, { savedPlaceId: item.savedPlaceId, placeName: item.placeName }] }));
+    setItinerary(normalizePositions({ ...itinerary, items: nextItems, unplaced: stillPlaced ? itinerary.unplaced : [...itinerary.unplaced, { savedPlaceId: item.savedPlaceId, placeName: item.placeName }] }));
   };
 
   const save = async () => {
@@ -148,7 +156,9 @@ export function useItineraryEdit(tripId: string) {
     setSaving(true); setError(undefined);
     try {
       const prepared = ensureLodgingEndpoints(itinerary, dates, places);
-      setItinerary(await replaceItinerary(tripId, serializeItineraryItems(prepared)));
+      const saved = await replaceItinerary(tripId, serializeItineraryItems(prepared), prepared.activities);
+      setItinerary(saved);
+      setSavedItems(JSON.stringify(serializeItineraryItems(saved)));
       return true;
     } catch (caught) { setError(apiErrorMessage(caught)); return false; } finally { setSaving(false); }
   };
@@ -158,17 +168,21 @@ export function useItineraryEdit(tripId: string) {
     setUpdatingDate(date); setError(undefined);
     try {
       const prepared = ensureLodgingEndpoints(itinerary, dates, places);
-      await replaceItinerary(tripId, serializeItineraryItems(prepared));
+      if (dirty) await replaceItinerary(tripId, serializeItineraryItems(prepared), prepared.activities);
+      setSavedItems(JSON.stringify(serializeItineraryItems(prepared)));
       const updated = await generateAiPlanDay(tripId, date);
       const nextPlaces = await listPlaces(tripId);
       setPlaces(nextPlaces);
-      setItinerary(ensureLodgingEndpoints(applySavedPlaceCoordinates(updated, nextPlaces), dates, nextPlaces));
+      const preparedResult = ensureLodgingEndpoints(applySavedPlaceCoordinates(updated, nextPlaces), dates, nextPlaces);
+      setItinerary(preparedResult);
+      setSavedItems(JSON.stringify(serializeItineraryItems(preparedResult)));
       return true;
     } catch (caught) { setError(apiErrorMessage(caught)); return false; }
     finally { setUpdatingDate(undefined); }
   };
 
-  return { dates, error, itinerary, moveToAdjacentDay, places, reload, removeFromItinerary, reorderWithinDay, replaceDayLodging, save, saving, setPlacesForDate, updateDayWithAi, updatingDate };
+  const hasChanges = Boolean(itinerary && savedItems !== undefined && JSON.stringify(serializeItineraryItems(itinerary)) !== savedItems);
+  return { dates, timezone, error: error ?? ((tripQuery.error ?? placesQuery.error ?? itineraryQuery.error) ? apiErrorMessage(tripQuery.error ?? placesQuery.error ?? itineraryQuery.error) : undefined), hasChanges, itinerary, moveToAdjacentDay, places, reload, removeFromItinerary, reorderWithinDay, replaceDayLodging, save, saving, setPlacesForDate, updateDayWithAi, updatingDate };
 }
 
 function serializeItineraryItems(itinerary: Itinerary) {

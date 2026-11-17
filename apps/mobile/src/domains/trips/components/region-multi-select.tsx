@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { searchCities, searchPlacesByDestination, type PlaceSearchCandidate } from "@/domains/places/api/places.api";
 import type { TravelCountry } from "@/domains/trips/components/country-options";
 import { safeErrorMessage } from "@/shared/api/trip-us-api";
-import { colors, radius, spacing } from "@/shared/design/tokens";
+import { colors, radius, spacing, fonts } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { KeyboardAvoidingContainer } from "@/shared/ui/keyboard-avoiding-container";
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   draftRegions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   draftRegion: { backgroundColor: colors.primarySoft, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   searchRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  input: { flex: 1, minHeight: 52, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, paddingHorizontal: spacing.md, fontSize: 16, color: colors.ink },
+  input: { fontFamily: fonts.sans, flex: 1, minHeight: 52, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, paddingHorizontal: spacing.md, fontSize: 16, color: colors.ink },
   result: { minHeight: 68, borderBottomWidth: 1, borderBottomColor: colors.line, padding: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   resultText: { flex: 1, gap: spacing.xs },
   selectedResult: { backgroundColor: colors.primarySoft, borderRadius: radius.sm },

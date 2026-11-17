@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 
@@ -20,16 +20,33 @@ export class RoutesService {
   async transit(tripId: string, input: TransitRouteRequestDto): Promise<TransitRouteResponseDto> {
     const trip = await this.trips.findOneBy({ id: tripId, ownerId: this.identity.getCurrentUserId(), active: true });
     if (!trip) throw new NotFoundException('Trip not found');
-    const places = await this.places.findBy({ id: In([input.originSavedPlaceId, input.destinationSavedPlaceId]), tripId });
-    const origin = places.find((place) => place.id === input.originSavedPlaceId);
-    const destination = places.find((place) => place.id === input.destinationSavedPlaceId);
-    if (!origin || !destination) throw new NotFoundException('Saved place not found');
-    if (!origin.googlePlaceId || !destination.googlePlaceId) return this.unavailable('PLACE_ID_MISSING');
+    if (Boolean(input.originSavedPlaceId) === Boolean(input.originBoundaryType)
+      || Boolean(input.destinationSavedPlaceId) === Boolean(input.destinationBoundaryType)) {
+      throw new BadRequestException('Specify exactly one saved place or boundary per endpoint');
+    }
+    const ids = [input.originSavedPlaceId, input.destinationSavedPlaceId].filter((id): id is string => Boolean(id));
+    const places = ids.length ? await this.places.findBy({ id: In(ids), tripId }) : [];
+    const resolve = (id?: string, boundary?: string): string | null => {
+      if (boundary) {
+        const point = boundary === 'start_point' ? trip.startPoint : trip.endPoint;
+        if (!point) throw new NotFoundException('Trip boundary not found');
+        return point.googlePlaceId;
+      }
+      const place = places.find((candidate) => candidate.id === id);
+      if (!place) throw new NotFoundException('Saved place not found');
+      return place.googlePlaceId;
+    };
+    const originGooglePlaceId = resolve(input.originSavedPlaceId, input.originBoundaryType);
+    const destinationGooglePlaceId = resolve(input.destinationSavedPlaceId, input.destinationBoundaryType);
+    if (!originGooglePlaceId || !destinationGooglePlaceId) return this.unavailable('PLACE_ID_MISSING');
+    if (originGooglePlaceId === destinationGooglePlaceId) {
+      return { status: TransitRouteStatus.Available, durationMinutes: 0, distanceMeters: 0, reason: null };
+    }
 
     try {
       const estimate = await this.routes.transit({
-        originGooglePlaceId: origin.googlePlaceId,
-        destinationGooglePlaceId: destination.googlePlaceId,
+        originGooglePlaceId,
+        destinationGooglePlaceId,
         departureTime: input.departureTime,
       });
       return estimate

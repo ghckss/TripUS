@@ -24,7 +24,7 @@ export class PhotosController {
   @HttpCode(204)
   @ApiParam({ name: 'tripId', type: String, format: 'uuid' })
   @ApiParam({ name: 'photoId', type: String, format: 'uuid' })
-  @ApiConsumes('image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif')
+  @ApiConsumes('image/jpeg', 'image/png', 'image/webp')
   @ApiBody({ schema: { type: 'string', format: 'binary' } })
   @ApiNoContentResponse()
   async upload(

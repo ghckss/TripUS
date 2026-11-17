@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { SortableItem } from "react-native-reanimated-dnd";
 
-import { colors, radius, spacing } from "@/shared/design/tokens";
+import { colors, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 
 type Props = {
@@ -10,6 +10,7 @@ type Props = {
   maxIndex?: number;
   minIndex?: number;
   placeName: string;
+  description?: string | null;
   scheduledTime?: string | null;
   timePrefix?: "도착" | "출발";
   fixed?: boolean;
@@ -21,6 +22,7 @@ type Props = {
 };
 
 export function DraggableItineraryItem({
+  description,
   fixed = false,
   fixedLabel = "숙소",
   index,
@@ -61,19 +63,21 @@ export function DraggableItineraryItem({
           </Pressable>
         </SortableItem.Handle>
         <Pressable accessibilityLabel={`${placeName} 지도에서 보기`} accessibilityRole="button" onPress={onPress} style={styles.placeContent}>
-          <View style={styles.order}><AppText variant="caption" color={colors.white}>{index + 1}</AppText></View>
+          <View style={styles.order}><AppText variant="caption" color={colors.primary}>{index + 1}</AppText></View>
           <View style={styles.placeText}>
-            <AppText numberOfLines={2} variant="label" style={styles.name}>{placeName}</AppText>
+            <AppText numberOfLines={description ? 1 : 2} variant="label" style={styles.name}>{placeName}</AppText>
             <AppText variant="caption" color={colors.muted}>{scheduledTime ? `${timePrefix} ${scheduledTime}` : `${timePrefix} 시간 미정`}</AppText>
+            {Boolean(description) && <AppText numberOfLines={1} variant="caption" color={colors.muted}>{description}</AppText>}
           </View>
         </Pressable>
       </> : <>
         <View style={styles.fixedHandleSpacer} />
         <Pressable accessibilityLabel={`${placeName} 지도에서 보기`} accessibilityRole="button" onPress={onPress} style={styles.placeSummary}>
-        <View style={styles.order}><AppText variant="caption" color={colors.white}>{index + 1}</AppText></View>
+        <View style={styles.order}><AppText variant="caption" color={colors.primary}>{index + 1}</AppText></View>
         <View style={styles.placeText}>
-          <AppText numberOfLines={2} variant="label" style={styles.name}>{placeName}</AppText>
+          <AppText numberOfLines={description ? 1 : 2} variant="label" style={styles.name}>{placeName}</AppText>
           <AppText variant="caption" color={colors.muted}>{scheduledTime ? `${timePrefix} ${scheduledTime}` : `${timePrefix} 시간 미정`}</AppText>
+            {Boolean(description) && <AppText numberOfLines={1} variant="caption" color={colors.muted}>{description}</AppText>}
         </View>
         </Pressable>
       </>}
@@ -88,13 +92,13 @@ export function DraggableItineraryItem({
 }
 
 const styles = StyleSheet.create({
-  card: { height: 80, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
+  card: { height: 80, paddingHorizontal: spacing.md, borderBottomWidth: 1, borderColor: colors.line, borderRadius: 0, backgroundColor: colors.canvas },
   header: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   dragHandle: { width: 32, minHeight: 44, alignItems: "center", justifyContent: "center" },
   fixedHandleSpacer: { width: 32 },
   placeContent: { flex: 1, minHeight: 44, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   placeSummary: { flex: 1, minHeight: 44, flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  order: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary },
+  order: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.primarySoft },
   placeText: { flex: 1, justifyContent: "center" },
   name: { flexShrink: 1 },
   remove: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },

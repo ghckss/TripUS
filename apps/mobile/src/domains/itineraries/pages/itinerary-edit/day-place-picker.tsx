@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { savePlace, searchPlaces, type PlaceSearchCandidate, type SavedPlace } from "@/domains/places/api/places.api";
 import { inferPlaceTag } from "@/domains/places/model/infer-place-tag";
 import { safeErrorMessage } from "@/shared/api/trip-us-api";
-import { colors, radius, spacing } from "@/shared/design/tokens";
+import { colors, radius, spacing, fonts } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { KeyboardAvoidingContainer } from "@/shared/ui/keyboard-avoiding-container";
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   tabSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   searchSection: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   searchRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  searchInput: { flex: 1, minHeight: 48, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, paddingHorizontal: spacing.md, color: colors.ink, backgroundColor: colors.surface },
+  searchInput: { fontFamily: fonts.sans, flex: 1, minHeight: 48, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, paddingHorizontal: spacing.md, color: colors.ink, backgroundColor: colors.surface },
   result: { flexDirection: "row", alignItems: "center", gap: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.surface, padding: spacing.sm },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
   empty: { padding: spacing.lg, borderRadius: radius.md, backgroundColor: colors.surface, gap: spacing.sm },

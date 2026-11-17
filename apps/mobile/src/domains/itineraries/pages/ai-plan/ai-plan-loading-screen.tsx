@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 
 import { colors, radius, spacing } from "@/shared/design/tokens";
+import { FieldIllustration } from "@/shared/ui/field-notes";
 import { AppText } from "@/shared/ui/app-text";
 import { Screen } from "@/shared/ui/screen";
 
@@ -73,7 +74,7 @@ export function AiPlanLoadingScreen({ dayLabel }: { dayLabel?: string }) {
         <View style={styles.orbitDot} />
       </Animated.View>
       <Animated.View style={[styles.centerBubble, { transform: [{ scale }] }]}>
-        <AppText style={styles.emoji}>🧭</AppText>
+        <FieldIllustration kind="park" />
       </Animated.View>
     </View>
 
@@ -89,7 +90,7 @@ const styles = StyleSheet.create({
   title: { maxWidth: 300 },
   detail: { maxWidth: 320 },
   animationArea: { alignItems: "center", justifyContent: "center", alignSelf: "center", width: 220, height: 220 },
-  orbit: { position: "absolute", width: 184, height: 184, borderRadius: radius.pill, borderWidth: 7, borderColor: colors.secondary },
+  orbit: { position: "absolute", width: 184, height: 184, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.line },
   orbitDot: { position: "absolute", top: 14, right: 18, width: 14, height: 14, borderRadius: radius.pill, backgroundColor: colors.secondary },
   centerBubble: { width: 124, height: 124, borderRadius: radius.pill, alignItems: "center", justifyContent: "center", backgroundColor: colors.primarySoft },
   emoji: { fontSize: 54, lineHeight: 66 },

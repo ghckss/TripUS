@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { FlatList, Modal, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { colors, radius, spacing } from "@/shared/design/tokens";
+import { colors, radius, spacing, fonts } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { KeyboardAvoidingContainer } from "@/shared/ui/keyboard-avoiding-container";
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   valueText: { flex: 1 },
   modal: { flex: 1, backgroundColor: colors.canvas, padding: spacing.lg, gap: spacing.md },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
-  searchInput: { minHeight: 52, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, paddingHorizontal: spacing.md, fontSize: 16, color: colors.ink },
+  searchInput: { fontFamily: fonts.sans, minHeight: 52, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, paddingHorizontal: spacing.md, fontSize: 16, color: colors.ink },
   option: { minHeight: 66, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line },
   selectedOption: { backgroundColor: colors.primarySoft, borderRadius: radius.sm },
 });

@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  AI_PLANNING_TASK,
-  TRAVEL_DENSITY_POLICIES,
-  TravelDensity,
-  TravelTheme,
-} from '../domain/ai-planner.port';
+import { TravelTheme } from '../domain/ai-planner.port';
 import { MockAiPlannerAdapter } from './mock-ai-planner.adapter';
 
 describe('MockAiPlannerAdapter', () => {
@@ -25,7 +20,7 @@ describe('MockAiPlannerAdapter', () => {
     }));
 
     const result = await planner.generate({
-      task: AI_PLANNING_TASK,
+      preferences: { themes: [TravelTheme.Highlights] },
       trip: {
         title: 'Seoul trip',
         destination: 'Seoul',
@@ -33,28 +28,36 @@ describe('MockAiPlannerAdapter', () => {
         timezone: 'Asia/Seoul',
         startDate: '2026-10-31',
         endDate: '2026-11-01',
+        lodgings: [],
         startPoint: null,
         endPoint: null,
       },
-      density: TRAVEL_DENSITY_POLICIES[TravelDensity.Relaxed],
-      travelerContext: {
-        companions: null,
-        transportModes: ['public_transit'],
-        budgetLevel: null,
-        themes: [TravelTheme.Highlights],
-        additionalRequests: null,
-        requiredActivityRequests: [],
-      },
       places,
-      days: [],
-      referenceItinerary: [],
-      lockedPlacements: [],
-      priorRecommendations: [],
+      days: [{ date: '2026-10-31', startLodging: null, endLodging: null }, { date: '2026-11-01', startLodging: null, endLodging: null }],
     });
 
-    expect(result.placements).toHaveLength(5);
-    expect(result.placements[0]?.savedPlaceId).toBe(places[4]?.id);
-    expect(result.placements[1]).toMatchObject({ date: '2026-11-01', position: 0 });
-    expect(result.unplaced).toHaveLength(0);
+    expect(result.days.flatMap((day) => day.visits)).toHaveLength(5);
+    expect(result.days[0]?.visits[0]?.savedPlaceId).toBe(places[4]?.id);
+    expect(result.days[1]).toMatchObject({ date: '2026-11-01', visits: [{ savedPlaceId: places[0]?.id }, { savedPlaceId: places[2]?.id }] });
   });
+
+  it('only returns the requested day even when the trip spans multiple days', async () => {
+    const input = {
+      preferences: { themes: [TravelTheme.Highlights] },
+      trip: { title: 'Paris', destination: 'France', regions: [], timezone: 'Europe/Paris', startDate: '2026-12-01', endDate: '2026-12-07', lodgings: [], startPoint: null, endPoint: null },
+      places: [], days: [{ date: '2026-12-03', startLodging: null, endLodging: null }],
+    };
+    expect(await new MockAiPlannerAdapter().generate(input)).toEqual({ days: [{ date: '2026-12-03', visits: [] }] });
+  });
+  it('uses the requested day scope rather than expanding back to the full trip', async () => {
+    const output = await new MockAiPlannerAdapter().generate({
+      preferences: { themes: [TravelTheme.Highlights] },
+      trip: { title: 'Paris', destination: 'France', regions: [], timezone: 'Europe/Paris', startDate: '2026-12-01', endDate: '2026-12-07', lodgings: [], startPoint: null, endPoint: null },
+      places: [{ id: 'place', name: 'Museum', address: null, latitude: null, longitude: null, tag: 'attraction', preference: 'must_visit', note: null }],
+      days: [{ date: '2026-12-03', startLodging: null, endLodging: null }],
+    });
+    expect(output.days).toHaveLength(1);
+    expect(output.days[0]).toMatchObject({ date: '2026-12-03', visits: [{ savedPlaceId: 'place' }] });
+  });
+
 });

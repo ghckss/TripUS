@@ -1,3 +1,4 @@
+import { useUnsavedChanges } from "@/shared/ui/use-unsaved-changes";
 import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
@@ -5,23 +6,19 @@ import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { Pill } from "@/shared/ui/pill";
+import { EditorialHeading } from "@/shared/ui/field-notes";
+import { TripNavigation } from "@/shared/ui/trip-navigation";
 import { Screen } from "@/shared/ui/screen";
-import { colors, radius, spacing } from "@/shared/design/tokens";
+import { colors, radius, spacing, fonts } from "@/shared/design/tokens";
 import {
   type AiBudgetLevel,
   type AiTransportMode,
-  type TravelDensity,
   type TravelTheme,
 } from "../../api/itineraries.api";
 import { useAiPlan } from "./use-ai-plan";
 import { AiPlanLoadingScreen } from "./ai-plan-loading-screen";
 import { useAppDialog } from "@/shared/ui/app-dialog";
 
-const densityOptions: { label: string; value: TravelDensity }[] = [
-  { label: "여유롭게", value: "relaxed" },
-  { label: "알차게", value: "balanced" },
-  { label: "꽉 채워서", value: "busy" },
-];
 const themeOptions: { label: string; value: TravelTheme }[] = [
   { label: "맛집 탐방", value: "food" },
   { label: "대표 명소", value: "highlights" },
@@ -42,8 +39,7 @@ const budgetOptions: { label: string; value: AiBudgetLevel }[] = [
 ];
 
 const settingDescriptions = {
-  density: "여유롭게: 쉬는 시간을 충분히 두고 핵심 장소를 둘러봐요.\n알차게: 관광과 휴식을 균형 있게 채워요.\n꽉 채워서: 하루를 길게 활용해 더 많은 장소를 방문해요.",
-  themes: "맛집 탐방: 식당과 먹거리를 중심으로 구성해요.\n대표 명소: 처음 가는 여행지의 필수 코스를 우선해요.\n카페·감성: 분위기 좋은 카페와 사진 명소를 담아요.\n문화·전시: 박물관, 미술관과 문화 공간을 둘러봐요.\n쇼핑: 시장, 상점과 쇼핑 거리를 포함해요.\n자연·휴식: 공원과 자연 속에서 쉬는 시간을 늘려요.",
+  themes: "맛집 탐방: 현지 식당과 지역 먹거리를 우선해요.\n대표 명소: 여행지를 대표하는 명소를 우선해요.\n카페·감성: 분위기 좋은 카페와 사진 명소를 담아요.\n문화·전시: 박물관, 미술관과 문화 공간을 둘러봐요.\n쇼핑: 시장, 상점과 쇼핑 거리를 포함해요.\n자연·휴식: 공원과 자연 경관을 여유롭게 둘러봐요.\n여러 방식을 선택하면 여행 전체에 함께 반영해요. 별도의 휴식·대기 일정은 추가하지 않아요.",
   budget: "가성비: 비용 부담이 적은 장소와 식사를 우선해요.\n보통: 가격과 만족도의 균형을 맞춰요.\n여유롭게: 특별한 경험과 인기 장소도 적극적으로 포함해요.",
 };
 
@@ -63,7 +59,6 @@ function SettingLabel({ label, description }: { label: string; description: stri
 
 export default function AiPlanScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const [density, setDensity] = useState<TravelDensity>("relaxed");
   const [themes, setThemes] = useState<TravelTheme[]>(["highlights"]);
   const [companions, setCompanions] = useState("");
   const [transportModes, setTransportModes] = useState<AiTransportMode[]>(["public_transit"]);
@@ -71,9 +66,10 @@ export default function AiPlanScreen() {
   const [additionalRequests, setAdditionalRequests] = useState("");
   const { showDialog } = useAppDialog();
   const { entitlements, error, generate, latestRequest, loading, missingRegions } = useAiPlan(tripId);
+  const dirty = themes.join(",") !== "highlights" || transportModes.join(",") !== "public_transit" || budgetLevel !== "standard" || Boolean(companions || additionalRequests);
+  const allowNavigation = useUnsavedChanges(dirty, loading);
   const loadLatestRequest = () => {
     if (!latestRequest) return;
-    setDensity(latestRequest.density);
     setThemes(latestRequest.themes);
     setCompanions(latestRequest.companions ?? "");
     setTransportModes(latestRequest.transportModes);
@@ -101,14 +97,13 @@ export default function AiPlanScreen() {
     ? current.length > 1 ? current.filter((item) => item !== value) : current
     : [...current, value]);
   const createPlan = () => void generate({
-    density,
     themes,
     companions: companions.trim() || undefined,
     transportModes,
     budgetLevel,
     additionalRequests: additionalRequests.trim() || undefined,
   }).then((created) => {
-    if (created) router.replace(`/trips/${tripId}/itinerary`);
+    if (created) { allowNavigation(); router.replace(`/trips/${tripId}/itinerary`); }
   });
   const confirmPlan = () => {
     const freeAttempt = entitlements?.tier === "free" && entitlements.aiGenerationsUsed === 0;
@@ -124,9 +119,9 @@ export default function AiPlanScreen() {
   };
   if (loading) return <AiPlanLoadingScreen />;
   return (
-    <Screen>
+    <Screen bottomSlot={<TripNavigation allowActiveNavigation tripId={tripId} active="itinerary" />}>
       <View style={styles.titleRow}>
-        <AppText variant="title">어떤 여행을 원하나요?</AppText>
+        <EditorialHeading eyebrow="PLAN YOUR TRIP" title={"어떤 여행을\n하고 싶으세요?"} />
         <Pressable
           accessibilityLabel="최근 요청 불러오기"
           accessibilityRole="button"
@@ -135,9 +130,7 @@ export default function AiPlanScreen() {
           style={({ pressed }) => [styles.loadButton, pressed && styles.loadButtonPressed]}
         ><AppText style={styles.loadIcon}>↻</AppText></Pressable>
       </View>
-      <AppText color={colors.muted}>저장한 장소를 중심으로 동선, 시간과 식사까지 빈틈없이 구성해요.</AppText>
-      <SettingLabel label="여행의 밀도" description={settingDescriptions.density} />
-      <View style={styles.wrap}>{densityOptions.map((item) => <Pill key={item.value} label={item.label} selected={density === item.value} onPress={() => setDensity(item.value)} />)}</View>
+      <AppText color={colors.muted}>모아둔 장소로 하루를 제안해요. 순서와 방문 장소는 직접 바꿀 수 있어요.</AppText>
       <SettingLabel label="여행의 방식" description={settingDescriptions.themes} />
       <View style={styles.wrap}>{themeOptions.map((item) => <Pill key={item.value} label={item.label} selected={themes.includes(item.value)} onPress={() => toggleTheme(item.value)} />)}</View>
       <View style={styles.field}>
@@ -188,9 +181,9 @@ const styles = StyleSheet.create({
   loadButtonPressed: { backgroundColor: colors.primarySoft },
   loadIcon: { fontSize: 25, lineHeight: 28, color: colors.primary },
   settingLabel: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  infoButton: { width: 28, height: 28, alignItems: "center", justifyContent: "center" },
+  infoButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   field: { gap: spacing.sm },
-  input: { minHeight: 48, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, paddingHorizontal: spacing.md, color: colors.ink, fontSize: 16 },
+  input: { fontFamily: fonts.sans, minHeight: 48, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, paddingHorizontal: spacing.md, color: colors.ink, fontSize: 16 },
   multiline: { minHeight: 88, paddingTop: spacing.md },
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
 });

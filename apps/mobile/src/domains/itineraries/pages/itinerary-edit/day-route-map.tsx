@@ -6,7 +6,7 @@ import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import type { ItineraryItem } from "../../api/itineraries.api";
 
-const MAP_HEIGHT = 240;
+const MAP_HEIGHT = 200;
 const ANIMATED_COORDINATE_DELTA = { latitudeDelta: 0, longitudeDelta: 0 };
 const MovingMarker = Marker.Animated as unknown as ComponentType<{
   coordinate: AnimatedRegion;
@@ -226,15 +226,15 @@ function MapEmptyState({ title, description }: { title: string; description: str
 }
 
 const styles = StyleSheet.create({
-  container: { height: MAP_HEIGHT, overflow: "hidden", borderRadius: radius.md, backgroundColor: "#EEF0EA", borderWidth: 1, borderColor: colors.line },
+  container: { height: MAP_HEIGHT, overflow: "hidden", borderRadius: radius.md, backgroundColor: colors.secondarySoft, borderWidth: 1, borderColor: colors.line },
   empty: { alignItems: "center", justifyContent: "center", gap: spacing.xs, paddingHorizontal: spacing.lg },
   emptyDescription: { textAlign: "center" },
   pin: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary, borderWidth: 2, borderColor: colors.white, shadowColor: colors.ink, shadowOpacity: 0.22, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
   combinedPin: { width: "auto", minWidth: 48, paddingHorizontal: spacing.sm },
-  markerDetails: { position: "absolute", zIndex: 2, top: spacing.sm, left: spacing.sm, right: spacing.sm, gap: spacing.xs, borderRadius: radius.sm, backgroundColor: "#FFFFFFF5", padding: spacing.sm, paddingRight: spacing.xl, shadowColor: colors.ink, shadowOpacity: 0.16, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+  markerDetails: { position: "absolute", zIndex: 2, top: spacing.sm, left: spacing.sm, right: spacing.sm, gap: spacing.xs, borderRadius: radius.sm, backgroundColor: `${colors.surface}F5`, padding: spacing.sm, paddingRight: spacing.xl, shadowColor: colors.ink, shadowOpacity: 0.16, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
   detailsClose: { position: "absolute", zIndex: 1, top: spacing.xs, right: spacing.sm },
   detailsRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
   detailsContent: { flex: 1, gap: 2 },
-  legend: { position: "absolute", left: spacing.sm, bottom: spacing.sm, borderRadius: radius.pill, backgroundColor: "#FFFFFFEE", paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  legend: { position: "absolute", left: spacing.sm, bottom: spacing.sm, borderRadius: radius.pill, backgroundColor: `${colors.surface}EE`, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
   locationNotice: { position: "absolute", top: spacing.sm, left: spacing.sm, right: spacing.sm, borderRadius: radius.sm, backgroundColor: "#FFF7E8EE", paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
 });

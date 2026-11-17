@@ -363,47 +363,6 @@
         ]
       }
     },
-    "/v1/trips/{tripId}/routes/transit": {
-      "post": {
-        "operationId": "RoutesController_transit",
-        "parameters": [
-          {
-            "name": "tripId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TransitRouteRequestDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TransitRouteResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "routes"
-        ]
-      }
-    },
     "/v1/me/entitlements": {
       "get": {
         "operationId": "EntitlementsController_get",
@@ -611,6 +570,46 @@
             "schema": {
               "minLength": 2,
               "type": "string"
+            }
+          },
+          {
+            "name": "north",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": -90,
+              "maximum": 90,
+              "type": "number"
+            }
+          },
+          {
+            "name": "south",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": -90,
+              "maximum": 90,
+              "type": "number"
+            }
+          },
+          {
+            "name": "east",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": -180,
+              "maximum": 180,
+              "type": "number"
+            }
+          },
+          {
+            "name": "west",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": -180,
+              "maximum": 180,
+              "type": "number"
             }
           }
         ],
@@ -884,6 +883,37 @@
         ]
       }
     },
+    "/v1/trips/{tripId}/cover": {
+      "get": {
+        "operationId": "TripsController_cover",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlacePhotoResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "trips"
+        ]
+      }
+    },
     "/v1/trips/{tripId}": {
       "get": {
         "operationId": "TripsController_get",
@@ -1017,6 +1047,47 @@
         ]
       }
     },
+    "/v1/trips/{tripId}/routes/transit": {
+      "post": {
+        "operationId": "RoutesController_transit",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitRouteRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransitRouteResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "routes"
+        ]
+      }
+    },
     "/v1/trips/{tripId}/photos": {
       "post": {
         "operationId": "PhotosController_create",
@@ -1129,18 +1200,6 @@
               }
             },
             "image/webp": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            },
-            "image/heic": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            },
-            "image/heif": {
               "schema": {
                 "type": "string",
                 "format": "binary"
@@ -1368,14 +1427,6 @@
           "refreshToken"
         ]
       },
-      "TravelDensity": {
-        "type": "string",
-        "enum": [
-          "balanced",
-          "busy",
-          "relaxed"
-        ]
-      },
       "TravelTheme": {
         "type": "string",
         "enum": [
@@ -1406,13 +1457,6 @@
       "GenerateAiPlanDto": {
         "type": "object",
         "properties": {
-          "density": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/TravelDensity"
-              }
-            ]
-          },
           "themes": {
             "type": "array",
             "items": {
@@ -1444,7 +1488,6 @@
           }
         },
         "required": [
-          "density",
           "themes",
           "transportModes"
         ]
@@ -1515,6 +1558,101 @@
         "required": [
           "generationId",
           "status"
+        ]
+      },
+      "ItineraryActivityType": {
+        "type": "string",
+        "enum": [
+          "arrival",
+          "departure",
+          "transport",
+          "check_in",
+          "check_out",
+          "luggage",
+          "rest",
+          "waiting"
+        ]
+      },
+      "ItineraryActivityDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "position": {
+            "type": "number",
+            "minimum": 0
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ItineraryActivityType"
+              }
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "startTime": {
+            "type": "string",
+            "example": "13:30"
+          },
+          "durationMinutes": {
+            "type": "number",
+            "minimum": 0
+          },
+          "locationType": {
+            "type": "string",
+            "enum": [
+              "lodging",
+              "start_point",
+              "end_point",
+              "other"
+            ],
+            "nullable": true
+          },
+          "savedPlaceId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "locationName": {
+            "type": "string",
+            "nullable": true
+          },
+          "fromLocation": {
+            "type": "string",
+            "nullable": true
+          },
+          "toLocation": {
+            "type": "string",
+            "nullable": true
+          },
+          "travelMethod": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "position",
+          "type",
+          "title",
+          "startTime",
+          "durationMinutes",
+          "locationType",
+          "savedPlaceId",
+          "locationName",
+          "fromLocation",
+          "toLocation",
+          "travelMethod"
         ]
       },
       "ItinerarySource": {
@@ -1656,6 +1794,12 @@
       "ItineraryResponseDto": {
         "type": "object",
         "properties": {
+          "activities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItineraryActivityDto"
+            }
+          },
           "items": {
             "type": "array",
             "items": {
@@ -1699,8 +1843,7 @@
           },
           "durationMinutes": {
             "type": "number",
-            "minimum": 15,
-            "maximum": 720
+            "minimum": 0
           },
           "activitySummary": {
             "type": "string",
@@ -1712,8 +1855,7 @@
           },
           "travelDurationMinutes": {
             "type": "number",
-            "minimum": 0,
-            "maximum": 720
+            "minimum": 0
           }
         },
         "required": [
@@ -1725,6 +1867,12 @@
       "ReplaceItineraryDto": {
         "type": "object",
         "properties": {
+          "activities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItineraryActivityDto"
+            }
+          },
           "items": {
             "type": "array",
             "items": {
@@ -1767,61 +1915,6 @@
           "status",
           "conflicts",
           "itinerary"
-        ]
-      },
-      "TransitRouteRequestDto": {
-        "type": "object",
-        "properties": {
-          "originSavedPlaceId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "destinationSavedPlaceId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "departureTime": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "originSavedPlaceId",
-          "destinationSavedPlaceId"
-        ]
-      },
-      "TransitRouteStatus": {
-        "type": "string",
-        "enum": [
-          "available",
-          "unavailable"
-        ]
-      },
-      "TransitRouteResponseDto": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/TransitRouteStatus"
-              }
-            ]
-          },
-          "durationMinutes": {
-            "type": "number",
-            "nullable": true
-          },
-          "distanceMeters": {
-            "type": "number",
-            "nullable": true
-          },
-          "reason": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "status"
         ]
       },
       "SubscriptionTier": {
@@ -2488,6 +2581,71 @@
         "required": [
           "trip",
           "itinerary"
+        ]
+      },
+      "TransitRouteRequestDto": {
+        "type": "object",
+        "properties": {
+          "originSavedPlaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "destinationSavedPlaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "originBoundaryType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ItineraryBoundaryType"
+              }
+            ]
+          },
+          "destinationBoundaryType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ItineraryBoundaryType"
+              }
+            ]
+          },
+          "departureTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TransitRouteStatus": {
+        "type": "string",
+        "enum": [
+          "available",
+          "unavailable"
+        ]
+      },
+      "TransitRouteResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransitRouteStatus"
+              }
+            ]
+          },
+          "durationMinutes": {
+            "type": "number",
+            "nullable": true
+          },
+          "distanceMeters": {
+            "type": "number",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status"
         ]
       },
       "CreatePhotoUploadDto": {

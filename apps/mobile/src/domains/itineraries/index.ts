@@ -3,10 +3,10 @@ export {
   getLatestAiPlanRequest,
   getTransitRoute,
   getItinerary,
+  isItineraryBoundary,
   replaceItinerary,
   type Itinerary,
   type ItineraryItem,
-  type TravelDensity,
   type TravelTheme,
   type TransitRoute,
 } from "./api/itineraries.api";

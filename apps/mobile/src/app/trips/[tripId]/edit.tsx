@@ -1,1 +1,4 @@
-export { default } from "@/domains/trips/pages/edit-trip/edit-trip-page";
+import Page from "@/domains/trips/pages/edit-trip/edit-trip-page";
+import { withScreenDialog } from "@/shared/ui/with-screen-dialog";
+
+export default withScreenDialog(Page);

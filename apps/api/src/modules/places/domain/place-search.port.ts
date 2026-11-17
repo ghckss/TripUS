@@ -37,10 +37,17 @@ export interface PlacePhoto {
   authorNames: string[];
 }
 
+export interface PlaceSearchBounds {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
 export interface PlaceSearchPort {
-  search(query: string, destination: string): Promise<PlaceSearchCandidate[]>;
+  search(query: string, destination: string, bounds?: PlaceSearchBounds): Promise<PlaceSearchCandidate[]>;
   getCoordinates(googlePlaceId: string): Promise<{ latitude: number; longitude: number } | null>;
   getPrimaryType?(googlePlaceId: string): Promise<string | null>;
   getSchedulingDetails?(googlePlaceId: string): Promise<PlaceSchedulingDetails | null>;
-  getPhoto(googlePlaceId: string): Promise<PlacePhoto | null>;
+  getPhoto(googlePlaceId: string, dimensions?: { maxWidthPx: number; maxHeightPx: number }): Promise<PlacePhoto | null>;
 }

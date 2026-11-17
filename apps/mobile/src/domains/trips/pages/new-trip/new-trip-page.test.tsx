@@ -9,7 +9,7 @@ const mockSavePrimaryLodging = jest.fn();
 const mockSearchPlacesByDestination = jest.fn();
 const mockSearchCities = jest.fn();
 
-jest.mock("expo-router", () => ({
+jest.mock("expo-router", () => ({ usePreventRemove: () => jest.fn(),
   router: { replace: jest.fn() },
   useFocusEffect: jest.fn(),
 }));
@@ -157,6 +157,8 @@ describe("NewTripScreen", () => {
     expect(screen.queryByTestId("trip-start-point-search-input")).toBeNull();
     await selectTime(screen, "trip-start-point-time", 10, 30);
 
+    expect(screen.queryByTestId("trip-end-point-search-input")).toBeNull();
+    await fireEvent.press(screen.getByTestId("trip-end-point-edit"));
     await fireEvent.changeText(screen.getByTestId("trip-end-point-search-input"), "서울역");
     await fireEvent.press(screen.getByTestId("trip-end-point-search-button"));
     await fireEvent.press(await screen.findByTestId("trip-end-point-result-station-seoul"));

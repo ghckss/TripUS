@@ -1,14 +1,27 @@
+import { ItineraryBoundaryType } from '../../../itineraries/application/dto/itinerary.dto';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsUUID } from 'class-validator';
+import { IsDateString, IsEnum, IsOptional, IsUUID } from 'class-validator';
 
 export class TransitRouteRequestDto {
-  @ApiProperty({ type: String, format: 'uuid' })
+  @ApiPropertyOptional({ type: String, format: 'uuid' })
+  @IsOptional()
   @IsUUID()
-  originSavedPlaceId!: string;
+  originSavedPlaceId?: string;
 
-  @ApiProperty({ type: String, format: 'uuid' })
+  @ApiPropertyOptional({ type: String, format: 'uuid' })
+  @IsOptional()
   @IsUUID()
-  destinationSavedPlaceId!: string;
+  destinationSavedPlaceId?: string;
+
+  @ApiPropertyOptional({ enum: ItineraryBoundaryType, enumName: 'ItineraryBoundaryType' })
+  @IsOptional()
+  @IsEnum(ItineraryBoundaryType)
+  originBoundaryType?: ItineraryBoundaryType;
+
+  @ApiPropertyOptional({ enum: ItineraryBoundaryType, enumName: 'ItineraryBoundaryType' })
+  @IsOptional()
+  @IsEnum(ItineraryBoundaryType)
+  destinationBoundaryType?: ItineraryBoundaryType;
 
   @ApiPropertyOptional({ type: String, format: 'date-time' })
   @IsOptional()

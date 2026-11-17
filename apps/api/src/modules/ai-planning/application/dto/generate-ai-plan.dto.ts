@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ArrayMinSize, ArrayUnique, IsArray, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { ItineraryResponseDto } from '../../../itineraries/application/dto/itinerary.dto';
-import { TravelDensity, TravelTheme } from '../../domain/ai-planner.port';
+import { TravelTheme } from '../../domain/ai-planner.port';
 
 export enum AiTransportMode {
   PublicTransit = 'public_transit',
@@ -17,10 +17,6 @@ export enum AiBudgetLevel {
 }
 
 export class GenerateAiPlanDto {
-  @ApiProperty({ enum: TravelDensity, enumName: 'TravelDensity' })
-  @IsEnum(TravelDensity)
-  density!: TravelDensity;
-
   @ApiProperty({ enum: TravelTheme, enumName: 'TravelTheme', isArray: true })
   @IsArray()
   @ArrayMinSize(1)
@@ -62,9 +58,6 @@ export enum AiPlanGenerationStatus {
 export class GenerateAiPlanResponseDto {
   @ApiProperty({ enum: AiPlanGenerationStatus, enumName: 'AiPlanGenerationStatus' })
   status!: AiPlanGenerationStatus;
-
-  @ApiProperty({ enum: TravelDensity, enumName: 'TravelDensity' })
-  density!: TravelDensity;
 
   @ApiProperty({ enum: TravelTheme, enumName: 'TravelTheme', isArray: true })
   themes!: TravelTheme[];

@@ -10,146 +10,30 @@ import {
   AiPlannerInput,
   AiPlannerOutput,
   AiPlannerPort,
-  type AiPlannerReview,
-  type AiPlannerReviewFocus,
 } from '../domain/ai-planner.port';
 
-export const AI_PLANNER_SYSTEM_PROMPT = [
-  '너는 해당 여행지에서 10년 이상 활동한 현지 전문 가이드이자 실제 이동 가능한 일정을 설계하는 여행 플래너다.',
-  '목표는 초안을 제안하는 것이 아니라 사용자가 수정 없이 바로 사용할 수 있는 완성된 일정을 만드는 것이다. 일부 날짜가 비거나 지나치게 짧은 결과는 절대 반환하지 않는다.',
-  '모든 사용자 노출 문구인 activity와 reason은 자연스러운 한국어로 작성한다.',
-  '[저장 장소] places의 모든 장소는 사용자가 직접 선택한 필수 일정 후보가 아니라 필수 배치 장소다. 모든 ID를 placements에 정확히 한 번씩 배치하고, 누락하거나 추천 장소로 대체하거나 unplaced로 보내지 않는다.',
-  'placements에는 places에 전달된 ID만 사용한다. 새 장소에 임의 ID를 만들지 말고 반드시 recommendations에 넣는다.',
-  '저장 장소가 선택 지역 밖에 있더라도 사용자가 의도한 경유지로 간주한다. 같은 권역의 저장 장소를 가능한 한 같은 날 묶고, 그 주변에 식사·카페·관광지를 보충해 하나의 완성된 지역 동선을 만든다.',
-  '[추천 장소] 저장 장소의 수와 무관하게 각 날짜의 targetPlannedMinutes를 채우는 데 필요한 만큼 실제 방문 가능한 장소를 recommendations에 추가한다. 저장 장소 몇 개만 배치한 뒤 멈추지 않는다.',
-  '추천 장소는 선택 지역 안에서 찾는다. 단, 선택 지역 밖 저장 장소가 있는 날에는 그 저장 장소 주변의 동선을 완성하는 추천만 예외적으로 허용한다.',
-  '추천은 정확한 고유명칭으로 검색 가능한 관광지, 식당, 카페, 시장, 상점, 공원, 박물관 또는 문화시설이어야 한다. 도시·행정구역·동네·역·공항·숙소를 활동 장소로 추천하지 않는다.',
-  '식당, 카페, 술집은 여행지 고유의 음식과 문화를 경험할 수 있는 현지 업장을 우선한다. 사용자가 명시적으로 요청하지 않은 타국 콘셉트 업장(예: 일본 여행 중 한국 바)은 추천하지 않는다.',
-  'priorRecommendations는 과거 AI 추천 목록이다. 현재 수정 대상 날짜에 이미 있던 장소는 다시 선택할 수 있지만, referenceItinerary의 다른 날짜에 배치된 장소는 추가 요청사항에 명시적인 재방문 요청이 없으면 다시 추천하지 않는다.',
-  'priorRecommendations에 현지성 규칙을 위반하는 장소가 있으면 그대로 재사용하지 말고 더 적합한 현지 장소로 교체한다.',
-  '[일자별 완성도] targetPlannedMinutes가 0보다 큰 모든 날짜에는 실제 방문 장소가 있어야 하며, 그 날짜의 모든 durationMinutes와 travelDurationMinutes 합계가 targetPlannedMinutes 이상이어야 한다.',
-  '각 day의 availableStartTime 이후부터 availableEndTime 이전까지 시간순으로 배치한다. 첫 활동 시작 전 이동시간과 마지막 활동 종료 후 숙소·종료 지점까지의 이동 여유도 고려한다.',
-  '첫날 trip.startPoint가 있으면 그 장소와 시각에서 출발하며, 마지막 날 trip.endPoint가 있으면 해당 시각까지 도착한다. 공항은 입출국 절차와 터미널 이동을 고려해 무리한 일정을 만들지 않는다.',
-  'startLodging과 endLodging은 동선 기준점일 뿐 placements에 숙소 ID를 반환하지 않는다. 값이 null이면 숙소를 임의로 만들지 않는다.',
-  '[동선] 주소와 좌표를 이용해 가까운 장소끼리 묶고 역주행과 불필요한 도시 간 왕복을 피한다. 추천 장소 때문에 30분을 초과하는 이동이 생기지 않게 하며, 사용자가 선택한 원거리 저장 장소로 이동하는 구간만 합리적인 예외로 허용한다.',
-  '각 방문의 startTime, durationMinutes, activity, travelMethod, travelDurationMinutes를 빠짐없이 작성한다. travelDurationMinutes는 바로 앞 숙소·시작 지점·방문 장소에서 현재 장소까지 걸리는 시간이다.',
-  '각 방문의 preferredTimeSlot에는 장소의 성격과 활동 목적에 가장 알맞은 시간대를 any, morning, lunch, daytime, sunset, evening, night 중 하나로 지정한다. 전망대·관람차·야경 명소는 일몰 이후, 야시장은 저녁, 아침 전문점은 오전, 박물관·미술관은 실제 운영 시간 안에 배치한다.',
-  'places.regularOpeningHours가 있으면 해당 날짜의 영업시간 안에서 방문을 시작하고 마친다. 영업시간을 알 수 없으면 임의로 단정하지 않되 장소의 일반적인 이용 시간과 활동 목적을 고려한다.',
-  '식사 시간에는 실제 식당을, 긴 동선 사이에는 필요한 휴식이나 카페를 자연스럽게 포함하되 단순 대기시간으로 목표 시간을 채우지 않는다.',
-  '[식사] 첫날 아침과 마지막 날 저녁은 배치하지 않는다. 중간 날짜에는 사용 가능 시간에 아침(07:00~10:59), 점심(11:00~14:59), 저녁(17:00~20:59) 식사 장소를 배치한다. 카페, 디저트, 음료 장소를 식사로 계산하지 않는다.',
-  '첫날 availableStartTime이 14:00보다 늦으면 점심도 생략한다. 마지막 날 availableEndTime이 12:00보다 이르면 점심도 생략한다. 그 외에는 사용 가능 시간에 포함된 점심을 배치한다.',
-  '동일 날짜의 일정 시간이 겹치지 않게 하고, 이동시간을 포함해 다음 활동을 시작할 수 있는 시각을 계산한다.',
-  'density guidance로 하루의 일정 밀도를 정하고 travelerContext.themes에 선택된 여행 방식을 함께 반영한다. 여러 themes가 있으면 한 가지만 고집하지 말고 일정 전체에 균형 있게 분배한다.',
-  'travelerContext.transportModes는 사용자가 허용한 이동수단의 목록이다. 목록 밖 이동수단을 임의로 사용하지 말고, 복수 수단이 있으면 구간별로 가장 현실적인 수단을 선택한다.',
-  'travelerContext.additionalRequests에는 좋아하는 것과 피하고 싶은 것을 포함한 자유 요청이 들어온다. 동행자·예산·추가 요청, must_visit, lockedPlacements를 모두 존중한다.',
-  '[명시 일정 요청] travelerContext.requiredActivityRequests는 사용자가 직접 하겠다고 지정한 투어·체험·공연·활동이다. 선택 취향이 아니라 반드시 일정에 배치해야 하는 확정 조건이며 savedRecommendations로 보내거나 생략하지 않는다.',
-  '요청 이름이 예스허지처럼 여러 장소를 뜻하는 투어 약칭이면 집결지만 하나 넣지 말고, 약칭이 뜻하는 실제 방문지들을 풀어 같은 날 연속된 recommendations로 배치한다. 모든 관련 방문의 activity에 requiredActivityRequests.name을 그대로 포함한다.',
-  'fullDay가 true이면 같은 날짜에 배치한 관련 방문과 이동의 합이 최소 7시간 이상이어야 한다. minimumStops 이상 서로 다른 실제 방문 장소를 배치하고, 투어 전후에는 현실적으로 가능한 식사나 짧은 일정만 둔다.',
-  '[날짜별 업데이트] referenceItinerary는 현재 수정 대상이 아닌 다른 날짜의 확정된 읽기 전용 일정이다. 그 안의 날짜나 장소를 placements 또는 recommendations로 반환하거나 이동·삭제·변경하지 않는다.',
-  'referenceItinerary의 장소, 지역, 시간대와 테마를 여행 전체 관점에서 검토해 수정 대상 날짜가 다른 날짜와 겹치지 않고 서로 보완되도록 설계한다. 같은 장소 재방문은 travelerContext.additionalRequests에 다시 방문하거나 여러 번 방문하라는 명시적 요청이 있을 때만 허용한다.',
-  '날짜별 업데이트 응답에는 days에 전달된 수정 대상 날짜만 포함한다. referenceItinerary의 날짜는 출력하지 않는다.',
-  '[일정 다양성] 사용자가 직접 저장·배치한 places와 lockedPlacements의 중복은 그대로 존중한다. AI가 새로 추천하는 recommendations는 동일한 실제 장소를 같은 여행에서 중복 추천하지 않는다.',
-  '카페, 디저트, 차 전문점 같은 휴식 장소는 travelerContext.additionalRequests에 카페 투어처럼 같은 유형을 여러 곳 방문하려는 명시적 요청이 없는 한 세부 유형별로 하루 한 곳만 recommendations에 넣는다. 카페+디저트, 카페+차처럼 세부 유형이 다르면 각각 한 곳씩 허용한다.',
-  '[장소 설명] recommendations와 savedRecommendations의 reason은 사용자에게 장소 설명으로 표시된다. 장소 자체의 특징과 방문 가치를 사실적인 한국어 한두 문장으로만 작성한다. 일정에서 제외한 이유, 기존 장소 교체, 시간·동선·공간 부족, 보관함에 저장·포함한다는 내부 처리 내용은 절대 쓰지 않는다.',
-  'places에서 note가 비어 있는 모든 장소는 placeDescriptions에 savedPlaceId와 실제 장소 설명을 정확히 한 번 작성한다. 이미 note가 있는 장소는 placeDescriptions에 넣지 않는다. 설명은 장소 자체의 특징과 방문 가치만 담은 사실적인 한국어 한두 문장으로 작성한다.',
-  '[장소 보관함] 일정에 배치하기에는 시간이나 동선이 맞지 않지만 여행지에서 추천할 가치가 있는 유명 장소는 savedRecommendations에 넣는다. savedRecommendations는 일정에 배치하지 않으며, 정확한 고유명칭과 지역, 위 기준을 따르는 장소 설명만 작성한다. 억지로 채우지 말고 최대 5곳까지만 제안한다.',
-  'unplaced는 정상 결과에서는 항상 빈 배열이어야 한다. 모든 저장 장소를 포함하면서 완전한 일정을 만들 수 없다면 불완전한 결과를 타협해서 반환하지 말고 전체 배치를 다시 설계한다.',
-  '[검증 후 재작성] revisionDraft가 있으면 직전 응답이 서버 검증에서 탈락한 것이다. revisionGuidance의 모든 문제를 revisionDraft와 대조해 수정한다. 처음부터 무관한 일정을 다시 만들거나 일부 수정분만 반환하지 말고, 문제가 없던 방문은 유지하면서 탈락 사유를 모두 해소한 완전한 전체 일정을 반환한다.',
-  '[병렬 검토 통합] orchestrationReviews가 있으면 서로 독립적인 전문 검토 결과다. 모든 blocking 문제를 반드시 해결하고 warning도 일정 품질을 높이는 범위에서 반영한다. 검토 의견이 충돌하면 사용자 명시 요청, 저장 장소 포함, 실제 이동 가능성, 영업시간, 식사를 우선순위로 판단한다. 검토 문구를 출력하지 말고 수정된 전체 일정만 반환한다.',
-  'revisionGuidance가 최종 품질 검토를 요구하면 revisionDraft 전체를 전문 여행 가이드 관점에서 다시 검토한다. 장소별 최적 시간대, 영업시간, 식사 간격, 이동 동선, 시작·종료 지점 도착 가능성, 사용자 명시 요청 충족 여부를 확인하고 어색한 부분을 직접 고친 완전한 일정만 반환한다.',
-  'underfilled_day는 일정이 비거나 너무 짧다는 뜻이다. 해당 날짜의 availableStartTime부터 availableEndTime까지 현실적인 방문·식사·이동으로 채우고 targetPlannedMinutes를 충족한다. outside_available_window 또는 invalid_time_window는 단순히 시간을 앞당기는 방식으로 다른 겹침을 만들지 말고, 방문 수·체류시간·이동시간을 함께 재배치해 해결한다.',
-  '영업시간을 확인했다고 단정하거나 장소, 위치, 날짜, 운영시간을 지어내지 않는다. 예약이나 운영시간 확인이 중요한 경우에만 activity에 짧은 확인 안내를 포함한다.',
-  '응답 전 자체 점검: 모든 저장 장소가 정확히 한 번 배치됐는지, requiredActivityRequests가 activity에 원문 그대로 모두 포함됐는지, 사용 가능한 모든 날짜가 채워졌는지, 날짜별 목표 시간이 충족됐는지, 시간이 겹치지 않는지, 추천 장소가 구체적이고 검색 가능한지 확인한 뒤 완전한 전체 일정만 반환한다.',
-].join(' ');
+import { AI_PLANNER_PROMPT_VERSION, buildPlannerSystemPrompt, buildPlannerUserInput } from './ai-planner-prompts';
+export { AI_PLANNER_SYSTEM_PROMPT } from './ai-planner-prompts';
 
-const PlacementSchema = z.object({
-  savedPlaceId: z.string().uuid(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  position: z.number().int().min(0),
-  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-  durationMinutes: z.number().int().min(15).max(360),
-  activity: z.string().min(1).max(500),
-  travelMethod: z.string().min(1).max(120),
-  travelDurationMinutes: z.number().int().min(0).max(180),
-  preferredTimeSlot: z.enum(['any', 'morning', 'lunch', 'daytime', 'sunset', 'evening', 'night']),
-});
-
-const RecommendationSchema = z.object({
-  placeName: z.string().min(1),
-  regionName: z.string().min(1),
-  suggestedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  position: z.number().int().min(0),
-  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-  durationMinutes: z.number().int().min(15).max(360),
-  activity: z.string().min(1).max(500),
-  travelMethod: z.string().min(1).max(120),
-  travelDurationMinutes: z.number().int().min(0).max(180),
-  reason: z.string().min(1),
-  preferredTimeSlot: z.enum(['any', 'morning', 'lunch', 'daytime', 'sunset', 'evening', 'night']),
-});
-
-const SavedRecommendationSchema = z.object({
-  placeName: z.string().min(1),
-  regionName: z.string().min(1),
-  reason: z.string().min(1),
-});
-
-export const PlannerReviewSchema = z.object({
-  verdict: z.enum(['pass', 'revise']),
-  summary: z.string().min(1).max(1000),
-  issues: z.array(z.object({
-    severity: z.enum(['warning', 'blocking']),
-    code: z.string().min(1).max(100),
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
-    placeNames: z.array(z.string().min(1)).max(10),
-    finding: z.string().min(1).max(1000),
-    requiredChange: z.string().min(1).max(1000),
-  })).max(30),
-});
-
-const REVIEWER_PROMPTS: Record<AiPlannerReviewFocus, string> = {
-  route_time: [
-    '너는 여행 일정의 동선·시간·영업시간만 검토하는 독립 검토자다.',
-    '장소 순서, 이동시간, 역주행, 도시 간 왕복, 시작·종료 지점 도착 가능성, 영업시간, 장소별 적합 시간대를 확인한다.',
-    '일정을 직접 다시 작성하지 말고 구체적인 문제와 필요한 수정만 구조화해 반환한다.',
-  ].join(' '),
-  traveler_intent: [
-    '너는 여행자의 의도와 장소 구성을 검토하는 독립 검토자다.',
-    '저장 장소와 필수 투어 누락, 다른 날짜와의 AI 중복, 선택 지역, 현지성, 여행 테마, 추가 요청사항, 장소 설명 품질을 확인한다.',
-    '사용자가 직접 넣은 중복은 허용하고 AI가 만든 불필요한 중복만 지적한다. 일정을 직접 다시 작성하지 말고 구체적인 문제와 필요한 수정만 구조화해 반환한다.',
-  ].join(' '),
-  meal_density: [
-    '너는 식사와 하루 일정 완성도를 검토하는 독립 검토자다.',
-    '첫날·마지막 날 예외를 포함한 아침·점심·저녁, 식사 간격, 카페의 식사 대체 여부, 하루 밀도, 비현실적인 체류시간, 휴식 균형을 확인한다.',
-    '일정을 직접 다시 작성하지 말고 구체적인 문제와 필요한 수정만 구조화해 반환한다.',
-  ].join(' '),
-};
-
-export function createAiPlanSchema(allowedPlaceIds: string[], missingDescriptionPlaceIds: string[] = allowedPlaceIds) {
-  const allowedId = allowedPlaceIds.length > 0
-    ? z.enum(allowedPlaceIds as [string, ...string[]])
-    : z.string().uuid();
-  const missingDescriptionId = missingDescriptionPlaceIds.length > 0
-    ? z.enum(missingDescriptionPlaceIds as [string, ...string[]])
-    : z.string().uuid();
-  const placements = allowedPlaceIds.length === 0
-    ? z.array(PlacementSchema).max(0)
-    : z.array(PlacementSchema.extend({
-      savedPlaceId: allowedId,
-    }));
-  const unplacedItem = z.object({ savedPlaceId: allowedId, reason: z.string() });
-  return z.object({
-    placements,
-    unplaced: allowedPlaceIds.length === 0
-      ? z.array(unplacedItem).max(0)
-      : z.array(unplacedItem),
-    placeDescriptions: missingDescriptionPlaceIds.length === 0
-      ? z.array(z.object({ savedPlaceId: missingDescriptionId, description: z.string().min(1).max(300) })).max(0)
-      : z.array(z.object({ savedPlaceId: missingDescriptionId, description: z.string().min(1).max(300) })),
-    recommendations: allowedPlaceIds.length === 0
-      ? z.array(RecommendationSchema).min(1)
-      : z.array(RecommendationSchema),
-    savedRecommendations: z.array(SavedRecommendationSchema).max(5),
+/** Restrict references and dates, without judging visit counts or itinerary quality. */
+export function createAiPlanSchema(allowedPlaceIds: string[], itineraryDates: string[]) {
+  const savedPlaceId = allowedPlaceIds.length > 0
+    ? z.enum(allowedPlaceIds as [string, ...string[]]).nullable()
+    : z.null();
+  const date = itineraryDates.length > 0
+    ? z.enum(itineraryDates as [string, ...string[]])
+    : z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+  const visit = z.strictObject({
+    savedPlaceId,
+    placeName: z.string().min(1),
+    regionName: z.string().min(1),
+    startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+    durationMinutes: z.number().int().min(0),
+    description: z.string().min(1).max(500),
+    mealType: z.enum(['breakfast', 'lunch', 'dinner']).nullable(),
+  });
+  return z.strictObject({
+    days: z.array(z.strictObject({ date, visits: z.array(visit) })),
   });
 }
 
@@ -158,8 +42,10 @@ export class OpenAiPlannerAdapter implements AiPlannerPort {
   private readonly client: OpenAI;
   private readonly model: string;
   private readonly maxOutputTokens: number;
+  private readonly timeoutMs: number;
 
   constructor(config: ConfigService) {
+    this.timeoutMs = config.getOrThrow<number>('OPENAI_TIMEOUT_MS');
     this.client = new OpenAI({
       apiKey: config.getOrThrow<string>('OPENAI_API_KEY'),
       timeout: config.getOrThrow<number>('OPENAI_TIMEOUT_MS'),
@@ -167,24 +53,66 @@ export class OpenAiPlannerAdapter implements AiPlannerPort {
     });
     this.model = config.getOrThrow<string>('OPENAI_MODEL');
     this.maxOutputTokens = config.getOrThrow<number>('OPENAI_MAX_OUTPUT_TOKENS');
+    writeStructuredLog('info', 'ai.planner.config', { model: this.model, timeoutMs: this.timeoutMs, maxOutputTokens: this.maxOutputTokens, maxRetries: this.client.maxRetries, streaming: true });
   }
 
-  async generate(input: AiPlannerInput): Promise<AiPlannerOutput> {
+  async generate(input: AiPlannerInput, context?: { generationId: string; tripId: string }): Promise<AiPlannerOutput> {
+    const startedAt = Date.now();
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(), this.timeoutMs);
+    let responseId: string | undefined;
+    let phase = 'connecting';
+    let lastEventAt = startedAt;
+    let lastProgressLogAt = 0;
+    let completedSearches = 0;
     try {
       const schema = createAiPlanSchema(
         input.places.map((place) => place.id),
-        input.places.filter((place) => !place.note?.trim()).map((place) => place.id),
+        input.days.map((day) => day.date),
       );
-      const response = await this.client.responses.parse({
+      writeStructuredLog('info', 'ai.planner.prompt', { ...context, version: AI_PLANNER_PROMPT_VERSION, model: this.model, timeoutMs: this.timeoutMs, maxOutputTokens: this.maxOutputTokens, phase: 'generate' });
+      const stream = this.client.responses.stream({
         model: this.model,
         max_output_tokens: this.maxOutputTokens,
+        tools: [{ type: 'web_search', external_web_access: true, user_location: { type: 'approximate' } }],
+        tool_choice: 'required',
+        include: ['web_search_call.action.sources'],
         input: [
-          { role: 'system', content: AI_PLANNER_SYSTEM_PROMPT },
-          { role: 'user', content: JSON.stringify(input) },
+          { role: 'system', content: buildPlannerSystemPrompt() },
+          { role: 'user', content: JSON.stringify(buildPlannerUserInput(input)) },
         ],
         text: { format: zodTextFormat(schema, 'trip_itinerary') },
+      }, { signal: controller.signal });
+      stream.on('event', (event) => {
+        lastEventAt = Date.now();
+        const previousPhase = phase;
+        if (event.type === 'response.created') responseId = event.response.id;
+        if (event.type === 'response.in_progress') phase = 'planning';
+        if (event.type.startsWith('response.web_search_call.')) phase = 'web_search';
+        if (event.type === 'response.web_search_call.completed') completedSearches += 1;
+        if (event.type === 'response.output_text.delta') phase = 'writing';
+        if (event.type === 'response.completed') phase = 'completed';
+        if (phase !== previousPhase || event.type === 'response.web_search_call.completed' || lastEventAt - lastProgressLogAt >= 15_000) {
+          lastProgressLogAt = lastEventAt;
+          writeStructuredLog('info', 'ai.planner.progress', {
+            ...context, responseId, model: this.model, phase, streamEvent: event.type,
+            elapsedMs: lastEventAt - startedAt, completedSearches,
+          });
+        }
       });
-      if (response.status === 'incomplete') throw new AiPlannerError('incomplete');
+      const response = await stream.finalResponse();
+      writeStructuredLog('info', 'ai.planner.web_search', {
+        ...context, responseId, calls: response.output.filter((item) => item.type === 'web_search_call').length,
+      });
+      writeStructuredLog('info', 'ai.planner.response', {
+        ...context, responseId, status: response.status, maxOutputTokens: this.maxOutputTokens,
+        usage: response.usage, incompleteDetails: response.incomplete_details,
+      });
+      if (response.status === 'incomplete') throw new AiPlannerError(
+        response.incomplete_details?.reason === 'max_output_tokens' ? 'output_limit' : 'incomplete',
+        { responseId, maxOutputTokens: this.maxOutputTokens, usage: response.usage, incompleteDetails: response.incomplete_details },
+      );
+      if (response.status === 'failed') throw new AiPlannerError('provider_failure', { responseId, providerError: response.error });
       if (response.output.some((item) => item.type === 'message' && item.content.some((content) => content.type === 'refusal'))) {
         throw new AiPlannerError('refused');
       }
@@ -195,44 +123,19 @@ export class OpenAiPlannerAdapter implements AiPlannerPort {
       };
     } catch (error) {
       if (error instanceof AiPlannerError) throw error;
-      const details = providerErrorDetails(error);
+      const timedOut = controller.signal.aborted || error instanceof OpenAI.APIConnectionTimeoutError;
+      const details = {
+        ...context, ...providerErrorDetails(error), responseId, model: this.model, phase,
+        timeoutMs: this.timeoutMs, elapsedMs: Date.now() - startedAt,
+        lastEventAgoMs: Date.now() - lastEventAt, completedSearches,
+      };
       writeStructuredLog('error', 'ai.planner.provider_failure', details);
-      throw new AiPlannerError('provider_failure', details);
+      throw new AiPlannerError(timedOut ? 'timeout' : 'provider_failure', details);
+    } finally {
+      clearTimeout(deadline);
     }
   }
 
-  async review(
-    input: AiPlannerInput,
-    draft: Omit<AiPlannerOutput, 'usage'>,
-    focus: AiPlannerReviewFocus,
-  ): Promise<AiPlannerReview> {
-    try {
-      const response = await this.client.responses.parse({
-        model: this.model,
-        max_output_tokens: Math.min(this.maxOutputTokens, 4_000),
-        input: [
-          { role: 'system', content: REVIEWER_PROMPTS[focus] },
-          { role: 'user', content: JSON.stringify({ input, draft }) },
-        ],
-        text: { format: zodTextFormat(PlannerReviewSchema, `trip_itinerary_review_${focus}`) },
-      });
-      if (response.status === 'incomplete') throw new AiPlannerError('incomplete');
-      if (response.output.some((item) => item.type === 'message' && item.content.some((content) => content.type === 'refusal'))) {
-        throw new AiPlannerError('refused');
-      }
-      if (!response.output_parsed) throw new AiPlannerError('invalid_output');
-      return {
-        focus,
-        ...response.output_parsed,
-        usage: { inputTokens: response.usage?.input_tokens ?? 0, outputTokens: response.usage?.output_tokens ?? 0 },
-      };
-    } catch (error) {
-      if (error instanceof AiPlannerError) throw error;
-      const details = providerErrorDetails(error);
-      writeStructuredLog('error', 'ai.planner.review_provider_failure', { focus, ...details });
-      throw new AiPlannerError('provider_failure', details);
-    }
-  }
 }
 
 function providerErrorDetails(error: unknown): Record<string, unknown> {

@@ -1,11 +1,30 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsNumber, IsOptional, Max, Min, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class SearchPlacesQueryDto {
   @ApiProperty({ type: String, minLength: 2 })
   @IsString()
   @MinLength(2)
   query!: string;
+}
+
+export class SearchPlacesInMapQueryDto extends SearchPlacesQueryDto {
+  @ApiPropertyOptional({ type: Number, minimum: -90, maximum: 90 })
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(-90) @Max(90)
+  north?: number;
+
+  @ApiPropertyOptional({ type: Number, minimum: -90, maximum: 90 })
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(-90) @Max(90)
+  south?: number;
+
+  @ApiPropertyOptional({ type: Number, minimum: -180, maximum: 180 })
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(-180) @Max(180)
+  east?: number;
+
+  @ApiPropertyOptional({ type: Number, minimum: -180, maximum: 180 })
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(-180) @Max(180)
+  west?: number;
 }
 
 export class SearchPlacesByDestinationQueryDto extends SearchPlacesQueryDto {

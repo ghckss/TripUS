@@ -1,1 +1,1 @@
-export { getTrip, listTrips, type Trip } from "./api/trips.api";
+export { getTrip, listTrips, updateTripResources, type Trip } from "./api/trips.api";

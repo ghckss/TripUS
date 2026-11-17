@@ -1,15 +1,17 @@
+import { useApiQuery } from "@/shared/query/use-resource";
 import { router, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
-import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { getPlacePhoto, type PlacePhoto } from "@/domains/places/api/places.api";
+import { useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { getPlacePhoto } from "@/domains/places/api/places.api";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { Pill } from "@/shared/ui/pill";
 import { Screen } from "@/shared/ui/screen";
-import { colors, spacing } from "@/shared/design/tokens";
+import { EditorialHeading, FieldIcon, FieldIllustration } from "@/shared/ui/field-notes";
+import { TripNavigation } from "@/shared/ui/trip-navigation";
+import { colors, fonts, spacing } from "@/shared/design/tokens";
 import { placeDescription } from "./place-description";
 import { usePlaceLibrary } from "./use-place-library";
 import { useAppDialog } from "@/shared/ui/app-dialog";
@@ -21,11 +23,13 @@ export default function PlacesScreen() {
     removePlaces, selectPlaces, selectedIds, toggleSelection,
   } = usePlaceLibrary(tripId);
   const { showDialog } = useAppDialog();
+  const [query, setQuery] = useState("");
+  const [managing, setManaging] = useState(false);
   const selectedCount = selectedIds.size;
   const [activeTag, setActiveTag] = useState<string>("all");
   const tags = useMemo(() => [...new Set(places.map((place) => place.tag))].sort(), [places]);
   const effectiveTag = activeTag === "all" || tags.some((tag) => tag === activeTag) ? activeTag : "all";
-  const filteredPlaces = effectiveTag === "all" ? places : places.filter((place) => place.tag === effectiveTag);
+  const filteredPlaces = places.filter((place) => (effectiveTag === "all" || place.tag === effectiveTag) && `${place.name} ${placeDescription(place.note)}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const allFilteredSelected = filteredPlaces.length > 0 && filteredPlaces.every((place) => selectedIds.has(place.id));
 
   const changeTag = (tag: string) => {
@@ -50,17 +54,18 @@ export default function PlacesScreen() {
     ],
   });
   return (
-    <View style={styles.page}>
-      <Screen contentStyle={styles.libraryContent}>
-        <View style={styles.header}>
-          <AppText variant="title">저장한 모든 장소</AppText>
-          <AppText color={colors.muted}>일정 배치 여부와 관계없이 저장한 장소를 단순하게 모아봐요.</AppText>
-        </View>
+    <Screen bottomSlot={<><View style={styles.bottomAction}>
+      <Button label="＋" accessibilityLabel="장소 추가" testID="places-add" style={styles.addButton} variant="ghost" onPress={() => router.push(`/trips/${tripId}/places/new`)} />
+      <Button label="모은 장소로 일정 만들기" style={styles.planButton} disabled={places.length === 0} onPress={() => router.push(`/trips/${tripId}/ai-plan`)} />
+    </View><TripNavigation tripId={tripId} active="places" /></>}>
+        <EditorialHeading eyebrow="PLACES TO KEEP" title="가보고 싶은 곳." description={`${places.length}곳을 모았어요. 일정은 그다음에.`} />
+        <TextInput accessibilityLabel="저장한 장소 검색" placeholder="장소 이름이나 메모 검색" placeholderTextColor={colors.muted} value={query} onChangeText={setQuery} style={styles.search} />
         {tags.length > 0 && <ScrollView horizontal contentContainerStyle={styles.filters} showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-          <Pill label="전체" selected={effectiveTag === "all"} onPress={() => changeTag("all")} />
+          <Pill label={`전체 ${places.length}`} selected={effectiveTag === "all"} onPress={() => changeTag("all")} />
           {tags.map((tag) => <Pill key={tag} label={tagLabel(tag)} selected={effectiveTag === tag} onPress={() => changeTag(tag)} />)}
         </ScrollView>}
-        {!loading && places.length > 0 && <Card>
+        {!loading && places.length > 0 && <Pressable accessibilityRole="button" accessibilityState={{ expanded: managing }} onPress={() => setManaging((value) => !value)} style={styles.manageToggle}><AppText variant="caption" color={colors.primary}>{managing ? "선택 관리 닫기" : "장소 선택·관리"}</AppText></Pressable>}
+        {!loading && places.length > 0 && managing && <Card>
           <View style={styles.selectionSummary}>
             <AppText variant="label">{selectedCount}개 선택됨</AppText>
             <Pressable accessibilityRole="button" onPress={allFilteredSelected ? clearSelection : () => selectPlaces(filteredPlaces.map((place) => place.id))}>
@@ -93,16 +98,15 @@ export default function PlacesScreen() {
                   <AppText numberOfLines={1} variant="heading" style={styles.placeName}>{place.name}</AppText>
                   {description && <AppText numberOfLines={3} color={colors.muted} style={styles.placeDescription}>{description}</AppText>}
                 </View>
+                <View style={styles.bookmark}><FieldIcon name="bookmark" color={selected ? colors.primary : colors.muted} /><AppText variant="micro" color={selected ? colors.primary : colors.muted}>{selected ? "선택됨" : "선택"}</AppText></View>
               </View>
             </Card>
           </Pressable>;
         })}
         {message && <Button label="다시 불러오기" variant="ghost" onPress={() => void reload()} />}
-      </Screen>
-      <SafeAreaView edges={["bottom"]} style={styles.bottomAction}>
-        <Button label="＋ 장소 추가" testID="places-add" onPress={() => router.push(`/trips/${tripId}/places/new`)} />
-      </SafeAreaView>
-    </View>
+        {!loading && places.length > 0 && filteredPlaces.length === 0 && <AppText color={colors.muted}>검색 조건에 맞는 장소가 없어요.</AppText>}
+        <AppText variant="micro" color={colors.muted}>장소를 선택해 관리하거나, 모아둔 곳으로 하루를 구성해 보세요.</AppText>
+    </Screen>
   );
 }
 
@@ -113,37 +117,17 @@ const tagLabels: Record<string, string> = {
 
 function tagLabel(tag: string) { return tagLabels[tag] ?? tag; }
 
-function tagIcon(tag: string) {
-  return ({ activity: "🎟", attraction: "📍", cafe: "☕", food: "🍽", lodging: "🛏", shopping: "🛍", transport: "🚉" } as Record<string, string>)[tag] ?? "✦";
-}
-
-function tagVisualStyle(tag: string) {
-  if (tag === "food") return styles.foodVisual;
-  if (tag === "cafe") return styles.cafeVisual;
-  if (tag === "attraction" || tag === "activity") return styles.attractionVisual;
-  return styles.defaultVisual;
-}
-
 function PlaceCardVisual({ placeId, tag, tripId }: { placeId: string; tag: string; tripId: string }) {
-  const [photo, setPhoto] = useState<PlacePhoto | null>();
-  useEffect(() => {
-    let active = true;
-    void getPlacePhoto(tripId, placeId)
-      .then((nextPhoto) => { if (active) setPhoto(nextPhoto.imageUrl ? nextPhoto : null); })
-      .catch(() => { if (active) setPhoto(null); });
-    return () => { active = false; };
-  }, [placeId, tripId]);
-
-  if (!photo?.imageUrl) {
-    return <View style={[styles.placeVisual, tagVisualStyle(tag)]}>
-      <AppText style={styles.placeVisualText}>{tagIcon(tag)}</AppText>
-    </View>;
+  const { data: photo } = useApiQuery(`trips:${tripId}:photo:${placeId}`, getPlacePhoto, tripId, placeId);
+  const [failedUrl, setFailedUrl] = useState<string>();
+  if (!photo?.imageUrl || photo.imageUrl === failedUrl) {
+    return <FieldIllustration kind={tag === "cafe" || tag === "food" ? "cafe" : tag === "attraction" ? "journey" : "park"} style={styles.placeVisual} />;
   }
   return <Image
     accessibilityLabel="장소 대표 사진"
-    cachePolicy="none"
+    cachePolicy="memory"
     contentFit="cover"
-    onError={() => setPhoto(null)}
+    onError={() => setFailedUrl(photo.imageUrl ?? undefined)}
     source={{ uri: photo.imageUrl }}
     style={styles.placePhoto}
     transition={150}
@@ -152,26 +136,23 @@ function PlaceCardVisual({ placeId, tag, tripId }: { placeId: string; tag: strin
 
 const styles = StyleSheet.create({
   actionButton: { flex: 1 },
-  attractionVisual: { backgroundColor: colors.primarySoft },
-  cafeVisual: { backgroundColor: "#F6E8D5" },
-  defaultVisual: { backgroundColor: colors.secondarySoft },
   filters: { gap: spacing.xs, paddingRight: spacing.lg },
   filterScroll: { flexGrow: 0, marginHorizontal: -spacing.lg, paddingLeft: spacing.lg },
-  foodVisual: { backgroundColor: "#FCE3DC" },
-  header: { gap: spacing.xs },
-  libraryContent: { paddingBottom: 112 },
   managementActions: { flexDirection: "row", gap: spacing.sm },
-  page: { flex: 1, backgroundColor: colors.canvas },
-  placeCard: { padding: spacing.md },
+  placeCard: { paddingHorizontal: spacing.sm, paddingVertical: spacing.md, borderWidth: 0, borderBottomWidth: 1, borderRadius: 0, backgroundColor: colors.canvas },
   placeCardPressed: { opacity: 0.78 },
-  placeCardSelected: { backgroundColor: colors.primarySoft, borderColor: colors.primary, borderWidth: 2 },
+  placeCardSelected: { borderBottomColor: colors.primary, backgroundColor: colors.primarySoft },
   placeDescription: { flexShrink: 1 },
   placeMediaRow: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
   placeIdentity: { flex: 1, minWidth: 0, gap: spacing.sm },
   placeName: { flexShrink: 1 },
-  placePhoto: { width: 80, height: 80, borderRadius: 14, backgroundColor: colors.line },
-  placeVisual: { width: 80, height: 80, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  placeVisualText: { fontSize: 30 },
+  placePhoto: { width: 68, height: 77, borderRadius: 0, backgroundColor: colors.line },
+  placeVisual: { width: 68, height: 77, borderRadius: 0, alignItems: "center", justifyContent: "center" },
   selectionSummary: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  bottomAction: { position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 10, backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: colors.line, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  bookmark: { width: 44, minHeight: 44, alignItems: "center", justifyContent: "center", gap: spacing.xs },
+  search: { minHeight: 50, borderBottomWidth: 1, borderBottomColor: colors.line, fontFamily: fonts.sans, fontSize: 14, color: colors.ink, paddingVertical: spacing.sm },
+  manageToggle: { minHeight: 44, justifyContent: "center", alignItems: "flex-end" },
+  addButton: { width: 50, paddingHorizontal: 0 },
+  planButton: { flex: 1 },
+  bottomAction: { flexDirection: "row", alignItems: "center", backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: colors.line, padding: spacing.md, gap: spacing.sm },
 });

@@ -1,12 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { TravelDensity, TravelTheme } from '../domain/ai-planner.port';
+import { TravelTheme } from '../domain/ai-planner.port';
 import { AiPlanGenerationJobStatus, type AiPlanGenerationEntity } from '../domain/entities/ai-plan-generation.entity';
 import { AiPlanningJobsService } from './ai-planning-jobs.service';
 import { AiPlanGenerationStatus, AiTransportMode } from './dto/generate-ai-plan.dto';
 
 const request = {
-  density: TravelDensity.Balanced,
   themes: [TravelTheme.Highlights],
   transportModes: [AiTransportMode.PublicTransit],
 };

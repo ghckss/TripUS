@@ -1,10 +1,10 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query, ValidationPipe } from '@nestjs/common';
 import { ApiBody, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 
 import { CreateSavedPlaceDto } from '../application/dto/create-saved-place.dto';
 import { SavedPlaceResponseDto, SavePlaceResultDto } from '../application/dto/saved-place-response.dto';
 import { PlacesService } from '../application/places.service';
-import { PlaceSearchCandidateDto, SearchCitiesQueryDto, SearchPlacesByDestinationQueryDto, SearchPlacesQueryDto } from '../application/dto/search-places.dto';
+import { PlaceSearchCandidateDto, SearchCitiesQueryDto, SearchPlacesByDestinationQueryDto, SearchPlacesInMapQueryDto } from '../application/dto/search-places.dto';
 import { UpdateSavedPlaceDto } from '../application/dto/update-saved-place.dto';
 import { RemoveSavedPlacesDto } from '../application/dto/remove-saved-places.dto';
 import { PlacePhotoResponseDto } from '../application/dto/place-photo-response.dto';
@@ -38,9 +38,9 @@ export class PlacesController {
   @ApiOkResponse({ type: PlaceSearchCandidateDto, isArray: true })
   search(
     @Param('tripId', new ParseUUIDPipe()) tripId: string,
-    @Query() input: SearchPlacesQueryDto,
+    @Query(new ValidationPipe({ expectedType: SearchPlacesInMapQueryDto, transform: true, whitelist: true, forbidNonWhitelisted: true })) input: SearchPlacesInMapQueryDto,
   ): Promise<PlaceSearchCandidateDto[]> {
-    return this.places.search(tripId, input.query);
+    return this.places.search(tripId, input.query, input);
   }
 
   @Post()

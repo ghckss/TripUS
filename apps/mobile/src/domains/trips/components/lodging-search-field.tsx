@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, TextInput, View } from "react-native";
 
 import { searchPlacesByDestination, type PlaceSearchCandidate } from "@/domains/places/api/places.api";
 import { safeErrorMessage } from "@/shared/api/trip-us-api";
-import { colors, radius, spacing } from "@/shared/design/tokens";
+import { colors, radius, spacing, fonts } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   container: { gap: spacing.sm, marginTop: spacing.md },
   selected: { backgroundColor: colors.primarySoft },
   searchRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  input: { flex: 1, minHeight: 52, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.canvas, paddingHorizontal: spacing.md, fontSize: 16, color: colors.ink },
+  input: { fontFamily: fonts.sans, flex: 1, minHeight: 52, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.canvas, paddingHorizontal: spacing.md, fontSize: 16, color: colors.ink },
   result: { minHeight: 68, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, padding: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   resultText: { flex: 1, gap: spacing.xs },
 });

@@ -1,5 +1,6 @@
-import { forwardRef, PropsWithChildren } from "react";
+import { forwardRef, PropsWithChildren, type ReactNode } from "react";
 import { Platform, ScrollView, StyleProp, StyleSheet, View, ViewStyle, type ScrollViewInstance, type ScrollViewProps } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useNetInfo } from "@react-native-community/netinfo";
 import { GestureDetector, type NativeGesture } from "react-native-gesture-handler";
 import { colors, radius, spacing } from "@/shared/design/tokens";
@@ -9,9 +10,10 @@ import { KeyboardAvoidingContainer } from "@/shared/ui/keyboard-avoiding-contain
 type ScreenProps = PropsWithChildren<Omit<ScrollViewProps, "contentContainerStyle"> & {
   contentStyle?: StyleProp<ViewStyle>;
   gesture?: NativeGesture;
+  bottomSlot?: ReactNode;
 }>;
 
-export const Screen = forwardRef<ScrollViewInstance, ScreenProps>(function Screen({ children, contentStyle, gesture, scrollEnabled = true, stickyHeaderIndices, testID, ...scrollProps }, ref) {
+export const Screen = forwardRef<ScrollViewInstance, ScreenProps>(function Screen({ children, contentStyle, gesture, bottomSlot, scrollEnabled = true, stickyHeaderIndices, testID, ...scrollProps }, ref) {
   const network = useNetInfo();
   const stickyOffset = network.isConnected === false ? 1 : 0;
   const resolvedStickyHeaders = stickyHeaderIndices?.map((index) => index + stickyOffset);
@@ -22,9 +24,11 @@ export const Screen = forwardRef<ScrollViewInstance, ScreenProps>(function Scree
     {children}
   </ScrollView>;
   const keyboardAwareScreen = <KeyboardAvoidingContainer>{scrollView}</KeyboardAvoidingContainer>;
-  return gesture ? <GestureDetector gesture={gesture}>{keyboardAwareScreen}</GestureDetector> : keyboardAwareScreen;
+  const content = gesture ? <GestureDetector gesture={gesture}>{keyboardAwareScreen}</GestureDetector> : keyboardAwareScreen;
+  return <View style={styles.screen}>{content}{bottomSlot && <SafeAreaView edges={["bottom"]} style={styles.bottom}>{bottomSlot}</SafeAreaView>}</View>;
 });
 const styles = StyleSheet.create({
+  bottom: { backgroundColor: colors.surface },
   screen: { flex: 1, backgroundColor: colors.canvas },
   content: { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
   offlineBanner: { backgroundColor: "#FFF1D6", borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },

@@ -70,9 +70,9 @@ export function validateEnvironment(
       throw new Error('OPENAI_MODEL is required when AI_PLANNER_PROVIDER=openai');
     }
   }
-  const openAiTimeoutMs = positiveInteger(environment.OPENAI_TIMEOUT_MS ?? 120_000, 'OPENAI_TIMEOUT_MS');
-  const openAiMaxRetries = nonNegativeInteger(environment.OPENAI_MAX_RETRIES ?? 2, 'OPENAI_MAX_RETRIES');
-  const openAiMaxOutputTokens = positiveInteger(environment.OPENAI_MAX_OUTPUT_TOKENS ?? 1_200, 'OPENAI_MAX_OUTPUT_TOKENS');
+  const openAiTimeoutMs = positiveInteger(environment.OPENAI_TIMEOUT_MS ?? 600_000, 'OPENAI_TIMEOUT_MS');
+  const openAiMaxRetries = nonNegativeInteger(environment.OPENAI_MAX_RETRIES ?? 0, 'OPENAI_MAX_RETRIES');
+  const openAiMaxOutputTokens = positiveInteger(environment.OPENAI_MAX_OUTPUT_TOKENS ?? 64_000, 'OPENAI_MAX_OUTPUT_TOKENS');
 
   const mapsProvider = environment.MAPS_PROVIDER ?? MapsProvider.Mock;
   if (!Object.values(MapsProvider).includes(mapsProvider as MapsProvider)) {

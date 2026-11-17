@@ -107,6 +107,7 @@ export function ensureLodgingEndpoints(itinerary: Itinerary, dates: string[], pl
     return [day[0]?.savedPlaceId, day.at(-1)?.savedPlaceId].filter((id): id is string => Boolean(id));
   }));
   return {
+    ...itinerary,
     items: nextItems,
     unplaced: itinerary.unplaced.filter((item) => !endpointIds.has(item.savedPlaceId)),
   };

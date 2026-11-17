@@ -1,29 +1,10 @@
-import { useCallback, useState } from "react";
-import { useFocusEffect } from "expo-router";
-
-import { listTrips, type Trip } from "@/domains/trips/api/trips.api";
+import { listTrips } from "@/domains/trips/api/trips.api";
+import { useApiQuery } from "@/shared/query/use-resource";
 import { safeErrorMessage } from "@/shared/api/trip-us-api";
 
 export function useTripList() {
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>();
-
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(undefined);
-    try {
-      setTrips(await listTrips());
-    } catch (caught) {
-      setError(safeErrorMessage(caught, "여행을 불러오지 못했어요."));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useFocusEffect(useCallback(() => {
-    void reload();
-  }, [reload]));
-
-  return { trips, loading, error, reload };
+  const query = useApiQuery("trips:list", listTrips);
+  return { trips: query.data ?? [], loading: query.loading,
+    error: query.error ? safeErrorMessage(query.error, "여행을 불러오지 못했어요.") : undefined,
+    reload: query.refetch };
 }

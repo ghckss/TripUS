@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { isUUID } from 'class-validator';
 import { Repository } from 'typeorm';
 
 import { IDENTITY_PORT, type IdentityPort } from '../../identity/domain/identity.port';
@@ -30,9 +31,16 @@ export class PhotosService {
   async createUpload(tripId: string, input: CreatePhotoUploadDto): Promise<PhotoUploadTargetDto> {
     const userId = this.identity.getCurrentUserId();
     await this.assertOwnedTrip(tripId);
+    if (!this.processor.supports(input.mimeType)) {
+      throw new BadRequestException({ code: 'PHOTO_FORMAT_UNSUPPORTED' });
+    }
     if (input.itineraryItemId) {
+      if (!isUUID(input.itineraryItemId)) {
+        throw new BadRequestException({ code: 'INVALID_ITINERARY_ITEM_ID' });
+      }
       const item = await this.itineraryItems.findOneBy({ id: input.itineraryItemId, tripId });
       if (!item) throw new NotFoundException('Itinerary item not found');
+      await this.assertPlacePhotoSlotAvailable(tripId, item.savedPlaceId);
     }
     const id = randomUUID();
     const originalKey = `${userId}/${tripId}/${id}/original.${extensionFor(input.mimeType)}`;
@@ -90,6 +98,10 @@ export class PhotosService {
     } catch (error) {
       photo.status = PhotoStatus.Failed;
       await this.photos.save(photo);
+      this.logger.error(
+        `Photo processing failed photoId=${photo.id} tripId=${tripId} mimeType=${photo.mimeType} reason=${error instanceof Error ? error.message : 'unknown'}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new BadRequestException('Photo could not be processed', { cause: error });
     }
   }
@@ -136,6 +148,20 @@ export class PhotosService {
   private async assertOwnedTrip(tripId: string): Promise<void> {
     const trip = await this.trips.findOneBy({ id: tripId, ownerId: this.identity.getCurrentUserId(), active: true });
     if (!trip) throw new NotFoundException('Trip not found');
+  }
+
+  private async assertPlacePhotoSlotAvailable(tripId: string, savedPlaceId: string): Promise<void> {
+    const activeUploadCutoff = new Date(Date.now() - 15 * 60 * 1_000);
+    const existing = await this.photos.createQueryBuilder('photo')
+      .innerJoin(ItineraryItemEntity, 'item', 'item.id = photo.itineraryItemId')
+      .where('photo.tripId = :tripId', { tripId })
+      .andWhere('item.savedPlaceId = :savedPlaceId', { savedPlaceId })
+      .andWhere(
+        '(photo.status = :ready OR (photo.status = :pending AND photo.createdAt > :activeUploadCutoff))',
+        { ready: PhotoStatus.Ready, pending: PhotoStatus.Pending, activeUploadCutoff },
+      )
+      .getExists();
+    if (existing) throw new ConflictException({ code: 'PLACE_PHOTO_LIMIT_REACHED' });
   }
 }
 

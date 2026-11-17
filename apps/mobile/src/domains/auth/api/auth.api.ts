@@ -23,8 +23,9 @@ export async function socialLogin(
 
 export async function logout(): Promise<void> {
   const session = await getSession();
-  if (session) {
-    await tripUsApi.POST("/v1/auth/logout", { body: { refreshToken: session.refreshToken } });
+  try {
+    if (session) await tripUsApi.POST("/v1/auth/logout", { body: { refreshToken: session.refreshToken } });
+  } finally {
+    await clearSession();
   }
-  await clearSession();
 }

@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { savePlace, searchPlaces, updatePlace, type PlaceSearchCandidate, type SavedPlace } from "@/domains/places/api/places.api";
 import { safeErrorMessage } from "@/shared/api/trip-us-api";
-import { colors, radius, spacing } from "@/shared/design/tokens";
+import { colors, radius, spacing, fonts } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -160,5 +160,5 @@ const styles = StyleSheet.create({
   selectedPlace: { backgroundColor: colors.canvas },
   placeText: { flex: 1, gap: spacing.xs },
   searchRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  input: { flex: 1, minHeight: 52, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, paddingHorizontal: spacing.md, color: colors.ink },
+  input: { fontFamily: fonts.sans, flex: 1, minHeight: 52, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, paddingHorizontal: spacing.md, color: colors.ink },
 });

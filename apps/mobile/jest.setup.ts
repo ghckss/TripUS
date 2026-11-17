@@ -73,6 +73,7 @@ jest.mock("react-native-maps", () => {
     React.useImperativeHandle(ref, () => ({
       animateToRegion: jest.fn(),
       fitToCoordinates: jest.fn(),
+      getMapBoundaries: jest.fn().mockResolvedValue({ northEast: { latitude: 38, longitude: 128 }, southWest: { latitude: 37, longitude: 126 } }),
     }));
     return React.createElement(View, props, props.children);
   });

@@ -1,6 +1,7 @@
+import { ACTIVITY_LOCATION_TYPES, ITINERARY_ACTIVITY_TYPES, type ItineraryActivity } from '../../domain/itinerary-activity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsDateString, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsIn, IsBoolean, IsDateString, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, Min, ValidateNested } from 'class-validator';
 
 import { ItineraryItemEntity, ItinerarySource, VisitStatus } from '../../domain/entities/itinerary-item.entity';
 
@@ -80,8 +81,8 @@ export class ItineraryItemResponseDto {
       scheduledTime: entity.scheduledTime?.slice(0, 5) ?? null,
       durationMinutes: entity.durationMinutes,
       activitySummary: entity.activitySummary,
-      travelMethod: entity.travelMethod,
-      travelDurationMinutes: entity.travelDurationMinutes,
+      travelMethod: null,
+      travelDurationMinutes: null,
       locked: entity.locked,
       source: entity.source,
       visitStatus: entity.visitStatus,
@@ -100,7 +101,74 @@ export class UnplacedPlaceResponseDto {
   placeName!: string;
 }
 
+export class ItineraryActivityDto implements ItineraryActivity {
+  @ApiProperty({ type: String, format: 'uuid' })
+  @IsUUID()
+  id!: string;
+
+  @ApiProperty({ type: String, format: 'date' })
+  @IsDateString({ strict: true })
+  date!: string;
+
+  @ApiProperty({ type: Number, minimum: 0 })
+  @IsInt()
+  @Min(0)
+  position!: number;
+
+  @ApiProperty({ enum: ITINERARY_ACTIVITY_TYPES, enumName: 'ItineraryActivityType' })
+  @IsIn(ITINERARY_ACTIVITY_TYPES)
+  type!: ItineraryActivity['type'];
+
+  @ApiProperty({ type: String, maxLength: 500 })
+  @IsString()
+  @MaxLength(500)
+  title!: string;
+
+  @ApiProperty({ type: String, example: '13:30' })
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  startTime!: string;
+
+  @ApiProperty({ type: Number, minimum: 0 })
+  @IsInt()
+  @Min(0)
+  durationMinutes!: number;
+
+  @ApiProperty({ enum: ACTIVITY_LOCATION_TYPES, nullable: true })
+  @IsOptional()
+  @IsIn(ACTIVITY_LOCATION_TYPES)
+  locationType!: ItineraryActivity['locationType'];
+
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  savedPlaceId!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  locationName!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  fromLocation!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  toLocation!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  travelMethod!: string | null;
+
+}
+
 export class ItineraryResponseDto {
+  @ApiPropertyOptional({ type: ItineraryActivityDto, isArray: true })
+  activities?: ItineraryActivityDto[];
+
   @ApiProperty({ type: ItineraryItemResponseDto, isArray: true })
   items!: ItineraryItemResponseDto[];
 
@@ -132,11 +200,10 @@ export class ReplaceItineraryItemDto {
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
   scheduledTime?: string;
 
-  @ApiPropertyOptional({ type: Number, minimum: 15, maximum: 720 })
+  @ApiPropertyOptional({ type: Number, minimum: 0 })
   @IsOptional()
   @IsInt()
-  @Min(15)
-  @Max(720)
+  @Min(0)
   durationMinutes?: number;
 
   @ApiPropertyOptional({ type: String, maxLength: 500 })
@@ -151,15 +218,21 @@ export class ReplaceItineraryItemDto {
   @MaxLength(120)
   travelMethod?: string;
 
-  @ApiPropertyOptional({ type: Number, minimum: 0, maximum: 720 })
+  @ApiPropertyOptional({ type: Number, minimum: 0 })
   @IsOptional()
   @IsInt()
   @Min(0)
-  @Max(720)
   travelDurationMinutes?: number;
 }
 
 export class ReplaceItineraryDto {
+  @ApiPropertyOptional({ type: ItineraryActivityDto, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ItineraryActivityDto)
+  activities?: ItineraryActivityDto[];
+
   @ApiProperty({ type: ReplaceItineraryItemDto, isArray: true })
   @IsArray()
   @ValidateNested({ each: true })

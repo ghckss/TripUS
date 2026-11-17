@@ -3,6 +3,8 @@ import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 import ItineraryScreen from "./itinerary-edit-page";
 import { AppDialogProvider } from "@/shared/ui/app-dialog";
 
+jest.mock("./use-transit-leg", () => ({ useTransitLeg: () => ({ status: "available", durationMinutes: 18 }) }));
+
 const mockSetPlacesForDate = jest.fn();
 const mockRemoveFromItinerary = jest.fn();
 const mockReorderWithinDay = jest.fn();
@@ -17,7 +19,8 @@ let mockSearchParams: { aiGenerated?: string; tripId: string } = { tripId: "trip
 let mockUpdatingDate: string | undefined;
 
 jest.mock("expo-router", () => ({
-  router: { back: jest.fn(), push: jest.fn() },
+  usePreventRemove: () => jest.fn(),
+  router: { dismissTo: jest.fn(), back: jest.fn(), push: jest.fn() },
   useFocusEffect: jest.fn(),
   useLocalSearchParams: () => mockSearchParams,
 }));
@@ -211,8 +214,8 @@ describe("ItineraryScreen day editing", () => {
 
     const screen = await renderItineraryScreen();
 
-    expect(screen.getByText("이동 약 18분")).toBeOnTheScreen();
-    expect(screen.getByLabelText("이동 시간 약 18분")).toBeOnTheScreen();
+    expect(screen.getByText("18분")).toBeOnTheScreen();
+    expect(screen.getByLabelText("이동 시간 18분")).toBeOnTheScreen();
   });
 
   it("does not show transit or external directions actions between visits", async () => {

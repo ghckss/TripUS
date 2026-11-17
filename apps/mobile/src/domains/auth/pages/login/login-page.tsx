@@ -4,6 +4,7 @@ import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { FieldIllustration } from "@/shared/ui/field-notes";
 import { Screen } from "@/shared/ui/screen";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { useLogin } from "./use-login";
@@ -17,8 +18,9 @@ export default function LoginScreen() {
     <Screen contentStyle={styles.content}>
       <View style={styles.hero}>
         <AppText variant="caption" color={colors.primary} style={styles.eyebrow}>TRIPUS</AppText>
-        <AppText variant="display">여행의 설렘부터{`\n`}기억까지 한곳에</AppText>
+        <AppText variant="display">여행의 여백을{`\n`}나만의 이야기로.</AppText>
         <AppText color={colors.muted}>장소를 모으고, 나다운 일정을 만들고, 다녀온 순간을 기록하세요.</AppText>
+        <FieldIllustration />
       </View>
       <Card>
         <AppText variant="heading">여행을 시작해 볼까요?</AppText>
@@ -47,15 +49,15 @@ export default function LoginScreen() {
   );
 }
 const styles = StyleSheet.create({
-  content: { flexGrow: 1, justifyContent: "space-between", paddingTop: 96 },
+  content: { flexGrow: 1, justifyContent: "space-between", paddingTop: 72, gap: spacing.xxl },
   hero: { gap: spacing.md },
-  eyebrow: { fontWeight: "800", letterSpacing: 2 },
+  eyebrow: { fontWeight: "700", letterSpacing: 2 },
   googleButton: {
-    minHeight: 52,
+    minHeight: 50,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.line,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     paddingHorizontal: spacing.lg,
     alignItems: "center",
     justifyContent: "center",

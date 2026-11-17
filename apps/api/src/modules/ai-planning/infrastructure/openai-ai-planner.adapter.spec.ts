@@ -1,81 +1,118 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { createAiPlanSchema, PlannerReviewSchema } from './openai-ai-planner.adapter';
+import { TravelTheme, type AiPlannerInput } from '../domain/ai-planner.port';
+import { ConfigService } from '@nestjs/config';
+import { createAiPlanSchema, OpenAiPlannerAdapter } from './openai-ai-planner.adapter';
 
-const placement = {
-  savedPlaceId: '30000000-0000-4000-8000-000000000001',
-  date: '2026-11-08',
-  position: 0,
-  startTime: '09:00',
-  durationMinutes: 120,
-  activity: '장소 둘러보기',
-  travelMethod: '도보',
-  travelDurationMinutes: 10,
-  preferredTimeSlot: 'any',
+const date = '2026-11-08';
+const savedPlaceId = '30000000-0000-4000-8000-000000000001';
+const visit = {
+  savedPlaceId: null, placeName: '서울숲', regionName: '서울특별시',
+  startTime: '09:00', durationMinutes: 120, description: '계절별 숲과 정원', mealType: null,
 };
 
-const recommendation = {
-  placeName: '서울숲',
-  regionName: '서울특별시',
-  suggestedDate: '2026-11-08',
-  position: 0,
-  startTime: '09:00',
-  durationMinutes: 120,
-  activity: '서울숲 둘러보기',
-  travelMethod: '대중교통',
-  travelDurationMinutes: 20,
-  reason: '서울의 대표적인 공원',
-  preferredTimeSlot: 'daytime',
-};
-
-describe('createAiPlanSchema', () => {
-  it('requires recommendation-only output when there are no saved places', () => {
-    const schema = createAiPlanSchema([]);
-
-    expect(schema.safeParse({ placements: [placement], unplaced: [], placeDescriptions: [], recommendations: [], savedRecommendations: [] }).success).toBe(false);
-    expect(schema.safeParse({ placements: [], unplaced: [], placeDescriptions: [], recommendations: [recommendation], savedRecommendations: [] }).success).toBe(true);
+describe('day visit response schema', () => {
+  it('supports mixed registered and new places in a single ordered day', () => {
+    const output = { days: [{ date, visits: [{ ...visit, savedPlaceId }, visit] }] };
+    expect(createAiPlanSchema([savedPlaceId], [date]).parse(output)).toEqual(output);
   });
-
-  it('rejects placement IDs that were not supplied by the service', () => {
-    const allowedId = '30000000-0000-4000-8000-000000000002';
-    const schema = createAiPlanSchema([allowedId]);
-
-    expect(schema.safeParse({ placements: [placement], unplaced: [], placeDescriptions: [], recommendations: [], savedRecommendations: [] }).success).toBe(false);
-    expect(schema.safeParse({
-      placements: [{ ...placement, savedPlaceId: allowedId }],
-      unplaced: [],
-      placeDescriptions: [{ savedPlaceId: allowedId, description: '서울의 역사를 볼 수 있는 대표 궁궐' }],
-      recommendations: [],
-      savedRecommendations: [{ placeName: '덕수궁', regionName: '서울', reason: '시간이 되면 추천' }],
-    }).success).toBe(true);
+  it('supports new visits without registered places or arrays forced empty', () => {
+    const schema = createAiPlanSchema([], [date]);
+    expect(schema.safeParse({ days: [{ date, visits: [visit] }] }).success).toBe(true);
+    expect(schema.safeParse({ days: [{ date, visits: [{ ...visit, savedPlaceId }] }] }).success).toBe(false);
   });
-
-  it('only accepts descriptions for supplied places that are missing a note', () => {
-    const allowedId = '30000000-0000-4000-8000-000000000002';
-    const describedId = '30000000-0000-4000-8000-000000000003';
-    const schema = createAiPlanSchema([allowedId, describedId], [allowedId]);
-
-    expect(schema.safeParse({
-      placements: [], unplaced: [], recommendations: [], savedRecommendations: [],
-      placeDescriptions: [{ savedPlaceId: describedId, description: '기존 설명을 덮어쓰면 안 됨' }],
-    }).success).toBe(false);
+  it('restricts saved place IDs and dates to supplied references', () => {
+    const schema = createAiPlanSchema(['30000000-0000-4000-8000-000000000002'], [date]);
+    expect(schema.safeParse({ days: [{ date, visits: [{ ...visit, savedPlaceId }] }] }).success).toBe(false);
+    expect(schema.safeParse({ days: [{ date: '2026-11-09', visits: [visit] }] }).success).toBe(false);
+  });
+  it('does not judge visit counts, sparse output or long dwell times', () => {
+    const schema = createAiPlanSchema([], [date]);
+    expect(schema.safeParse({ days: [] }).success).toBe(true);
+    expect(schema.safeParse({ days: [{ date, visits: [] }] }).success).toBe(true);
+    expect(schema.safeParse({ days: [{ date, visits: [{ ...visit, durationMinutes: 480 }] }] }).success).toBe(true);
+  });
+  it('does not accept retired lists, reason, transport fields or arbitrary activities', () => {
+    const schema = createAiPlanSchema([], [date]);
+    expect(schema.safeParse({ days: [], placements: [], recommendations: [] }).success).toBe(false);
+    for (const extra of [{ reason: '추천 근거' }, { travelDurationMinutes: 10 }, { type: 'transport' }]) {
+      expect(schema.safeParse({ days: [{ date, visits: [{ ...visit, ...extra }] }] }).success).toBe(false);
+    }
   });
 });
 
-describe('PlannerReviewSchema', () => {
-  it('accepts a compact specialist review and rejects incomplete issues', () => {
-    expect(PlannerReviewSchema.safeParse({
-      verdict: 'revise',
-      summary: '야경 명소 시간대 조정이 필요함',
-      issues: [{
-        severity: 'blocking',
-        code: 'night_view_in_morning',
-        date: '2026-11-08',
-        placeNames: ['타이베이 101'],
-        finding: '야경 명소가 오전에 배치됨',
-        requiredChange: '일몰 이후로 이동하고 주변 일정을 재배치',
-      }],
-    }).success).toBe(true);
-    expect(PlannerReviewSchema.safeParse({ verdict: 'revise', summary: '문제 있음', issues: [{ code: 'missing_fields' }] }).success).toBe(false);
+const plannerInput: AiPlannerInput = {
+  preferences: { themes: [TravelTheme.Food, TravelTheme.Cafes] },
+  trip: { title: 'Paris', destination: '프랑스', regions: [], timezone: 'Europe/Paris', startDate: '2026-12-01', endDate: '2026-12-07', startPoint: null, endPoint: null, lodgings: [] },
+  places: [], days: [],
+};
+function streamingFixture() {
+  const adapter = new OpenAiPlannerAdapter(new ConfigService({
+    OPENAI_API_KEY: 'test-key', OPENAI_TIMEOUT_MS: 1000, OPENAI_MAX_RETRIES: 0,
+    OPENAI_MODEL: 'gpt-4.1-mini', OPENAI_MAX_OUTPUT_TOKENS: 20000,
+  }));
+  const client = (adapter as unknown as { client: { responses: { stream: (...args: unknown[]) => unknown } } }).client;
+  const on = vi.fn();
+  const finalResponse = vi.fn().mockResolvedValue({
+    status: 'completed', output: [{ type: 'web_search_call' }],
+    output_parsed: { days: [] }, usage: { input_tokens: 10, output_tokens: 20 },
+  });
+  const stream = vi.spyOn(client.responses, 'stream').mockReturnValue({ on, finalResponse });
+  return { adapter, stream, on, finalResponse };
+}
+
+describe('web-backed streaming generation', () => {
+  it('requires live search and JSON output with a shared cancellation deadline', async () => {
+    const { adapter, stream } = streamingFixture();
+    expect(await adapter.generate(plannerInput)).toMatchObject({ usage: { inputTokens: 10, outputTokens: 20 } });
+    expect(stream).toHaveBeenCalledTimes(1);
+    expect(stream.mock.calls[0]?.[0]).toMatchObject({
+      tools: [{ type: 'web_search', external_web_access: true, user_location: { type: 'approximate' } }],
+      tool_choice: 'required', include: ['web_search_call.action.sources'],
+      text: { format: { type: 'json_schema' } },
+    });
+    const { input: messages } = stream.mock.calls[0]?.[0] as { input: Array<{ role: string; content: string }> };
+    const payload: unknown = JSON.parse(messages.find((message) => message.role === 'user')!.content);
+    expect(payload).toMatchObject({ preferences: plannerInput.preferences });
+    const { text } = stream.mock.calls[0]?.[0] as { text: { format: { schema: unknown } } };
+    expect(JSON.stringify(text.format.schema)).not.toMatch(/"(reason|activities|placements|recommendations|unplaced|savedRecommendations|placeDescriptions|position|travelMethod|travelDurationMinutes)"/);
+    expect(JSON.stringify(text.format.schema)).not.toMatch(/minItems|maxItems/);
+    expect(text.format.schema).toMatchObject({ properties: { days: { type: 'array' } }, required: ['days'] });
+    expect((stream.mock.calls[0]?.[1] as { signal: AbortSignal }).signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('aborts at the total deadline and preserves the last known search progress in timeout details', async () => {
+    vi.useFakeTimers();
+    try {
+      const { adapter, stream, on, finalResponse } = streamingFixture();
+      finalResponse.mockImplementation(() => {
+        const listener = on.mock.calls[0]![1] as (event: unknown) => void;
+        listener({ type: 'response.created', response: { id: 'response-test' } });
+        listener({ type: 'response.web_search_call.completed' });
+        const { signal } = stream.mock.calls[0]![1] as { signal: AbortSignal };
+        return new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('aborted'))));
+      });
+      const assertion = expect(adapter.generate(plannerInput)).rejects.toMatchObject({
+        reason: 'timeout', details: { responseId: 'response-test', phase: 'web_search', timeoutMs: 1000, elapsedMs: 1000, completedSearches: 1 },
+      });
+      await vi.advanceTimersByTimeAsync(1000);
+      await assertion;
+      expect(stream).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('distinguishes output exhaustion from timeout and retains token usage', async () => {
+    const { adapter, finalResponse } = streamingFixture();
+    finalResponse.mockResolvedValue({ status: 'incomplete', output: [], incomplete_details: { reason: 'max_output_tokens' }, usage: { input_tokens: 100, output_tokens: 20000 } });
+    await expect(adapter.generate(plannerInput)).rejects.toMatchObject({ reason: 'output_limit', details: { maxOutputTokens: 20000, usage: { output_tokens: 20000 } } });
+  });
+
+  it('keeps provider errors distinct from timeout and clears the deadline', async () => {
+    const { adapter, finalResponse } = streamingFixture();
+    finalResponse.mockRejectedValue(new Error('connection lost'));
+    await expect(adapter.generate(plannerInput)).rejects.toMatchObject({ reason: 'provider_failure', details: { phase: 'connecting' } });
   });
 });

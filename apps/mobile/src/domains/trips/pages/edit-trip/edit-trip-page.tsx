@@ -1,3 +1,4 @@
+import { useUnsavedChanges } from "@/shared/ui/use-unsaved-changes";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, TextInput } from "react-native";
@@ -6,12 +7,13 @@ import { getPrimaryLodging, savePrimaryLodging } from "@/domains/places/api/lodg
 import { getTrip, updateTrip } from "@/domains/trips/api/trips.api";
 import { CountrySelect } from "@/domains/trips/components/country-select";
 import { defaultTravelCountry, resolveTravelCountry, type TravelCountry } from "@/domains/trips/components/country-options";
-import { DateField } from "@/domains/trips/components/date-field";
+import { TripDateRangeField } from "@/domains/trips/components/trip-date-range-field";
+import { useTripBoundaryPoints } from "@/domains/trips/hooks/use-trip-boundary-points";
 import { LodgingSearchField, type SelectedLodging } from "@/domains/trips/components/lodging-search-field";
 import { RegionMultiSelect, type SelectedRegion } from "@/domains/trips/components/region-multi-select";
-import { isBoundaryPointValid, TripBoundarySearchField, type SelectedBoundaryPoint } from "@/domains/trips/components/trip-boundary-search-field";
+import { isBoundaryPointValid, TripBoundarySearchField } from "@/domains/trips/components/trip-boundary-search-field";
 import { safeErrorMessage } from "@/shared/api/trip-us-api";
-import { colors, radius, spacing } from "@/shared/design/tokens";
+import { colors, radius, spacing, fonts } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -25,21 +27,25 @@ export default function EditTripScreen() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [lodging, setLodging] = useState<SelectedLodging>();
-  const [startPoint, setStartPoint] = useState<SelectedBoundaryPoint>();
-  const [endPoint, setEndPoint] = useState<SelectedBoundaryPoint>();
+  const { startPoint, endPoint, setStartPoint, setEndPoint, setPoints } = useTripBoundaryPoints();
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
+  const [savedForm, setSavedForm] = useState<string>();
+  const form = JSON.stringify({ title, country, regions, startDate, endDate, lodging, startPoint, endPoint });
+  const allowNavigation = useUnsavedChanges(savedForm !== undefined && savedForm !== form, saving);
 
   useEffect(() => {
     void Promise.all([getTrip(tripId), getPrimaryLodging(tripId)]).then(([trip, currentLodging]) => {
+      const nextCountry = resolveTravelCountry(trip.destination, trip.timezone);
+      const nextLodging = currentLodging ? { googlePlaceId: currentLodging.googlePlaceId ?? undefined, name: currentLodging.name, address: currentLodging.address, latitude: currentLodging.latitude, longitude: currentLodging.longitude } : undefined;
+      setSavedForm(JSON.stringify({ title: trip.title, country: nextCountry, regions: trip.regions ?? [], startDate: trip.startDate, endDate: trip.endDate, lodging: nextLodging, startPoint: trip.startPoint ?? undefined, endPoint: trip.endPoint ?? undefined }));
       setTitle(trip.title);
       setCountry(resolveTravelCountry(trip.destination, trip.timezone));
       setRegions(trip.regions ?? []);
       setStartDate(trip.startDate);
       setEndDate(trip.endDate);
-      setStartPoint(trip.startPoint ?? undefined);
-      setEndPoint(trip.endPoint ?? undefined);
+      setPoints({ startPoint: trip.startPoint ?? undefined, endPoint: trip.endPoint ?? undefined });
       setLodging(currentLodging ? {
         googlePlaceId: currentLodging.googlePlaceId ?? undefined,
         name: currentLodging.name,
@@ -49,19 +55,13 @@ export default function EditTripScreen() {
       } : undefined);
     }).catch((caught) => setError(safeErrorMessage(caught, "여행 정보를 불러오지 못했어요.")))
       .finally(() => setLoading(false));
-  }, [tripId]);
+  }, [tripId, setPoints]);
 
   const changeCountry = (next: TravelCountry) => {
     setCountry(next);
     setRegions([]);
     setLodging(undefined);
-    setStartPoint(undefined);
-    setEndPoint(undefined);
-  };
-
-  const changeStartDate = (next: string) => {
-    setStartDate(next);
-    if (endDate < next) setEndDate(next);
+    setPoints({});
   };
 
   const submit = async () => {
@@ -86,6 +86,7 @@ export default function EditTripScreen() {
           ? { latitude: lodging.latitude, longitude: lodging.longitude }
           : {}),
       });
+      allowNavigation();
       router.back();
     } catch (caught) {
       setError(safeErrorMessage(caught, "여행 정보를 저장하지 못했어요."));
@@ -104,8 +105,7 @@ export default function EditTripScreen() {
       <CountrySelect value={country} onChange={changeCountry} />
       <AppText variant="caption" color={colors.muted}>시간대 · {country.timezone} (자동 설정)</AppText>
       <RegionMultiSelect country={country} value={regions} onChange={setRegions} />
-      {startDate && <DateField label="출발일" value={startDate} onChange={changeStartDate} />}
-      {endDate && <DateField label="종료일" value={endDate} minimumDate={startDate} onChange={setEndDate} />}
+      {startDate && endDate && <TripDateRangeField testID="edit-trip-period" startDate={startDate} endDate={endDate} onChange={(range) => { setStartDate(range.startDate); setEndDate(range.endDate); }} />}
       <TripBoundarySearchField destination={country.name} kind="start" value={startPoint} onChange={setStartPoint} />
       <TripBoundarySearchField destination={country.name} kind="end" value={endPoint} onChange={setEndPoint} />
       <LodgingSearchField destination={[...regions.map((region) => region.name), country.name].join(", ")} value={lodging} onChange={setLodging} />
@@ -116,5 +116,5 @@ export default function EditTripScreen() {
 }
 
 const styles = StyleSheet.create({
-  input: { minHeight: 50, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.canvas, paddingHorizontal: spacing.md, fontSize: 16, color: colors.ink, marginBottom: spacing.md },
+  input: { fontFamily: fonts.sans, minHeight: 50, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.canvas, paddingHorizontal: spacing.md, fontSize: 16, color: colors.ink, marginBottom: spacing.md },
 });

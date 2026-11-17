@@ -1,3 +1,4 @@
+import type { ItineraryActivity } from '../../../itineraries/domain/itinerary-activity';
 import {
   Check,
   Column,
@@ -33,7 +34,6 @@ export interface TripBoundaryPoint {
 }
 
 export interface TripAiPlanRequest {
-  density?: string;
   themes?: string[];
   companions?: string;
   transportModes?: string[];
@@ -83,6 +83,9 @@ export class TripEntity {
 
   @Column({ name: 'end_point', type: 'jsonb', nullable: true })
   endPoint!: TripBoundaryPoint | null;
+
+  @Column({ name: 'itinerary_activities', type: 'jsonb', default: () => "'[]'::jsonb" })
+  itineraryActivities!: ItineraryActivity[];
 
   @Column({ name: 'latest_ai_plan_request', type: 'jsonb', nullable: true })
   latestAiPlanRequest!: TripAiPlanRequest | null;

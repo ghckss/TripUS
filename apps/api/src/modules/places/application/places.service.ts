@@ -1,11 +1,11 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, QueryFailedError, Repository } from 'typeorm';
 
 import { IDENTITY_PORT, type IdentityPort } from '../../identity/domain/identity.port';
 import { TripEntity } from '../../trips/domain/entities/trip.entity';
 import { SavedPlaceEntity } from '../domain/entities/saved-place.entity';
-import { PLACE_SEARCH_PORT, type PlaceSearchPort } from '../domain/place-search.port';
+import { PLACE_SEARCH_PORT, type PlaceSearchBounds, type PlaceSearchPort } from '../domain/place-search.port';
 import { CreateSavedPlaceDto } from './dto/create-saved-place.dto';
 import { SavedPlaceResponseDto, SavePlaceResultDto, SavePlaceStatus } from './dto/saved-place-response.dto';
 import { PlaceSearchCandidateDto } from './dto/search-places.dto';
@@ -26,9 +26,17 @@ export class PlacesService {
     private readonly placeSearch: PlaceSearchPort,
   ) {}
 
-  async search(tripId: string, query: string): Promise<PlaceSearchCandidateDto[]> {
+  async search(tripId: string, query: string, viewport: Partial<PlaceSearchBounds> = {}): Promise<PlaceSearchCandidateDto[]> {
     const trip = await this.assertOwnedActiveTrip(tripId);
-    return this.placeSearch.search(query, trip.destination);
+    const { north, south, east, west } = viewport;
+    const values = [north, south, east, west];
+    if (values.every((value) => value === undefined)) return this.placeSearch.search(query, trip.destination);
+    if (values.some((value) => value === undefined || !Number.isFinite(value)) ||
+      north! <= south! || north! > 90 || south! < -90 ||
+      east! < -180 || east! > 180 || west! < -180 || west! > 180 || east === west) {
+      throw new BadRequestException('지도의 올바른 검색 영역을 지정해 주세요.');
+    }
+    return this.placeSearch.search(query, trip.destination, { north: north!, south: south!, east: east!, west: west! });
   }
 
   searchByDestination(query: string, destination: string): Promise<PlaceSearchCandidateDto[]> {

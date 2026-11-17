@@ -1,3 +1,6 @@
+import { useUnsavedChanges } from "@/shared/ui/use-unsaved-changes";
+import { RouteConnector } from "./route-connector";
+import { DayActivityTimeline, timelineMapItems } from "./day-activity-timeline";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
@@ -7,7 +10,7 @@ import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
-import { Pill } from "@/shared/ui/pill";
+import { TripNavigation } from "@/shared/ui/trip-navigation";
 import { Screen } from "@/shared/ui/screen";
 import type { SavedPlace } from "@/domains/places/api/places.api";
 import type { ItineraryItem } from "../../api/itineraries.api";
@@ -33,10 +36,11 @@ const ITINERARY_ITEM_HEIGHT = ITINERARY_CARD_HEIGHT + TRAVEL_CONNECTOR_HEIGHT;
 export default function ItineraryScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const {
-    dates, error, itinerary, places, reload,
+    dates, timezone, error, hasChanges, itinerary, places, reload,
     removeFromItinerary, reorderWithinDay, replaceDayLodging, save, saving, setPlacesForDate,
     updateDayWithAi, updatingDate,
   } = useItineraryEdit(tripId);
+  const allowNavigation = useUnsavedChanges(hasChanges, saving || Boolean(updatingDate));
   const { showDialog } = useAppDialog();
   const screenRef = useRef<ScrollViewInstance>(null);
   const reorderCommitTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -52,6 +56,8 @@ export default function ItineraryScreen() {
     (groups[date] ??= []).push(item);
     return groups;
   }, {}), [itinerary?.items]);
+  const [showPlaceEditor, setShowPlaceEditor] = useState(false);
+  const dayActivities = (itinerary?.activities ?? []).filter((activity) => activity.date === selectedDate);
   const items = useMemo(() => [...(grouped[selectedDate] ?? [])].sort((left, right) => (left.position ?? 0) - (right.position ?? 0)), [grouped, selectedDate]);
   const placesById = useMemo(() => new Map(places.map((place) => [place.id, place])), [places]);
   const firstItem = items[0];
@@ -114,6 +120,14 @@ export default function ItineraryScreen() {
 
   return <>
   <Screen
+    bottomSlot={<TripNavigation tripId={tripId} active="itinerary" onNavigate={(navigate) => {
+      if (!hasChanges) { navigate(); return; }
+      showDialog({ title: "저장하지 않은 일정이 있어요", message: "변경한 일정을 저장한 뒤 이동할 수 있어요.", actions: [
+        { label: "계속 편집", variant: "ghost" },
+        { label: "저장하지 않고 이동", variant: "ghost", onPress: () => { allowNavigation(); navigate(); } },
+        { label: "저장하고 이동", onPress: () => void save().then((saved) => { if (saved) navigate(); }) },
+      ] });
+    }} />}
     ref={screenRef}
     testID="itinerary-screen"
     onScrollBeginDrag={() => setMapAnimationPaused(true)}
@@ -121,8 +135,7 @@ export default function ItineraryScreen() {
     onMomentumScrollEnd={finishScreenScroll}
     scrollEventThrottle={32}
   >
-    <AppText variant="title">일정을 다듬어 보세요</AppText>
-    <AppText color={colors.muted}>날짜를 고르고 지도 동선과 장소 순서를 편집하세요.</AppText>
+    <AppText variant="display">하루를, 천천히.</AppText>
     {error && <Card><AppText color={colors.danger}>{error}</AppText><Button label="다시 시도" variant="ghost" onPress={() => void reload()} /></Card>}
     {!itinerary && !error && <Card><AppText color={colors.muted}>일정을 불러오는 중이에요…</AppText></Card>}
 
@@ -137,12 +150,11 @@ export default function ItineraryScreen() {
       })}
     </ScrollView>}
 
-    {selectedDate && <Card>
-      <View style={styles.row}><AppText variant="heading">Day {dayIndex + 1}</AppText><Pill label={selectedDate} /></View>
-      <DayRouteMap animationPaused={mapAnimationPaused} focusTarget={mapFocusTarget} items={items} />
+    {selectedDate && <View style={styles.day}>
+      <DayRouteMap animationPaused={mapAnimationPaused} focusTarget={mapFocusTarget} items={dayActivities.length > 0 ? timelineMapItems(items, dayActivities, places, hasFixedStart ? firstItem?.id : undefined, hasFixedEnd ? lastItem?.id : undefined) : items} />
 
       <View style={styles.scheduleHeader}>
-        <AppText variant="heading">방문 일정</AppText>
+        <AppText variant="label">DAY {String(dayIndex + 1).padStart(2, "0")} · {items.length}곳</AppText>
         <Button
           disabled={Boolean(updatingDate)}
           label={updatingDate === selectedDate ? "업데이트 중…" : "일정 업데이트"}
@@ -153,7 +165,14 @@ export default function ItineraryScreen() {
         />
       </View>
       {items.length === 0 && <AppText color={colors.muted}>아직 배치된 장소가 없어요.</AppText>}
-      <View style={styles.placeList}>
+      {dayActivities.length > 0 && <>
+        <DayActivityTimeline tripId={tripId} timezone={timezone} items={items} activities={dayActivities}
+          startId={hasFixedStart ? firstItem?.id : undefined} endId={hasFixedEnd ? lastItem?.id : undefined}
+          onPlacePress={focusPlaceOnMap} />
+        <Button label={showPlaceEditor ? "장소 순서 편집 닫기" : "장소 순서 편집"} variant="ghost" onPress={() => setShowPlaceEditor(!showPlaceEditor)} />
+        {showPlaceEditor && <AppText variant="caption" color={colors.muted}>이동시간은 변경된 구간에 맞춰 갱신돼요. 방문 시각까지 다시 구성하려면 일정 업데이트를 사용하세요.</AppText>}
+      </>}
+      {(dayActivities.length === 0 || showPlaceEditor) && <View style={styles.placeList}>
         {hasFixedStart && <DraggableItineraryItem
           fixed
           fixedLabel={hasStartBoundary ? "시작 지점" : "시작 숙소"}
@@ -168,7 +187,7 @@ export default function ItineraryScreen() {
           scheduledTime={items[0].scheduledTime}
           timePrefix="출발"
         />}
-        {hasFixedStart && items.length > 1 && <TravelConnector durationMinutes={items[1].travelDurationMinutes} />}
+        {hasFixedStart && items.length > 1 && <RouteConnector tripId={tripId} origin={items[0]} destination={items[1]} timezone={timezone} />}
         {movableItems.length > 0 && <View
           style={[styles.sortableViewport, { height: sortableHeight }]}
           testID="itinerary-sortable-list"
@@ -203,10 +222,11 @@ export default function ItineraryScreen() {
                   onPress={() => focusPlaceOnMap(item.id)}
                   onRemove={() => removeFromItinerary(item.id)}
                   onReorder={(targetIndex) => reorderWithinDay(item.id, targetIndex)}
+                  description={item.activitySummary}
                   placeName={item.placeName}
                   scheduledTime={item.scheduledTime}
                 />
-                {placeIndex < items.length - 1 && <TravelConnector durationMinutes={items[placeIndex + 1].travelDurationMinutes} />}
+                {placeIndex < items.length - 1 && <RouteConnector tripId={tripId} origin={item} destination={items[placeIndex + 1]} timezone={timezone} />}
               </SortableItem>;
             }}
           />
@@ -224,11 +244,11 @@ export default function ItineraryScreen() {
           placeName={items.at(-1)!.placeName}
           scheduledTime={items.at(-1)!.scheduledTime}
         />}
-      </View>
+      </View>}
       <Button label="＋" variant="ghost" testID={`itinerary-add-places-${selectedDate}`} onPress={() => setPlacePickerDay({ date: selectedDate, index: dayIndex })} />
-    </Card>}
+    </View>}
 
-    <Button label={saving ? "저장 중…" : "일정 저장"} disabled={!itinerary || saving} testID="itinerary-save" onPress={() => void save().then((saved) => { if (saved) router.back(); })} />
+    <Button label={saving ? "저장 중…" : "변경한 일정 저장"} disabled={!itinerary || saving} testID="itinerary-save" onPress={() => void save().then((saved) => { if (saved) { allowNavigation(); router.back(); } })} />
     {placePickerDay && <DayPlacePicker tripId={tripId} date={placePickerDay.date} dayIndex={placePickerDay.index} items={itinerary?.items ?? []} places={places} onApply={setPlacesForDate} onClose={() => setPlacePickerDay(undefined)} />}
     {lodgingPicker && <LodgingEndpointPicker
       current={lodgingPicker.current}
@@ -253,33 +273,18 @@ export default function ItineraryScreen() {
   </>;
 }
 
-function TravelConnector({ durationMinutes }: { durationMinutes?: number | null }) {
-  return <View accessibilityLabel={durationMinutes != null ? `이동 시간 약 ${durationMinutes}분` : "이동 시간 미정"} style={styles.connector}>
-    <View style={styles.connectorLine} />
-    <View style={styles.connectorDot} />
-    <View style={styles.connectorLabel}>
-      <AppText variant="caption" color={durationMinutes != null ? colors.secondary : colors.muted}>
-        {durationMinutes != null ? `이동 약 ${durationMinutes}분` : "이동시간 미정"}
-      </AppText>
-    </View>
-  </View>;
-}
-
 const styles = StyleSheet.create({
+  day: { gap: spacing.md },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   tabs: { gap: spacing.sm, paddingRight: spacing.lg },
   tabScroll: { flexGrow: 0, marginHorizontal: -spacing.lg, paddingLeft: spacing.lg },
   tab: { minWidth: 88, gap: 2, alignItems: "center", borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   selectedTab: { borderColor: colors.primary, backgroundColor: colors.primary },
   scheduleHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: spacing.sm },
-  updateButton: { minHeight: 40, paddingHorizontal: spacing.md },
+  updateButton: { minHeight: 44, paddingHorizontal: spacing.md },
   placeList: { overflow: "visible" },
   sortableViewport: { zIndex: 2, elevation: 2, overflow: "visible" },
   sortableList: { flex: 1, overflow: "visible", backgroundColor: "transparent" },
   sortableContent: { overflow: "visible" },
   sortableItem: { height: ITINERARY_ITEM_HEIGHT, overflow: "visible" },
-  connector: { height: TRAVEL_CONNECTOR_HEIGHT, justifyContent: "center" },
-  connectorLine: { position: "absolute", top: 0, bottom: 0, left: 67, width: 2, backgroundColor: colors.line },
-  connectorDot: { position: "absolute", left: 64, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.secondary },
-  connectorLabel: { alignSelf: "flex-start", marginLeft: 88, borderRadius: radius.pill, backgroundColor: colors.secondarySoft, paddingHorizontal: spacing.sm, paddingVertical: 2 },
 });

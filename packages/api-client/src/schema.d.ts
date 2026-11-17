@@ -180,22 +180,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/trips/{tripId}/routes/transit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["RoutesController_transit"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/me/entitlements": {
         parameters: {
             query?: never;
@@ -340,6 +324,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trips/{tripId}/cover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TripsController_cover"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trips/{tripId}": {
         parameters: {
             query?: never;
@@ -366,6 +366,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["TripRecordsController_complete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trips/{tripId}/routes/transit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RoutesController_transit"];
         delete?: never;
         options?: never;
         head?: never;
@@ -481,15 +497,12 @@ export interface components {
             refreshToken: string;
         };
         /** @enum {string} */
-        TravelDensity: "balanced" | "busy" | "relaxed";
-        /** @enum {string} */
         TravelTheme: "cafes" | "culture" | "food" | "highlights" | "nature" | "shopping";
         /** @enum {string} */
         AiTransportMode: "public_transit" | "walking" | "car";
         /** @enum {string} */
         AiBudgetLevel: "budget" | "standard" | "premium";
         GenerateAiPlanDto: {
-            density: components["schemas"]["TravelDensity"];
             themes: components["schemas"]["TravelTheme"][];
             /** @example 친구 2명 */
             companions?: string;
@@ -513,6 +526,28 @@ export interface components {
             /** Format: uuid */
             generationId: string;
             status: components["schemas"]["AiPlanExecutionStatus"];
+        };
+        /** @enum {string} */
+        ItineraryActivityType: "arrival" | "departure" | "transport" | "check_in" | "check_out" | "luggage" | "rest" | "waiting";
+        ItineraryActivityDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            date: string;
+            position: number;
+            type: components["schemas"]["ItineraryActivityType"];
+            title: string;
+            /** @example 13:30 */
+            startTime: string;
+            durationMinutes: number;
+            /** @enum {string|null} */
+            locationType: "lodging" | "start_point" | "end_point" | "other" | null;
+            /** Format: uuid */
+            savedPlaceId: string | null;
+            locationName: string | null;
+            fromLocation: string | null;
+            toLocation: string | null;
+            travelMethod: string | null;
         };
         /** @enum {string} */
         ItinerarySource: "manual" | "ai";
@@ -550,6 +585,7 @@ export interface components {
             placeName: string;
         };
         ItineraryResponseDto: {
+            activities?: components["schemas"]["ItineraryActivityDto"][];
             items: components["schemas"]["ItineraryItemResponseDto"][];
             unplaced: components["schemas"]["UnplacedPlaceResponseDto"][];
         };
@@ -569,6 +605,7 @@ export interface components {
             travelDurationMinutes?: number;
         };
         ReplaceItineraryDto: {
+            activities?: components["schemas"]["ItineraryActivityDto"][];
             items: components["schemas"]["ReplaceItineraryItemDto"][];
         };
         /** @enum {string} */
@@ -577,22 +614,6 @@ export interface components {
             status: components["schemas"]["ItineraryUpdateStatus"];
             conflicts: string[];
             itinerary: components["schemas"]["ItineraryResponseDto"];
-        };
-        TransitRouteRequestDto: {
-            /** Format: uuid */
-            originSavedPlaceId: string;
-            /** Format: uuid */
-            destinationSavedPlaceId: string;
-            /** Format: date-time */
-            departureTime?: string;
-        };
-        /** @enum {string} */
-        TransitRouteStatus: "available" | "unavailable";
-        TransitRouteResponseDto: {
-            status: components["schemas"]["TransitRouteStatus"];
-            durationMinutes?: number | null;
-            distanceMeters?: number | null;
-            reason?: string | null;
         };
         /** @enum {string} */
         SubscriptionTier: "free" | "plus";
@@ -760,6 +781,24 @@ export interface components {
         CompleteTripResponseDto: {
             trip: components["schemas"]["TripResponseDto"];
             itinerary: components["schemas"]["ItineraryResponseDto"];
+        };
+        TransitRouteRequestDto: {
+            /** Format: uuid */
+            originSavedPlaceId?: string;
+            /** Format: uuid */
+            destinationSavedPlaceId?: string;
+            originBoundaryType?: components["schemas"]["ItineraryBoundaryType"];
+            destinationBoundaryType?: components["schemas"]["ItineraryBoundaryType"];
+            /** Format: date-time */
+            departureTime?: string;
+        };
+        /** @enum {string} */
+        TransitRouteStatus: "available" | "unavailable";
+        TransitRouteResponseDto: {
+            status: components["schemas"]["TransitRouteStatus"];
+            durationMinutes?: number | null;
+            distanceMeters?: number | null;
+            reason?: string | null;
         };
         CreatePhotoUploadDto: {
             /** Format: uuid */
@@ -1074,31 +1113,6 @@ export interface operations {
             };
         };
     };
-    RoutesController_transit: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                tripId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TransitRouteRequestDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TransitRouteResponseDto"];
-                };
-            };
-        };
-    };
     EntitlementsController_get: {
         parameters: {
             query?: never;
@@ -1232,6 +1246,10 @@ export interface operations {
         parameters: {
             query: {
                 query: string;
+                north?: number;
+                south?: number;
+                east?: number;
+                west?: number;
             };
             header?: never;
             path: {
@@ -1386,6 +1404,27 @@ export interface operations {
             };
         };
     };
+    TripsController_cover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlacePhotoResponseDto"];
+                };
+            };
+        };
+    };
     TripsController_get: {
         parameters: {
             query?: never;
@@ -1476,6 +1515,31 @@ export interface operations {
             };
         };
     };
+    RoutesController_transit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tripId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransitRouteRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransitRouteResponseDto"];
+                };
+            };
+        };
+    };
     PhotosController_list: {
         parameters: {
             query?: never;
@@ -1537,8 +1601,6 @@ export interface operations {
                 "image/jpeg": string;
                 "image/png": string;
                 "image/webp": string;
-                "image/heic": string;
-                "image/heif": string;
             };
         };
         responses: {

@@ -4,7 +4,7 @@
 
 TripUS 클라이언트는 Expo 기반 React Native 앱으로 개발한다. 서버는 앱과 런타임 및 배포 단위가 분리된 독립 API로 구성한다.
 
-- 모바일: React Native + Expo + Expo Router + TypeScript
+- 모바일: React Native + Expo + Expo Router + TypeScript + TanStack Query v5
 - API: Node.js LTS + NestJS + TypeScript
 - 데이터베이스: PostgreSQL
 - ORM/마이그레이션: TypeORM + 명시적 migration
@@ -141,12 +141,15 @@ AI 일정 시작 화면은 여행 스타일 선택이다. 장소 보관함은 �
 
 ### 상태 관리
 
-- 서버 상태: 도메인별 API 함수와 화면 전용 hook에서 관리하며 `@tripus/api-client` 생성 클라이언트를 사용
 - 폼과 화면 임시 상태: React local state
-- 복잡한 캐시 무효화가 필요해질 때 TanStack Query 도입
+- 서버 상태: TanStack Query v5의 계정별 공유 QueryClient와 도메인 API의 defineQuery/options 사용
 - 복잡한 일정 편집 초안이 여러 화면으로 확장될 때만 Zustand 도입
 - 인증 토큰: OS 보안 저장소 사용, 일반 AsyncStorage에 저장하지 않음
-- 오프라인 최소 일정: SQLite 기반 읽기 캐시를 단계적으로 도입
+- 오프라인: 계정별 SQLite 읽기 캐시를 Query 초기화 시 원래 updated_at으로 복원. AI 되돌리기 스냅샷은 별도로 유지
+
+캐시 정책과 조회·변경별 연결은 [모바일 공유 캐시](./mobile-query-cache.md)에 정리한다. 기본 staleTime은 1분, gcTime은 30분이며 자동 재시도는 끈다. 읽기 API는 같은 query options를 훅과 명령형 조회가 공유해 중복 요청을 합친다. AppState와 NetInfo를 focusManager·onlineManager에 연결한다. 편집 초안·토큰·업로드 바이트·텔레메트리는 Query에 넣지 않는다.
+
+루트 Stack의 `trips/[tripId]`는 기존 탭 위를 덮는 전체 화면 작업 공간이며 내부에 별도 Stack을 둔다. iOS·Android 모두 오른쪽 진입·오른쪽 복귀를 사용하도록 `presentation: card`, `animation: slide_from_right`를 적용한다. 원래 탭을 replace하지 않고 루트 작업 공간만 닫아 목록 상태를 유지한다. 편집·미리보기도 같은 가로 스택 전환의 전체 화면으로 열고 기존 파일 경로·딥링크를 유지한다. 각 여행 화면의 로컬 AppDialogProvider가 네이티브 모달 위에 확인창을 표시한다.
 
 모바일은 `@tripus/api-client`의 생성 클라이언트만 사용한다. 로컬 Development Build에서는 Expo 개발 서버 호스트의 3000 포트를 기본 API 주소로 사용하며, 다른 포트나 실제 기기를 사용할 때는 `EXPO_PUBLIC_API_URL`로 명시한다. Android Emulator에서 호스트 루프백을 직접 지정할 때는 `10.0.2.2`를 사용한다.
 
@@ -275,6 +278,7 @@ MVP 기반에서는 Google Maps와 OpenAI 포트에 결정적 목업 어댑터�
 - 로컬 모드는 `.data/photos` 아래에 원본과 파생본을 저장하고 인증된 API 파일 경로로 제공한다.
 - S3 모드는 AWS SDK v3의 `S3Client`와 presigner를 사용한다. 원본 업로드 URL은 10분, 조회 URL은 1시간 유효하며 업로드의 `content-type`도 서명한다.
 - S3 호환 개발 저장소는 `PHOTO_S3_ENDPOINT`와 path-style 요청으로 연결할 수 있다.
+- 모바일은 HEIC/HEIF 사진을 기기에서 JPEG로 변환한 뒤 업로드한다. 서버 파생 이미지 처리기는 JPEG, PNG, WebP만 수락해 실행 환경의 HEVC 디코더 유무에 따라 업로드 결과가 달라지지 않게 한다.
 - 원본 저장 용량 확대는 Plus 혜택이 아니며 사용자별 원본 총량 제한을 두지 않는다.
 
 ## 8. 테스트

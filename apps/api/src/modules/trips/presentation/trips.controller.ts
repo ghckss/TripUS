@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBody, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 
+import { TripCoverService } from '../application/trip-cover.service';
+import { PlacePhotoResponseDto } from '../../places/application/dto/place-photo-response.dto';
 import { CreateTripDto } from '../application/dto/create-trip.dto';
 import { TripResponseDto } from '../application/dto/trip-response.dto';
 import { TripsService } from '../application/trips.service';
@@ -11,7 +13,7 @@ import { UpdateTripDto } from '../application/dto/update-trip.dto';
 @ApiTags('trips')
 @Controller('trips')
 export class TripsController {
-  constructor(@Inject(TripsService) private readonly trips: TripsService) {}
+  constructor(@Inject(TripsService) private readonly trips: TripsService, @Inject(TripCoverService) private readonly covers: TripCoverService) {}
 
   @Get()
   @ApiQuery({ name: 'status', required: false, enum: TripListStatus })
@@ -26,6 +28,13 @@ export class TripsController {
   @ApiCreatedResponse({ type: TripResponseDto })
   create(@Body() input: CreateTripDto): Promise<TripResponseDto> {
     return this.trips.create(input);
+  }
+
+  @Get(':tripId/cover')
+  @ApiParam({ name: 'tripId', type: String, format: 'uuid' })
+  @ApiOkResponse({ type: PlacePhotoResponseDto })
+  cover(@Param('tripId', new ParseUUIDPipe()) tripId: string): Promise<PlacePhotoResponseDto> {
+    return this.covers.get(tripId);
   }
 
   @Get(':tripId')
