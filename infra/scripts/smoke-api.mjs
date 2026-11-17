@@ -1,4 +1,4 @@
-const endpoint = process.argv[2] ?? process.env.TRIPUS_API_URL;
+const endpoint = process.argv.slice(2).find((argument) => argument !== '--') ?? process.env.TRIPUS_API_URL;
 if (!endpoint) throw new Error('Pass the API endpoint URL or set TRIPUS_API_URL');
 
 const healthUrl = new globalThis.URL('/v1/health', endpoint);

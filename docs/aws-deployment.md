@@ -99,7 +99,7 @@ pnpm --filter @tripus/infra exec cdk deploy TripUs-prod-Data --context stage=pro
 공개 JWT endpoint는 배포 직후 smoke test를 실행한다.
 
 ```bash
-pnpm deploy:smoke -- https://<ApiEndpointDomain>
+pnpm deploy:smoke https://<ApiEndpointDomain>
 ```
 
 ## GitHub Actions 배포

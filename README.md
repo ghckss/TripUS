@@ -79,5 +79,5 @@ pnpm deploy:synth
 배포된 공개 endpoint의 DB readiness를 확인하려면 다음 smoke test를 실행한다.
 
 ```bash
-pnpm deploy:smoke -- https://<ApiEndpointDomain>
+pnpm deploy:smoke https://<ApiEndpointDomain>
 ```
