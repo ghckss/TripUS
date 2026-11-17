@@ -8,6 +8,7 @@ describe('provisionApplicationDatabaseUser', () => {
     const query = vi.fn((sql: string, values?: unknown[]) => {
       if (sql.startsWith('SELECT 1 FROM pg_roles')) return Promise.resolve([]);
       if (sql.startsWith('SELECT format')) {
+        expect(sql).toBe('SELECT format($1::text, $2::text, $3::text) AS statement');
         expect(values).toEqual([
           'CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION',
           'tripus_app',
@@ -38,5 +39,26 @@ describe('provisionApplicationDatabaseUser', () => {
       { username: 'tripus_admin', password: 'admin-secret' },
       { username: 'tripus_app', password: 'secret' },
     )).rejects.toThrow('database name contains unsupported characters');
+  });
+
+  it('updates an existing application role without requiring PostgreSQL superuser attributes', async () => {
+    const query = vi.fn((sql: string, values?: unknown[]) => {
+      if (sql.startsWith('SELECT 1 FROM pg_roles')) return Promise.resolve([{ exists: 1 }]);
+      if (sql.startsWith('SELECT format')) {
+        expect(values?.[0]).toBe('ALTER ROLE %I LOGIN PASSWORD %L');
+        return Promise.resolve([{ statement: 'ALTER ROLE "tripus_app" LOGIN PASSWORD \'secret\'' }]);
+      }
+      return Promise.resolve([]);
+    });
+
+    await provisionApplicationDatabaseUser(
+      { query } as unknown as DataSource,
+      'tripus',
+      { username: 'tripus_admin', password: 'admin-secret' },
+      { username: 'tripus_app', password: 'secret' },
+    );
+
+    expect(query).toHaveBeenCalledWith('ALTER ROLE "tripus_app" LOGIN PASSWORD \'secret\'');
+    expect(query).not.toHaveBeenCalledWith(expect.stringMatching(/NOSUPERUSER|NOREPLICATION/));
   });
 });

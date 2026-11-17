@@ -21,10 +21,12 @@ export async function provisionApplicationDatabaseUser(
     'SELECT 1 FROM pg_roles WHERE rolname = $1',
     [application.username],
   );
-  const action = roleExists.length === 0 ? 'CREATE ROLE' : 'ALTER ROLE';
+  const roleFormat = roleExists.length === 0
+    ? 'CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION'
+    : 'ALTER ROLE %I LOGIN PASSWORD %L';
   const roleStatement = await formatSql(
     dataSource,
-    `${action} %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION`,
+    roleFormat,
     application.username,
     application.password,
   );
@@ -49,9 +51,11 @@ export async function provisionApplicationDatabaseUser(
 }
 
 async function formatSql(dataSource: DataSource, format: string, ...values: string[]): Promise<string> {
-  const placeholders = values.map((_, index) => `$${index + 2}`).join(', ');
+  // PostgreSQL cannot infer the polymorphic `format()` argument types from
+  // protocol parameters alone, so make each value's text type explicit.
+  const placeholders = values.map((_, index) => `$${index + 2}::text`).join(', ');
   const rows = await dataSource.query<Array<{ statement?: unknown }>>(
-    `SELECT format($1, ${placeholders}) AS statement`,
+    `SELECT format($1::text, ${placeholders}) AS statement`,
     [format, ...values],
   );
   const statement = rows[0]?.statement;

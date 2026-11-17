@@ -4,6 +4,7 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { build } from 'esbuild';
 
 const infraDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const workspaceDirectory = resolve(infraDirectory, '..');
@@ -17,6 +18,26 @@ mkdirSync(dirname(artifactFile), { recursive: true });
 
 try {
   run('pnpm', ['--filter', '@tripus/api', 'build']);
+  await build({
+    banner: {
+      js: [
+        'import { createRequire as __nodeCreateRequire } from "node:module";',
+        'import { fileURLToPath as __nodeFileURLToPath } from "node:url";',
+        'import { dirname as __nodeDirname } from "node:path";',
+        'const require = __nodeCreateRequire(import.meta.url);',
+        'const __filename = __nodeFileURLToPath(import.meta.url);',
+        'const __dirname = __nodeDirname(__filename);',
+      ].join(' '),
+    },
+    bundle: true,
+    entryPoints: [resolve(workspaceDirectory, 'apps/api/dist/main.js')],
+    external: ['sharp', '@img/*', '@fastify/*', '@nestjs/microservices*', '@nestjs/websockets*'],
+    format: 'esm',
+    logLevel: 'warning',
+    outfile: resolve(workspaceDirectory, 'apps/api/dist/web-main.mjs'),
+    platform: 'node',
+    target: 'node24',
+  });
   run('pnpm', ['--filter', '@tripus/api', 'deploy', '--prod', artifactDirectory]);
 
   for (const relativePath of ['.data', 'src', 'tsconfig.json', 'tsconfig.build.json', 'tsconfig.tsbuildinfo', 'dist/.tsbuildinfo', 'dist/scripts']) {

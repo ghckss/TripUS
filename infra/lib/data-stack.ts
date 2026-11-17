@@ -1,4 +1,5 @@
 import {
+  Aws,
   CfnOutput,
   Duration,
   RemovalPolicy,
@@ -46,6 +47,31 @@ export class DataStack extends Stack {
       id: 'AwsSolutions-S1',
       reason: 'This dedicated access-log destination cannot recursively deliver access logs to itself.',
     }]);
+    const flowLogsDelivery = new iam.ServicePrincipal('delivery.logs.amazonaws.com');
+    const flowLogsSourceConditions = {
+      ArnLike: { 'aws:SourceArn': `arn:${Aws.PARTITION}:logs:${this.region}:${this.account}:*` },
+      StringEquals: { 'aws:SourceAccount': this.account },
+    };
+    accessLogBucket.addToResourcePolicy(new iam.PolicyStatement({
+      actions: ['s3:GetBucketAcl'],
+      conditions: flowLogsSourceConditions,
+      principals: [flowLogsDelivery],
+      resources: [accessLogBucket.bucketArn],
+      sid: 'AllowVpcFlowLogsBucketAclCheck',
+    }));
+    accessLogBucket.addToResourcePolicy(new iam.PolicyStatement({
+      actions: ['s3:PutObject'],
+      conditions: {
+        ...flowLogsSourceConditions,
+        StringEquals: {
+          ...flowLogsSourceConditions.StringEquals,
+          's3:x-amz-acl': 'bucket-owner-full-control',
+        },
+      },
+      principals: [flowLogsDelivery],
+      resources: [accessLogBucket.arnForObjects(`vpc-flow-logs/AWSLogs/${this.account}/*`)],
+      sid: 'AllowVpcFlowLogsDelivery',
+    }));
 
     this.vpc = new ec2.Vpc(this, 'Vpc', {
       enableDnsHostnames: true,

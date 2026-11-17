@@ -56,6 +56,9 @@ describe('TripUS infrastructure', () => {
     template.hasResourceProperties('AWS::Lambda::WebFunctionRevision', {
       BuildConfig: { RuntimeConfig: { Runtime: 'nodejs24.x' } },
       ServiceConfig: Match.objectLike({
+        EnvironmentVariables: Match.objectLike({
+          AWS_LAMBDA_NODEJS_ENTRYPOINT: 'dist/web-main.mjs',
+        }),
         MaxConcurrencyPerEnvironment: 8,
         TimeoutSeconds: 60,
       }),

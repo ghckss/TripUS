@@ -1,4 +1,4 @@
-import { CfnOutput, CustomResource, Duration, Fn, Stack, Validations, type StackProps } from 'aws-cdk-lib';
+import { CfnOutput, CustomResource, Duration, Fn, RemovalPolicy, Stack, Validations, type StackProps } from 'aws-cdk-lib';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as cloudwatchActions from 'aws-cdk-lib/aws-cloudwatch-actions';
 import * as customResources from 'aws-cdk-lib/custom-resources';
@@ -27,12 +27,15 @@ export class ApiStack extends Stack {
 
     const { config, data } = props;
     const functionName = `tripus-${config.stage}-api`;
+    const logRemovalPolicy = config.production ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY;
     const logGroup = new logs.LogGroup(this, 'ApiLogs', {
       logGroupName: `/aws/lambda/web/${functionName}`,
+      removalPolicy: logRemovalPolicy,
       retention: config.production ? logs.RetentionDays.THREE_MONTHS : logs.RetentionDays.ONE_MONTH,
     });
     const localLogGroup = new logs.LogGroup(this, 'ApiLocalLogs', {
       logGroupName: `/aws/lambda/web/${functionName}.local`,
+      removalPolicy: logRemovalPolicy,
       retention: config.production ? logs.RetentionDays.ONE_MONTH : logs.RetentionDays.ONE_WEEK,
     });
 
@@ -68,6 +71,15 @@ export class ApiStack extends Stack {
       ],
       resources: ['*'],
     }));
+    connectorOperatorRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['ec2:CreateTags'],
+      conditions: {
+        StringEquals: {
+          'ec2:ManagedResourceOperator': 'network-connectors.lambda.amazonaws.com',
+        },
+      },
+      resources: ['*'],
+    }));
     NagSuppressions.addResourceSuppressions(connectorOperatorRole, [{
       id: 'AwsSolutions-IAM5',
       reason: 'Lambda network connector ENI lifecycle APIs do not support resource-level permissions and therefore require Resource *.',
@@ -85,9 +97,10 @@ export class ApiStack extends Stack {
       name: `tripus-${config.stage}-api`,
       operatorRole: connectorOperatorRole.roleArn,
     });
+    connector.node.addDependency(connectorOperatorRole.node.findChild('DefaultPolicy'));
     Validations.of(connector).acknowledge({
-      id: 'CloudFormation-Validate::W3030',
-      reason: 'WebFunction is supported by the current Lambda NetworkConnector API but is not yet present in the bundled validation schema.',
+      id: 'CloudFormation-Validate::F3006',
+      reason: 'AWS::Lambda::NetworkConnector is live in ap-northeast-2, but the bundled regional availability data has not caught up yet.',
     });
 
     const artifact = new s3deployment.BucketDeployment(this, 'ApiArtifact', {
@@ -97,6 +110,7 @@ export class ApiStack extends Stack {
       prune: false,
       sources: [s3deployment.Source.asset(props.apiArtifactPath)],
     });
+    const artifactObjectKey = Fn.join('', ['artifacts/api/', Fn.select(0, artifact.objectKeys)]);
     NagSuppressions.addResourceSuppressions(artifact, [
       {
         id: 'AwsSolutions-IAM4',
@@ -128,14 +142,14 @@ export class ApiStack extends Stack {
     ], true);
 
     const migrationLogGroup = new logs.LogGroup(this, 'MigrationLogs', {
+      removalPolicy: logRemovalPolicy,
       retention: config.production ? logs.RetentionDays.THREE_MONTHS : logs.RetentionDays.ONE_MONTH,
     });
     const migrationFunction = new lambda.Function(this, 'MigrationFunction', {
       architecture: lambda.Architecture.ARM_64,
       code: lambda.Code.fromBucket(
         data.codeBucket,
-        Fn.select(0, artifact.objectKeys),
-        Fn.select(0, artifact.objectVersionIds),
+        artifactObjectKey,
       ),
       description: `TripUS ${config.stage} TypeORM deployment migrations`,
       environment: {
@@ -155,6 +169,10 @@ export class ApiStack extends Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
     });
     migrationFunction.node.addDependency(artifact);
+    Validations.of(data.codeBucket).acknowledge({
+      id: 'Annotation::@aws-cdk/aws-lambda:codeFromBucketObjectVersionNotSpecified',
+      reason: 'The API artifact uses a content-addressed S3 object key, so every code change produces a new key without requiring a version ID.',
+    });
     data.databaseSecret.grantRead(migrationFunction);
     data.applicationDatabaseSecret.grantRead(migrationFunction);
     NagSuppressions.addResourceSuppressions(migrationFunction, [{
@@ -163,6 +181,7 @@ export class ApiStack extends Stack {
     }], true);
 
     const migrationProviderLogGroup = new logs.LogGroup(this, 'MigrationProviderLogs', {
+      removalPolicy: logRemovalPolicy,
       retention: config.production ? logs.RetentionDays.THREE_MONTHS : logs.RetentionDays.ONE_MONTH,
     });
     const migrationProvider = new customResources.Provider(this, 'MigrationProvider', {
@@ -184,7 +203,7 @@ export class ApiStack extends Stack {
       },
     ], true);
     const migration = new CustomResource(this, 'DatabaseMigration', {
-      properties: { artifactVersion: Fn.select(0, artifact.objectVersionIds) },
+      properties: { artifactKey: artifactObjectKey },
       serviceToken: migrationProvider.serviceToken,
     });
     migration.node.addDependency(migrationFunction);
@@ -202,8 +221,7 @@ export class ApiStack extends Stack {
         codeConfig: {
           s3Object: {
             bucket: data.codeBucket.bucketName,
-            key: Fn.select(0, artifact.objectKeys),
-            versionId: Fn.select(0, artifact.objectVersionIds),
+            key: artifactObjectKey,
           },
         },
         runtimeConfig: { runtime: 'nodejs24.x' },
@@ -216,7 +234,7 @@ export class ApiStack extends Stack {
           AI_PLANNER_PROVIDER: config.aiPlannerProvider,
           AUTH_MODE: config.authMode,
           BILLING_PROVIDER: 'disabled',
-          AWS_LAMBDA_NODEJS_ENTRYPOINT: 'dist/main.js',
+          AWS_LAMBDA_NODEJS_ENTRYPOINT: 'dist/web-main.mjs',
           DATABASE_NAME: 'tripus',
           DATABASE_PROXY_HOST: data.databaseProxy.endpoint,
           DATABASE_SECRET_ARN: data.applicationDatabaseSecret.secretArn,

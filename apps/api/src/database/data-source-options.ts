@@ -26,7 +26,7 @@ export function createDataSourceOptions(
       connectionTimeoutMillis: connection.connectionTimeoutMs ?? 5_000,
       idleTimeoutMillis: connection.idleTimeoutMs ?? 30_000,
       max: connection.poolMax ?? 4,
-      statement_timeout: connection.statementTimeoutMs ?? 15_000,
+      query_timeout: connection.statementTimeoutMs ?? 15_000,
     },
   };
 }
