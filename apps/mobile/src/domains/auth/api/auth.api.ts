@@ -1,6 +1,6 @@
 import type { components } from "@tripus/api-client";
 
-import { apiErrorMessage, tripUsApi } from "@/shared/api/trip-us-api";
+import { apiErrorMessage, tripUsApi, tripUsApiBaseUrl } from "@/shared/api/trip-us-api";
 import { clearSession, getSession, saveSession, type AuthSession } from "@/shared/auth/session";
 
 export async function developmentLogin(): Promise<AuthSession> {
@@ -16,7 +16,10 @@ export async function socialLogin(
   displayName?: string,
 ): Promise<AuthSession> {
   const { data, error } = await tripUsApi.POST("/v1/auth/social", { body: { provider, idToken, displayName } });
-  if (error) throw new Error(apiErrorMessage(error));
+  if (error) {
+    if (__DEV__) console.error("[SocialLoginApi]", { baseUrl: tripUsApiBaseUrl, error, provider });
+    throw new Error(apiErrorMessage(error));
+  }
   await saveSession(data);
   return data;
 }
