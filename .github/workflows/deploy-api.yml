@@ -19,6 +19,16 @@ on:
         options:
           - diff
           - deploy
+      phase:
+        description: Deployment phase (non-steady phases are prod-only)
+        required: true
+        default: steady
+        type: choice
+        options:
+          - steady
+          - prod-data-initial
+          - prod-api-initial
+          - prod-db-rotation
 
 permissions:
   contents: read
@@ -50,10 +60,58 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tripus/infra test
-      - run: pnpm deploy:synth -- --context stage=${{ inputs.stage }}
+      - name: Configure deployment phase
+        env:
+          PHASE: ${{ inputs.phase }}
+          STAGE: ${{ inputs.stage }}
+        run: |
+          case "$PHASE" in
+            steady)
+              echo "CDK_TARGET=--all" >> "$GITHUB_ENV"
+              echo "APP_DB_ROTATION=true" >> "$GITHUB_ENV"
+              ;;
+            prod-data-initial)
+              if [ "$STAGE" != "prod" ]; then
+                echo "$PHASE can only run with stage=prod"
+                exit 1
+              fi
+              echo "CDK_TARGET=TripUs-prod-Data" >> "$GITHUB_ENV"
+              echo "APP_DB_ROTATION=false" >> "$GITHUB_ENV"
+              ;;
+            prod-api-initial)
+              if [ "$STAGE" != "prod" ]; then
+                echo "$PHASE can only run with stage=prod"
+                exit 1
+              fi
+              echo "CDK_TARGET=TripUs-prod-Api" >> "$GITHUB_ENV"
+              echo "APP_DB_ROTATION=false" >> "$GITHUB_ENV"
+              ;;
+            prod-db-rotation)
+              if [ "$STAGE" != "prod" ]; then
+                echo "$PHASE can only run with stage=prod"
+                exit 1
+              fi
+              echo "CDK_TARGET=TripUs-prod-Data" >> "$GITHUB_ENV"
+              echo "APP_DB_ROTATION=true" >> "$GITHUB_ENV"
+              ;;
+          esac
+      - name: Package API
+        run: pnpm --filter @tripus/infra package:api
+      - name: Synthesize infrastructure
+        run: >-
+          pnpm --filter @tripus/infra exec cdk synth --strict
+          --context stage=${{ inputs.stage }}
+          --context applicationDatabaseRotation=$APP_DB_ROTATION
       - name: Show infrastructure diff
         if: inputs.operation == 'diff'
-        run: pnpm deploy:diff -- --context stage=${{ inputs.stage }}
+        run: >-
+          pnpm --filter @tripus/infra exec cdk diff --strict $CDK_TARGET
+          --context stage=${{ inputs.stage }}
+          --context applicationDatabaseRotation=$APP_DB_ROTATION
       - name: Deploy infrastructure
         if: inputs.operation == 'deploy'
-        run: pnpm deploy:aws -- --context stage=${{ inputs.stage }} --require-approval never
+        run: >-
+          pnpm --filter @tripus/infra exec cdk deploy $CDK_TARGET
+          --context stage=${{ inputs.stage }}
+          --context applicationDatabaseRotation=$APP_DB_ROTATION
+          --require-approval never

@@ -2,9 +2,38 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 
 import baseConfig from "./app.json";
 
+type TripUsAppVariant = "development" | "preview" | "production";
+
+const appVariants = {
+  development: {
+    androidPackage: "com.tripus.app.dev",
+    name: "TripUS Dev",
+    scheme: "tripus-dev",
+  },
+  preview: {
+    androidPackage: "com.tripus.app.preview",
+    name: "TripUS Preview",
+    scheme: "tripus-preview",
+  },
+  production: {
+    androidPackage: "com.tripus.app",
+    name: "TripUS",
+    scheme: "tripus",
+  },
+} satisfies Record<TripUsAppVariant, { androidPackage: string; name: string; scheme: string }>;
+
+function resolveAppVariant(value = process.env.TRIPUS_APP_VARIANT) {
+  if (value === undefined || value.length === 0) return { ...appVariants.development, variant: "development" as const };
+  if (value === "development" || value === "preview" || value === "production") {
+    return { ...appVariants[value], variant: value };
+  }
+  throw new Error(`TRIPUS_APP_VARIANT must be one of development, preview, production; received ${value}`);
+}
+
 export default ({ config }: ConfigContext): ExpoConfig => {
   const enableAppleSignIn = process.env.EAS_BUILD === "true" || process.env.TRIPUS_ENABLE_APPLE_SIGN_IN === "true";
   const expo = baseConfig.expo as ExpoConfig;
+  const appVariant = resolveAppVariant();
   const iosGoogleMapsApiKey = process.env.GOOGLE_MAPS_IOS_API_KEY;
   const androidGoogleMapsApiKey = process.env.GOOGLE_MAPS_ANDROID_API_KEY;
   const iosGoogleClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
@@ -41,6 +70,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   return {
     ...config,
     ...expo,
+    name: appVariant.name,
+    scheme: appVariant.scheme,
+    android: {
+      ...expo.android,
+      package: appVariant.androidPackage,
+    },
     ios: {
       ...expo.ios,
       usesAppleSignIn: enableAppleSignIn,
@@ -51,6 +86,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     extra: {
       ...expo.extra,
+      appVariant: appVariant.variant,
       enableAppleSignIn,
     },
     plugins,

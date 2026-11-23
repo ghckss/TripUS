@@ -13,6 +13,16 @@ pnpm --filter @tripus/mobile exec eas project:init
 
 EAS의 `development`, `preview`, `production` 환경마다 다음 변수를 설정한다. `EXPO_PUBLIC_` 값은 앱 번들에 포함되므로 비밀 값을 넣지 않는다.
 
+빌드 프로필은 Android 애플리케이션 ID를 분리한다. 로컬에서 `TRIPUS_APP_VARIANT`를 생략하면 안전하게 `development`를 사용한다.
+
+| 프로필 | 앱 이름 | Android package | URL scheme |
+| --- | --- | --- | --- |
+| `development` | `TripUS Dev` | `com.tripus.app.dev` | `tripus-dev` |
+| `preview` | `TripUS Preview` | `com.tripus.app.preview` | `tripus-preview` |
+| `production` | `TripUS` | `com.tripus.app` | `tripus` |
+
+개발·preview·운영 앱은 별도 Android OAuth client와 Maps SDK 제한을 사용한다. 같은 기기에 함께 설치할 수 있으며, 운영 앱의 서명 설정이 개발 앱에 섞이지 않는다.
+
 | 변수 | development | preview / production |
 | --- | --- | --- |
 | `EXPO_PUBLIC_API_URL` | 개발 Web Function endpoint 또는 로컬 접근 URL | 해당 환경의 HTTPS Web Function endpoint |
@@ -30,6 +40,8 @@ EAS의 `development`, `preview`, `production` 환경마다 다음 변수를 설�
 - `development`: Development Client를 포함한 팀 내부 설치 빌드
 - `preview`: QA용 내부 배포 빌드
 - `production`: 스토어 제출용 빌드 번호 자동 증가 빌드
+
+각 프로필의 `TRIPUS_APP_VARIANT`는 `eas.json`이 고정한다. production 빌드를 로컬에서 만들 때도 임의로 이 값을 덮어쓰지 않는다.
 
 로컬에서는 `pnpm --filter @tripus/mobile eas:build:preview`처럼 실행한다. GitHub Actions의 `Mobile EAS Build`는 수동 실행으로 프로필과 플랫폼을 선택한다. GitHub Environment마다 `EXPO_TOKEN` secret을 등록해야 하며, EAS 환경 변수는 Expo에서 관리한다.
 

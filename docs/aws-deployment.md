@@ -46,9 +46,11 @@ pnpm deploy:bootstrap
 변경 사항과 IAM 확장을 먼저 확인한다.
 
 ```bash
-pnpm deploy:diff -- --context stage=dev
-pnpm deploy:aws -- --context stage=dev
+pnpm deploy:diff --context stage=dev --context applicationDatabaseRotation=true
+pnpm deploy:aws --context stage=dev --context applicationDatabaseRotation=true
 ```
+
+루트 `pnpm` 스크립트에는 CDK 인자 앞에 별도 `--`를 넣지 않는다. `pnpm deploy:synth -- --context stage=prod`처럼 실행하면 `--` 뒤의 값이 CDK context가 아니라 위치 인자로 처리되어 기본 `dev` 스택을 대상으로 할 수 있다.
 
 기본 dev endpoint 호출에는 AWS SigV4 서명이 필요하므로 일반 모바일 앱의 API 주소로 직접 사용할 수 없다. 실제 기기에서 AWS dev 환경을 사용하려면 `authMode=jwt`로 데이터 스택을 먼저 배포하고 운영 환경과 같은 방식으로 OIDC Client ID를 runtime secret에 넣은 뒤 API 스택을 배포한다.
 
@@ -67,7 +69,7 @@ JWT 모드에서 출력된 `ApiEndpointDomain`에 `https://`를 붙여 모바일
 
 ```bash
 pnpm --filter @tripus/infra package:api
-pnpm --filter @tripus/infra exec cdk deploy TripUs-prod-Data --context stage=prod --require-approval broadening
+pnpm --filter @tripus/infra exec cdk deploy TripUs-prod-Data --context stage=prod --context applicationDatabaseRotation=false --require-approval broadening
 ```
 
 CloudFormation 출력의 `RuntimeSecretArn`을 AWS Secrets Manager 콘솔에서 열고 기존 JSON을 유지하면서 아래 값을 추가한다.
@@ -85,7 +87,7 @@ CloudFormation 출력의 `RuntimeSecretArn`을 AWS Secrets Manager 콘솔에서 
 키를 셸 명령 기록, CDK context, GitHub Actions 변수 또는 CloudFormation template에 넣지 않는다. 비밀값을 채운 다음 API 스택을 배포한다.
 
 ```bash
-pnpm --filter @tripus/infra exec cdk deploy TripUs-prod-Api --context stage=prod --require-approval broadening
+pnpm --filter @tripus/infra exec cdk deploy TripUs-prod-Api --context stage=prod --context applicationDatabaseRotation=false --require-approval broadening
 ```
 
 migration이 `tripus_app` 계정을 만든 것을 확인한 후 애플리케이션 계정의 자동 회전을 활성화한다. 최초 Data 스택부터 이 옵션을 켜면 아직 DB 계정이 없어 rotation 검증이 실패할 수 있으므로 이 순서를 지킨다.
@@ -104,7 +106,17 @@ pnpm deploy:smoke https://<ApiEndpointDomain>
 
 ## GitHub Actions 배포
 
-`Deploy AWS API` 워크플로는 수동 실행만 허용하며 `diff`와 `deploy`를 분리한다. GitHub의 `dev`, `prod` Environment 각각에 `AWS_DEPLOY_ROLE_ARN` 변수를 등록한다. 이 역할은 GitHub OIDC 공급자를 신뢰하고 해당 저장소와 Environment에서 발급된 토큰만 수락해야 한다. 장기 AWS access key는 GitHub secret에 저장하지 않는다.
+`Deploy AWS API` 워크플로는 수동 실행만 허용한다. GitHub의 `dev`, `prod` Environment 각각에 `AWS_DEPLOY_ROLE_ARN` 변수를 등록한다. 이 역할은 GitHub OIDC 공급자를 신뢰하고 해당 저장소와 Environment에서 발급된 토큰만 수락해야 한다. 장기 AWS access key는 GitHub secret에 저장하지 않는다.
+
+최초 운영 배포는 아래 stage·phase 조합으로 `diff`를 먼저 실행해 변경 사항을 검토한 뒤 같은 조합의 `deploy`를 순서대로 한 번씩 실행한다.
+
+1. `stage=prod`, `phase=prod-data-initial`
+2. 출력된 runtime secret에 운영 공급자 값을 입력한다.
+3. `stage=prod`, `phase=prod-api-initial`
+4. migration이 `tripus_app` 계정을 만든 것을 확인한다.
+5. `stage=prod`, `phase=prod-db-rotation`
+
+이후 이미 초기화된 `dev` 또는 `prod` 환경의 일반 변경은 `phase=steady`, `operation=diff`로 변경 사항을 검토한 다음 같은 stage에서 `operation=deploy`를 사용한다. `steady`는 애플리케이션 DB 회전이 이미 활성화된 환경만 대상으로 한다.
 
 최초 CDK bootstrap과 GitHub OIDC 역할 생성은 AWS 관리자 권한으로 별도 수행한다. `prod` Environment에는 required reviewer를 설정하고, 배포 전 `diff` 실행 결과와 IAM 변경을 검토한다. 워크플로 배포는 `cdk synth --strict`, 인프라 테스트, `cdk-nag`를 먼저 통과해야 시작된다.
 

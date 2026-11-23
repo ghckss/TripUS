@@ -74,6 +74,7 @@ APPLE_OIDC_CLIENT_IDS=
 나머지 모바일 로컬 값은 다음과 같다.
 
 ```dotenv
+TRIPUS_APP_VARIANT=development
 EXPO_PUBLIC_AUTH_MODE=development
 EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=
 EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=
@@ -84,7 +85,9 @@ GOOGLE_MAPS_IOS_API_KEY=<iOS 앱 제한 키>
 GOOGLE_MAPS_ANDROID_API_KEY=<Android 앱 제한 키>
 ```
 
-`GOOGLE_MAPS_IOS_API_KEY`와 `GOOGLE_MAPS_ANDROID_API_KEY`는 JavaScript 번들에서 읽는 런타임 값이 아니라 CNG가 네이티브 프로젝트를 생성할 때 사용하는 빌드 값이다. 키를 바꾼 뒤에는 Metro 재시작만으로 반영되지 않으므로 Development Build를 다시 생성한다. iOS 키는 Bundle ID `com.tripus.app`, Android 키는 package name `com.tripus.app`과 배포 인증서 SHA-1로 제한하고 각 키에는 해당 플랫폼의 Maps SDK만 허용한다.
+`TRIPUS_APP_VARIANT`는 로컬에서 생략하면 `development`이며 Android package를 `com.tripus.app.dev`로 만든다. EAS는 프로필별로 `development=com.tripus.app.dev`, `preview=com.tripus.app.preview`, `production=com.tripus.app`을 고정한다.
+
+`GOOGLE_MAPS_IOS_API_KEY`와 `GOOGLE_MAPS_ANDROID_API_KEY`는 JavaScript 번들에서 읽는 런타임 값이 아니라 CNG가 네이티브 프로젝트를 생성할 때 사용하는 빌드 값이다. 키를 바꾼 뒤에는 Metro 재시작만으로 반영되지 않으므로 Development Build를 다시 생성한다. iOS 키는 Bundle ID `com.tripus.app`, Android 키는 현재 variant의 package name과 해당 빌드 인증서 SHA-1로 제한하고 각 키에는 해당 플랫폼의 Maps SDK만 허용한다.
 
 3000 포트를 다른 프로그램이 사용하면 API의 `PORT`와 `API_PUBLIC_URL`, 모바일의 `EXPO_PUBLIC_API_URL`을 같은 포트로 함께 바꾼다. 예를 들어 API는 `3001`, iOS Simulator는 `http://127.0.0.1:3001`, Android Emulator는 `http://10.0.2.2:3001`을 사용한다.
 
@@ -127,7 +130,9 @@ ACCESS_TOKEN_SECRET=<32자 이상의 무작위 비밀값>
 
 Google 로그인은 네이티브 Google Sign-In SDK를 사용한다. Google Cloud의 OAuth 클라이언트는 다음 세 종류를 각각 만들어야 한다.
 
-- Android: package name `com.tripus.app`과 현재 빌드 인증서의 SHA-1 등록
+- Android development: package name `com.tripus.app.dev`와 로컬 또는 EAS development 인증서의 SHA-1 등록
+- Android preview: package name `com.tripus.app.preview`와 EAS preview 인증서의 SHA-1 등록
+- Android production: package name `com.tripus.app`과 Google Play App Signing 인증서의 SHA-1 등록
 - iOS: Bundle ID `com.tripus.app` 등록
 - Web application: 모바일에서 발급받을 ID 토큰의 audience로 사용
 
