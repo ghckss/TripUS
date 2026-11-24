@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { resolve } from 'node:path';
 
-import { App, Aspects, Tags, Validations } from 'aws-cdk-lib';
+import { App, Aspects, DefaultStackSynthesizer, Tags, Validations } from 'aws-cdk-lib';
 import { AwsSolutionsChecks } from 'cdk-nag';
 
 import { ApiStack } from '../lib/api-stack.js';
@@ -14,11 +14,16 @@ const environment = {
   account: process.env.CDK_DEFAULT_ACCOUNT,
   region: process.env.CDK_DEFAULT_REGION ?? 'ap-northeast-2',
 };
+const stackSynthesizer = () =>
+  config.production
+    ? new DefaultStackSynthesizer({ qualifier: 'tripusprod' })
+    : undefined;
 
 const data = new DataStack(app, `TripUs-${config.stage}-Data`, {
   config,
   description: `TripUS ${config.stage} stateful infrastructure`,
   env: environment,
+  synthesizer: stackSynthesizer(),
   terminationProtection: true,
 });
 const api = new ApiStack(app, `TripUs-${config.stage}-Api`, {
@@ -27,6 +32,7 @@ const api = new ApiStack(app, `TripUs-${config.stage}-Api`, {
   data,
   description: `TripUS ${config.stage} Lambda Web Function API`,
   env: environment,
+  synthesizer: stackSynthesizer(),
 });
 api.addStackDependency(data);
 Validations.of(data.databaseProxy.node.findChild('ProxyTargetGroup')).acknowledge({

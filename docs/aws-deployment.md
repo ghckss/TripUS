@@ -106,7 +106,9 @@ pnpm deploy:smoke https://<ApiEndpointDomain>
 
 ## GitHub Actions 배포
 
-`Deploy AWS API` 워크플로는 수동 실행만 허용한다. GitHub의 `dev`, `prod` Environment 각각에 `AWS_DEPLOY_ROLE_ARN` 변수를 등록한다. 이 역할은 GitHub OIDC 공급자를 신뢰하고 해당 저장소와 Environment에서 발급된 토큰만 수락해야 한다. 장기 AWS access key는 GitHub secret에 저장하지 않는다.
+`Deploy AWS API` 워크플로는 `dev` 브랜치 push 시 개발 환경을 자동 배포하고, 운영 환경은 수동 실행만 허용한다. GitHub의 `dev`, `prod` Environment 각각에 `AWS_DEPLOY_ROLE_ARN` 변수를 등록한다. 이 역할은 GitHub OIDC 공급자를 신뢰하고 해당 저장소와 Environment에서 발급된 토큰만 수락해야 한다. 장기 AWS access key는 GitHub secret에 저장하지 않는다.
+
+운영 배포는 `tripusprod` qualifier의 전용 CDK bootstrap 자산과 역할을 사용한다. `TripUsGitHubActionsProdDeployRole`은 `cdk-tripusprod-*` 역할만 맡을 수 있으며, 기본 `hnb659fds` bootstrap을 사용하는 dev 배포 경로와 분리한다. GitHub `prod` Environment는 `dev` 브랜치에서 시작한 수동 실행만 허용한다.
 
 최초 운영 배포는 아래 stage·phase 조합으로 `diff`를 먼저 실행해 변경 사항을 검토한 뒤 같은 조합의 `deploy`를 순서대로 한 번씩 실행한다.
 
@@ -120,7 +122,7 @@ pnpm deploy:smoke https://<ApiEndpointDomain>
 
 `dev` 브랜치에 push하면 `Deploy AWS API` workflow가 자동으로 품질 검사, API 패키징과 CDK 검증을 수행한 뒤 `stage=dev`, `phase=steady`로 전체 dev 스택을 배포한다. 실행 중인 배포는 취소하지 않고 최신 대기 작업이 이어서 진행된다. 자동 배포가 실패하면 GitHub Actions 로그에서 `quality` 또는 `deploy` job을 확인하며, 운영 배포는 계속 수동 실행한다.
 
-최초 CDK bootstrap과 GitHub OIDC 역할 생성은 AWS 관리자 권한으로 별도 수행한다. `prod` Environment에는 required reviewer를 설정하고, 배포 전 `diff` 실행 결과와 IAM 변경을 검토한다. 워크플로 배포는 `cdk synth --strict`, 인프라 테스트, `cdk-nag`를 먼저 통과해야 시작된다.
+최초 CDK bootstrap과 GitHub OIDC 역할 생성은 AWS 관리자 권한으로 별도 수행한다. 별도의 운영 승인 계정이 준비되면 `prod` Environment에 required reviewer와 관리자 우회 금지를 추가한다. 그전까지는 `dev` 브랜치 제한과 수동 실행을 유지하고, 배포 전 `diff` 실행 결과와 IAM 변경을 검토한다. 워크플로 배포는 `cdk synth --strict`, 인프라 테스트, `cdk-nag`를 먼저 통과해야 시작된다.
 
 배포 후 CloudFormation 출력의 `OperationsDashboardName`에서 API 5xx, endpoint throttling, migration 오류 알람 상태와 최근 오류 로그를 한 화면에서 확인한다. `AlertTopicArn`에는 환경별 이메일, Chatbot 또는 incident 관리 구독을 별도로 연결한다.
 
