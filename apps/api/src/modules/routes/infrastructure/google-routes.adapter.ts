@@ -37,8 +37,12 @@ export class GoogleRoutesAdapter implements RoutesPort {
     for (const [index, mode] of modes.entries()) {
       const route = await this.computeRoute(input, mode.api, mode.api === 'TRANSIT' ? departureTime : undefined);
       if (!route?.duration) continue;
+      const durationMinutes = Math.max(1, Math.ceil(Number.parseFloat(route.duration.replace('s', '')) / 60));
+      if (mode.domain === 'walking'
+        && input.maxFallbackWalkingMinutes !== undefined
+        && durationMinutes > input.maxFallbackWalkingMinutes) continue;
       return {
-        durationMinutes: Math.max(1, Math.ceil(Number.parseFloat(route.duration.replace('s', '')) / 60)),
+        durationMinutes,
         distanceMeters: route.distanceMeters ?? null,
         travelMode: mode.domain,
         isFallback: index > 0,

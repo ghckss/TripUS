@@ -120,10 +120,6 @@ export class AiPlanningService {
     const targetDatePlaceIds = new Set(current.items
       .filter((item) => !targetDate || item.date === targetDate)
       .map((item) => item.savedPlaceId));
-    const otherDatePlaceIds = new Set(current.items
-      .filter((item) => targetDate && item.date !== targetDate)
-      .map((item) => item.savedPlaceId));
-    const currentlyPlacedIds = new Set(current.items.map((item) => item.savedPlaceId));
     const travelerDuplicatePlaceIds = findTravelerDuplicatePlaceIds(current.items, placesById);
     const locked = current.items.filter((item) =>
       (item.locked || travelerDuplicatePlaceIds.has(item.savedPlaceId))
@@ -134,7 +130,6 @@ export class AiPlanningService {
       && placesById.get(item.savedPlaceId)?.tag !== PlaceTag.Lodging,
     );
     const lockedIds = new Set(locked.map((item) => item.savedPlaceId));
-    const previousAiRecommendations = places.filter(isAiRecommendedPlace);
     const planningPlaces = places.filter((place) =>
       place.tag !== PlaceTag.Lodging
       && !isAiRecommendedPlace(place)
@@ -182,7 +177,7 @@ export class AiPlanningService {
         days,
       };
       stage = 'initial_generation';
-      const output = await this.planner.generate(plannerInput, { generationId, tripId });
+      const output = normalizeVisitOrder(await this.planner.generate(plannerInput, { generationId, tripId }));
       writeStructuredLog('info', 'ai.generation.output_received', {
         generationId, tripId,
         receivedDayCount: output.days.length,
@@ -196,14 +191,6 @@ export class AiPlanningService {
         new Set(planningPlaces.map((place) => place.id)), validDates, lockedIds,
       );
       createdRecommendationEntities = materialized.created;
-      // The model owns itinerary quality and timing. No server scoring, repairs or veto.
-      const reusedRecommendationIds = new Set(materialized.placements.map((item) => item.savedPlaceId));
-      const staleAiRecommendations = previousAiRecommendations.filter((place) =>
-        currentlyPlacedIds.has(place.id)
-        && (!targetDate || targetDatePlaceIds.has(place.id))
-        && (!targetDate || !otherDatePlaceIds.has(place.id))
-        && !lockedIds.has(place.id) && !reusedRecommendationIds.has(place.id),
-      );
       writeStructuredLog('info', 'ai.generation.visits_materialized', {
         generationId, tripId,
         mappedVisitCount: materialized.placements.length,
@@ -229,19 +216,11 @@ export class AiPlanningService {
       const result = targetDate
         ? await this.itineraries.replaceDay(tripId, targetDate, persistedPlacements, ItinerarySource.Ai, [])
         : await this.itineraries.replace(tripId, persistedPlacements, ItinerarySource.Ai, []);
-      let finalItinerary = result.itinerary;
+      const finalItinerary = result.itinerary;
       if (result.status === ItineraryUpdateStatus.Updated) {
         await this.applyMissingPlaceDescriptions(places, output.days);
         await this.entitlements.recordSuccessfulAiGeneration();
         createdRecommendationEntities = [];
-        if (staleAiRecommendations.length > 0) {
-          try {
-            await this.places.remove(staleAiRecommendations);
-            finalItinerary = await this.itineraries.get(tripId);
-          } catch {
-            this.logger.error('Previous AI recommendation cleanup failed');
-          }
-        }
       } else if (createdRecommendationEntities.length > 0) {
         await this.places.remove(createdRecommendationEntities);
         createdRecommendationEntities = [];
@@ -372,7 +351,7 @@ export class AiPlanningService {
               ? place.googlePlaceId === candidate.googlePlaceId
               : place.name.trim().toLocaleLowerCase() === visit.placeName.trim().toLocaleLowerCase());
             if (!entity) {
-              entity = await this.places.save(this.places.create({
+              const newPlace = this.places.create({
                 tripId, googlePlaceId: candidate?.googlePlaceId ?? null,
                 name: candidate?.name ?? visit.placeName, address: candidate?.address ?? null,
                 latitude: candidate?.latitude ?? null, longitude: candidate?.longitude ?? null,
@@ -380,8 +359,15 @@ export class AiPlanningService {
                 preference: PlacePreference.IfTimeAllows,
                 note: `AI 추천 · ${visit.description}`,
                 isPrimaryLodging: false,
-              }));
-              created.push(entity);
+              });
+              try {
+                entity = await this.places.save(newPlace);
+                created.push(entity);
+              } catch (error) {
+                if (!candidate?.googlePlaceId || !isUniqueViolation(error)) throw error;
+                entity = await this.places.findOneBy({ tripId, googlePlaceId: candidate.googlePlaceId }) ?? undefined;
+                if (!entity) throw error;
+              }
             }
           }
           placements.push({
@@ -400,6 +386,26 @@ export class AiPlanningService {
       throw error;
     }
   }
+}
+
+export function normalizeVisitOrder(output: AiPlannerOutput): AiPlannerOutput {
+  return {
+    ...output,
+    days: output.days.map((day) => ({
+      ...day,
+      visits: [...day.visits].sort((left, right) => left.startTime.localeCompare(right.startTime)),
+    })),
+  };
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === 'object'
+    && error !== null
+    && 'driverError' in error
+    && typeof error.driverError === 'object'
+    && error.driverError !== null
+    && 'code' in error.driverError
+    && error.driverError.code === '23505';
 }
 
 

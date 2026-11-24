@@ -42,7 +42,7 @@ describe('AiPlanningJobsService', () => {
       status: AiPlanGenerationStatus.Generated,
       failureReason: null,
     });
-    const running = createJob({ status: AiPlanGenerationJobStatus.Running, startedAt: new Date() });
+    const running = createJob({ status: AiPlanGenerationJobStatus.Running, startedAt: new Date(Date.now() - 16 * 60 * 1000) });
     const { service, records } = createService(generate, [running]);
 
     await expect(service.getStatus('trip-1')).resolves.toEqual({
@@ -65,6 +65,28 @@ describe('AiPlanningJobsService', () => {
       failureReason: 'AI_GENERATION_LIMIT_REACHED',
     });
   });
+
+  it('claims a queued job only once when multiple workers try to resume it', async () => {
+    const generate = vi.fn().mockResolvedValue({
+      status: AiPlanGenerationStatus.Generated,
+      failureReason: null,
+    });
+    const queued = createJob();
+    const first = createService(generate, [queued]);
+    const second = new AiPlanningJobsService(
+      first.jobs as never,
+      { findOneBy: vi.fn().mockResolvedValue({ id: 'trip-1', ownerId: 'user-1', active: true }) } as never,
+      { generate, getLatestRequest: vi.fn() } as never,
+      { getCurrentUserId: () => 'user-1' },
+    );
+
+    await Promise.all([
+      (first.service as unknown as { execute(id: string): Promise<void> }).execute('generation-1'),
+      (second as unknown as { execute(id: string): Promise<void> }).execute('generation-1'),
+    ]);
+    await vi.waitFor(() => expect(first.records[0]?.status).toBe(AiPlanGenerationJobStatus.Generated));
+    expect(generate).toHaveBeenCalledOnce();
+  });
 });
 
 function createService(generate: ReturnType<typeof vi.fn>, initial: AiPlanGenerationEntity[] = []) {
@@ -77,6 +99,12 @@ function createService(generate: ReturnType<typeof vi.fn>, initial: AiPlanGenera
       else records.push(job);
       job.updatedAt = new Date();
       return Promise.resolve(job);
+    }),
+    update: vi.fn((criteria: Partial<AiPlanGenerationEntity>, values: Partial<AiPlanGenerationEntity>) => {
+      const record = records.find((candidate) => candidate.id === criteria.id && candidate.status === criteria.status);
+      if (!record) return Promise.resolve({ affected: 0 });
+      Object.assign(record, values);
+      return Promise.resolve({ affected: 1 });
     }),
     findOne: vi.fn((options: { where: { status?: unknown } }) => {
       if (options.where.status) {
@@ -92,7 +120,7 @@ function createService(generate: ReturnType<typeof vi.fn>, initial: AiPlanGenera
     { generate, getLatestRequest: vi.fn() } as never,
     { getCurrentUserId: () => 'user-1' },
   );
-  return { service, records };
+  return { service, records, jobs };
 }
 
 function createJob(overrides: Partial<AiPlanGenerationEntity> = {}): AiPlanGenerationEntity {

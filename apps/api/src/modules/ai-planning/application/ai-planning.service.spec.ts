@@ -27,6 +27,7 @@ function setup(latestAiPlanRequest: Record<string, unknown> | null = null) {
   const generate = vi.fn<(input: AiPlannerInput) => Promise<AiPlannerOutput>>().mockResolvedValue(draft);
   const search = vi.fn().mockResolvedValue([{ googlePlaceId: 'school', name: '파리 이름의 한국 학교', address: '대한민국 서울', primaryType: 'school', latitude: 37.55, longitude: 126.98 }]);
   const save = vi.fn((value: object | object[]) => Promise.resolve(Array.isArray(value) ? value : { ...value, id: `place-${++sequence}` }));
+  const findOneByPlace = vi.fn(({ googlePlaceId }: { googlePlaceId: string }) => Promise.resolve(savedPlaces.find((item) => item.googlePlaceId === googlePlaceId) ?? null));
   const remove = vi.fn().mockResolvedValue(undefined);
   const replace = vi.fn().mockImplementation((_id: string, items: StoredPlacement[]) => Promise.resolve({ status: 'updated', conflicts: [], itinerary: { items, unplaced: [] } }));
   const replaceDay = vi.fn().mockImplementation((_id: string, _date: string, items: StoredPlacement[]) => Promise.resolve({ status: 'updated', conflicts: [], itinerary: { items, unplaced: [] } }));
@@ -35,13 +36,16 @@ function setup(latestAiPlanRequest: Record<string, unknown> | null = null) {
   const saveTrip = vi.fn();
   const service = new AiPlanningService(
     { findOneBy: vi.fn().mockResolvedValue(trip), save: saveTrip } as never,
-    { find: vi.fn().mockResolvedValue(savedPlaces), create: vi.fn((value: object) => value), save, remove } as never,
+    {
+      find: vi.fn().mockResolvedValue(savedPlaces), create: vi.fn((value: object) => value), save, remove,
+      findOneBy: findOneByPlace,
+    } as never,
     { generate }, { get, replace, replaceDay } as never,
     { getCurrentUserId: () => 'user' }, { assertAllowed: vi.fn() } as never,
     { assertCanGenerateAiPlan: vi.fn(), recordSuccessfulAiGeneration: record } as never,
     { search } as never,
   );
-  return { service, generate, search, replace, replaceDay, save, saveTrip, remove, record, original, savedPlaces, trip };
+  return { service, generate, search, replace, replaceDay, save, saveTrip, remove, record, original, savedPlaces, trip, findOneByPlace };
 }
 
 describe('day visit materialization', () => {
@@ -101,12 +105,12 @@ describe('day visit materialization', () => {
     expect(replace.mock.calls[0]![1]).toHaveLength(2);
   });
 
-  it('keeps unused registered places in the library and removes stale AI recommendations', async () => {
+  it('keeps unused registered places and previous AI recommendations in the library', async () => {
     const { service, original, savedPlaces, remove } = setup();
     savedPlaces.push(place('unused'), place('old-ai', 'AI 추천 · 이전 설명'));
     original.items.push({ savedPlaceId: 'old-ai', date, position: 0 });
     await service.generate('trip', request);
-    expect(remove).toHaveBeenCalledWith([savedPlaces[1]]);
+    expect(remove).not.toHaveBeenCalled();
   });
 
   it.each(['unknown_id', 'outside_date', 'duplicate_date'])('preserves the old itinerary on invalid reference %s', async (kind) => {
@@ -129,6 +133,19 @@ describe('day visit materialization', () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
+  it('reuses the concurrently inserted Google place instead of failing generation', async () => {
+    const { service, generate, save, findOneByPlace, replace } = setup();
+    const concurrent = place('concurrent-place', 'AI 추천 · 다른 생성에서 저장');
+    concurrent.googlePlaceId = 'school';
+    generate.mockResolvedValue({ days: [{ date, visits: [visit] }] });
+    save.mockRejectedValueOnce({ driverError: { code: '23505' } });
+    findOneByPlace.mockResolvedValueOnce(concurrent);
+    expect((await service.generate('trip', request)).status).toBe('generated');
+    expect(replace).toHaveBeenCalledWith('trip', [
+      expect.objectContaining({ savedPlaceId: 'concurrent-place' }),
+    ], 'ai', []);
+  });
+
   it('cleans up new places when itinerary integrity reports a conflict', async () => {
     const { service, replace, remove, record, original } = setup();
     replace.mockResolvedValue({ status: 'conflict', conflicts: ['DUPLICATE_SLOT'], itinerary: original });
@@ -139,6 +156,17 @@ describe('day visit materialization', () => {
 });
 
 describe('AI-owned itinerary quality and diagnostics', () => {
+  it('stores visits in chronological order even when the reviewed model output is reversed', async () => {
+    const { service, generate, replace } = setup();
+    generate.mockResolvedValue({ days: [{ date, visits: [
+      { ...visit, placeName: '늦은 장소', startTime: '17:10' },
+      { ...visit, placeName: '이른 장소', startTime: '14:00' },
+      { ...visit, placeName: '중간 장소', startTime: '14:45' },
+    ] }] });
+    await service.generate('trip', request);
+    expect((replace.mock.calls[0]![1] as StoredPlacement[]).map((item) => item.scheduledTime))
+      .toEqual(['14:00', '14:45', '17:10']);
+  });
   it('stores sparse, meal-only, wrong-region/type and out-of-hours results without a quality veto or timing rewrite', async () => {
     const { service, generate, replace } = setup();
     expect((await service.generate('trip', request)).status).toBe('generated');

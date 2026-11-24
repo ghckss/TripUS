@@ -50,16 +50,21 @@ export class RoutesService {
     try {
       const configuredModes = trip.latestAiPlanRequest?.transportModes ?? [];
       const fallbackTravelModes = preferredFallbackModes(configuredModes);
+      const maxFallbackWalkingMinutes = fallbackTravelModes.includes('walking')
+        ? requestedWalkingLimitMinutes(trip.latestAiPlanRequest?.additionalRequests)
+        : undefined;
       const estimate = await this.routes.transit({
         originGooglePlaceId,
         destinationGooglePlaceId,
         departureTime: input.departureTime,
         fallbackTravelModes,
+        ...(maxFallbackWalkingMinutes !== undefined ? { maxFallbackWalkingMinutes } : {}),
       });
       if (!estimate) {
         writeStructuredLog('warn', 'routes.transit.not_found', {
           tripId, departureTime: input.departureTime ?? null,
           attemptedModes: ['public_transit', ...fallbackTravelModes],
+          maxFallbackWalkingMinutes: maxFallbackWalkingMinutes ?? null,
         });
         return this.unavailable('ROUTE_NOT_FOUND');
       }
@@ -91,8 +96,13 @@ function preferredFallbackModes(configuredModes: string[]): Array<Exclude<RouteT
   const result: Array<'walking' | 'car'> = [];
   if (selected.has('walking')) result.push('walking');
   if (selected.has('car')) result.push('car');
-  // Walking remains a truthful first/last-mile alternative when Google's transit
-  // coverage returns no route, even for older trips that stored no preferences.
-  if (!selected.has('walking')) result.push('walking');
   return result;
+}
+
+export function requestedWalkingLimitMinutes(additionalRequests?: string): number | undefined {
+  if (!additionalRequests) return undefined;
+  const walkingFirst = additionalRequests.match(/(?:도보|걷기|걸어서|walking)[^\d\n]{0,20}(\d{1,3})\s*분/i);
+  const numberFirst = additionalRequests.match(/(\d{1,3})\s*분[^\n]{0,20}(?:도보|걷기|걸어서|walking)/i);
+  const value = Number.parseInt((walkingFirst ?? numberFirst)?.[1] ?? '', 10);
+  return Number.isFinite(value) && value > 0 ? value : undefined;
 }

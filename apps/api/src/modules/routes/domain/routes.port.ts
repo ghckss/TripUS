@@ -7,6 +7,7 @@ export interface TransitRouteInput {
   destinationGooglePlaceId: string;
   departureTime?: string;
   fallbackTravelModes?: Array<Exclude<RouteTravelMode, 'public_transit'>>;
+  maxFallbackWalkingMinutes?: number;
 }
 
 export interface TransitRouteEstimate {

@@ -219,7 +219,7 @@ POST /v1/trips/:tripId/photos
 POST /v1/trips/:tripId/photos/:photoId/confirm
 ```
 
-AI 일정 생성 POST는 `202 Accepted`와 `generationId`를 즉시 반환한다. 작업 요청과 상태는 `ai_plan_generations`에 저장하며 실제 OpenAI 호출과 일정 저장은 응답 수명과 분리해 실행한다. 모바일은 상태 API에서 같은 `generationId`가 `generated`, `conflict`, `unavailable` 중 하나가 될 때까지 조회한다. 서버 재시작 뒤 상태 조회가 들어오면 DB에 남은 `queued` 또는 `running` 작업을 재개하며, 여행별 부분 고유 인덱스로 동시 활성 작업을 하나로 제한한다.
+AI 일정 생성 POST는 `202 Accepted`와 `generationId`를 즉시 반환한다. 작업 요청과 상태는 `ai_plan_generations`에 저장하며 실제 OpenAI 호출과 일정 저장은 응답 수명과 분리해 실행한다. 모바일은 상태 API에서 같은 `generationId`가 `generated`, `conflict`, `unavailable` 중 하나가 될 때까지 조회한다. 작업자는 `queued` 행을 조건부 UPDATE로 `running`으로 바꾼 경우에만 실행해 여러 Lambda 인스턴스의 중복 모델 호출을 막는다. 서버 중단으로 `running` 상태가 15분 이상 유지된 작업은 상태 조회 시 `queued`로 되돌려 재개하며, 여행별 부분 고유 인덱스로 동시 활성 작업을 하나로 제한한다.
 
 ## 7. 외부 연동 경계
 

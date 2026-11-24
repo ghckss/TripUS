@@ -39,4 +39,16 @@ describe('GoogleRoutesAdapter route coverage fallback', () => {
     expect(walkingRequest).toMatchObject({ travelMode: 'WALK' });
     expect(walkingRequest).not.toHaveProperty('departureTime');
   });
+
+  it('rejects a walking fallback that exceeds the traveler limit', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ routes: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ routes: [{ duration: '4320s', distanceMeters: 5700 }] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+    const adapter = new GoogleRoutesAdapter({ getOrThrow: () => 'key' } as never);
+    await expect(adapter.transit({
+      originGooglePlaceId: 'a', destinationGooglePlaceId: 'b',
+      fallbackTravelModes: ['walking'], maxFallbackWalkingMinutes: 10,
+    })).resolves.toBeNull();
+  });
 });

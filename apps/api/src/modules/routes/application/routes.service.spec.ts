@@ -54,7 +54,28 @@ describe('route legs after itinerary edits', () => {
     transit.mockResolvedValue({ durationMinutes: 22, distanceMeters: 7100, travelMode: 'car', isFallback: true });
     expect(await service.transit('trip', { originSavedPlaceId: 'hotel', destinationSavedPlaceId: 'visit' }))
       .toMatchObject({ status: 'available', durationMinutes: 22, travelMode: 'car', isFallback: true });
-    expect(transit).toHaveBeenCalledWith(expect.objectContaining({ fallbackTravelModes: ['car', 'walking'] }));
+    expect(transit).toHaveBeenCalledWith(expect.objectContaining({ fallbackTravelModes: ['car'] }));
+  });
+  it('passes an explicit walking limit to the provider and never enables an unselected fallback', async () => {
+    const { service, transit, trips } = setup();
+    trips.findOneBy.mockResolvedValue({
+      startPoint: { googlePlaceId: 'airport' }, endPoint: { googlePlaceId: 'end-airport' },
+      latestAiPlanRequest: {
+        transportModes: ['public_transit', 'walking'],
+        additionalRequests: '75세 부모님과 함께라 도보는 10분 이내로 제한해 주세요.',
+      },
+    });
+    await service.transit('trip', { originSavedPlaceId: 'hotel', destinationSavedPlaceId: 'visit' });
+    expect(transit).toHaveBeenCalledWith(expect.objectContaining({
+      fallbackTravelModes: ['walking'], maxFallbackWalkingMinutes: 10,
+    }));
+
+    trips.findOneBy.mockResolvedValue({
+      startPoint: { googlePlaceId: 'airport' }, endPoint: { googlePlaceId: 'end-airport' },
+      latestAiPlanRequest: { transportModes: ['public_transit'] },
+    });
+    await service.transit('trip', { originSavedPlaceId: 'hotel', destinationSavedPlaceId: 'visit' });
+    expect(transit).toHaveBeenLastCalledWith(expect.objectContaining({ fallbackTravelModes: [] }));
   });
   it('returns zero only when both endpoints resolve to the same real place', async () => {
     const { service, transit } = setup();

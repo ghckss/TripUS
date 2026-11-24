@@ -1,6 +1,6 @@
 import { BadRequestException, HttpException, Inject, Injectable, NotFoundException, Scope } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, LessThan, Repository } from 'typeorm';
 
 import { IDENTITY_PORT, type IdentityPort } from '../../identity/domain/identity.port';
 import { TripEntity } from '../../trips/domain/entities/trip.entity';
@@ -17,6 +17,7 @@ import {
 } from './dto/generate-ai-plan.dto';
 
 const ACTIVE_JOB_STATUSES = [AiPlanGenerationJobStatus.Queued, AiPlanGenerationJobStatus.Running];
+const STALE_JOB_MS = 15 * 60 * 1000;
 
 @Injectable({ scope: Scope.REQUEST })
 export class AiPlanningJobsService {
@@ -85,7 +86,15 @@ export class AiPlanningJobsService {
     if (!trip) throw new NotFoundException('Trip not found');
     const job = await this.jobs.findOne({ where: { tripId, ownerId }, order: { createdAt: 'DESC' } });
     if (!job) return { generationId: null, status: AiPlanExecutionStatus.Idle, failureReason: null };
-    if (ACTIVE_JOB_STATUSES.includes(job.status)) this.runInBackground(job);
+    if (job.status === AiPlanGenerationJobStatus.Running && job.startedAt
+      && job.startedAt.getTime() < Date.now() - STALE_JOB_MS) {
+      const reset = await this.jobs.update(
+        { id: job.id, ownerId, status: AiPlanGenerationJobStatus.Running, startedAt: LessThan(new Date(Date.now() - STALE_JOB_MS)) },
+        { status: AiPlanGenerationJobStatus.Queued, startedAt: null, failureReason: null },
+      );
+      if (reset.affected === 1) job.status = AiPlanGenerationJobStatus.Queued;
+    }
+    if (job.status === AiPlanGenerationJobStatus.Queued) this.runInBackground(job);
     return {
       generationId: job.id,
       status: toExecutionStatus(job.status),
@@ -100,12 +109,14 @@ export class AiPlanningJobsService {
   }
 
   private async execute(jobId: string): Promise<void> {
-    const job = await this.jobs.findOneBy({ id: jobId, ownerId: this.identity.getCurrentUserId() });
-    if (!job || !ACTIVE_JOB_STATUSES.includes(job.status)) return;
-    job.status = AiPlanGenerationJobStatus.Running;
-    job.startedAt ??= new Date();
-    job.failureReason = null;
-    await this.jobs.save(job);
+    const ownerId = this.identity.getCurrentUserId();
+    const claimed = await this.jobs.update(
+      { id: jobId, ownerId, status: AiPlanGenerationJobStatus.Queued },
+      { status: AiPlanGenerationJobStatus.Running, startedAt: new Date(), failureReason: null },
+    );
+    if (claimed.affected !== 1) return;
+    const job = await this.jobs.findOneBy({ id: jobId, ownerId });
+    if (!job) return;
     try {
       const result = await this.planning.generate(job.tripId, job.request, job.targetDate ?? undefined);
       job.status = result.status === AiPlanGenerationStatus.Generated
