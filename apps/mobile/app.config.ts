@@ -22,7 +22,7 @@ const appVariants = {
   },
 } satisfies Record<TripUsAppVariant, { androidPackage: string; name: string; scheme: string }>;
 
-function resolveAppVariant(value = process.env.TRIPUS_APP_VARIANT) {
+function resolveAppVariant(value: string | undefined = process.env.TRIPUS_APP_VARIANT) {
   if (value === undefined || value.length === 0) return { ...appVariants.development, variant: "development" as const };
   if (value === "development" || value === "preview" || value === "production") {
     return { ...appVariants[value], variant: value };
