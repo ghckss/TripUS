@@ -68,8 +68,8 @@ function streamingFixture() {
 describe('web-backed streaming generation', () => {
   it('requires live search and JSON output with a shared cancellation deadline', async () => {
     const { adapter, stream } = streamingFixture();
-    expect(await adapter.generate(plannerInput)).toMatchObject({ usage: { inputTokens: 10, outputTokens: 20 } });
-    expect(stream).toHaveBeenCalledTimes(1);
+    expect(await adapter.generate(plannerInput)).toMatchObject({ usage: { inputTokens: 20, outputTokens: 40 } });
+    expect(stream).toHaveBeenCalledTimes(2);
     expect(stream.mock.calls[0]?.[0]).toMatchObject({
       tools: [{ type: 'web_search', external_web_access: true, user_location: { type: 'approximate' } }],
       tool_choice: 'required', include: ['web_search_call.action.sources'],
@@ -78,11 +78,32 @@ describe('web-backed streaming generation', () => {
     const { input: messages } = stream.mock.calls[0]?.[0] as { input: Array<{ role: string; content: string }> };
     const payload: unknown = JSON.parse(messages.find((message) => message.role === 'user')!.content);
     expect(payload).toMatchObject({ preferences: plannerInput.preferences });
+    const { input: reviewMessages } = stream.mock.calls[1]?.[0] as { input: Array<{ role: string; content: string }> };
+    const reviewPayload: unknown = JSON.parse(reviewMessages.find((message) => message.role === 'user')!.content);
+    expect(reviewPayload).toMatchObject({ request: { preferences: plannerInput.preferences }, draft: { days: [] } });
+    expect(reviewMessages.find((message) => message.role === 'system')?.content).toContain('여행 일정의 최종 검토자');
+    expect(reviewMessages.find((message) => message.role === 'system')?.content).toContain('해당 여행 연도·월의 공식 달력');
     const { text } = stream.mock.calls[0]?.[0] as { text: { format: { schema: unknown } } };
     expect(JSON.stringify(text.format.schema)).not.toMatch(/"(reason|activities|placements|recommendations|unplaced|savedRecommendations|placeDescriptions|position|travelMethod|travelDurationMinutes)"/);
     expect(JSON.stringify(text.format.schema)).not.toMatch(/minItems|maxItems/);
     expect(text.format.schema).toMatchObject({ properties: { days: { type: 'array' } }, required: ['days'] });
     expect((stream.mock.calls[0]?.[1] as { signal: AbortSignal }).signal).toBeInstanceOf(AbortSignal);
+    expect((stream.mock.calls[1]?.[1] as { signal: AbortSignal }).signal).toBe((stream.mock.calls[0]?.[1] as { signal: AbortSignal }).signal);
+  });
+
+  it('keeps the usable draft when the final review pass fails', async () => {
+    const { adapter, stream, finalResponse } = streamingFixture();
+    finalResponse
+      .mockResolvedValueOnce({
+        status: 'completed', output: [{ type: 'web_search_call' }],
+        output_parsed: { days: [{ date, visits: [visit] }] }, usage: { input_tokens: 10, output_tokens: 20 },
+      })
+      .mockRejectedValueOnce(new Error('review unavailable'));
+
+    await expect(adapter.generate(plannerInput)).resolves.toMatchObject({
+      days: [{ date, visits: [visit] }], usage: { inputTokens: 10, outputTokens: 20 },
+    });
+    expect(stream).toHaveBeenCalledTimes(2);
   });
 
   it('aborts at the total deadline and preserves the last known search progress in timeout details', async () => {

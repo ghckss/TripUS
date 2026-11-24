@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TravelTheme, type AiPlannerInput } from '../domain/ai-planner.port';
-import { buildPlannerSystemPrompt, buildPlannerUserInput } from './ai-planner-prompts';
+import { AI_PLANNER_REVIEW_SYSTEM_PROMPT, buildPlannerSystemPrompt, buildPlannerUserInput } from './ai-planner-prompts';
 
 const input: AiPlannerInput = {
   preferences: {
@@ -44,6 +44,10 @@ describe('travel brief and selected preferences', () => {
     expect(prompt).toContain('preferences.budgetLevel');
     expect(prompt).toContain('preferences.additionalRequests');
     expect(prompt).toContain('투어 약칭이나 여러 장소를 뜻하는 표현은 웹 검색');
+    expect(prompt).toContain('공휴일 대체 휴관');
+    expect(AI_PLANNER_REVIEW_SYSTEM_PROMPT).toContain('해당 여행 연도·월의 공식 달력');
+    expect(AI_PLANNER_REVIEW_SYSTEM_PROMPT).toContain('최대 도보 시간');
+    expect(AI_PLANNER_REVIEW_SYSTEM_PROMPT).toContain('preferences.budgetLevel');
   });
 
   it('treats boundaries as ready-to-start and arrival times without adding airport procedures', () => {
