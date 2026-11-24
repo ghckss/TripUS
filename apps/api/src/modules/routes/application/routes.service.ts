@@ -5,7 +5,7 @@ import { In, Repository } from 'typeorm';
 import { IDENTITY_PORT, type IdentityPort } from '../../identity/domain/identity.port';
 import { SavedPlaceEntity } from '../../places/domain/entities/saved-place.entity';
 import { TripEntity } from '../../trips/domain/entities/trip.entity';
-import { ROUTES_PORT, type RoutesPort } from '../domain/routes.port';
+import { ROUTES_PORT, type RouteTravelMode, type RoutesPort } from '../domain/routes.port';
 import { TransitRouteRequestDto, TransitRouteResponseDto, TransitRouteStatus } from './dto/transit-route.dto';
 import { writeStructuredLog } from '../../../common/http/json-logger';
 
@@ -41,18 +41,32 @@ export class RoutesService {
     const destinationGooglePlaceId = resolve(input.destinationSavedPlaceId, input.destinationBoundaryType);
     if (!originGooglePlaceId || !destinationGooglePlaceId) return this.unavailable('PLACE_ID_MISSING');
     if (originGooglePlaceId === destinationGooglePlaceId) {
-      return { status: TransitRouteStatus.Available, durationMinutes: 0, distanceMeters: 0, reason: null };
+      return {
+        status: TransitRouteStatus.Available, durationMinutes: 0, distanceMeters: 0,
+        reason: null, travelMode: 'walking', isFallback: false,
+      };
     }
 
     try {
+      const configuredModes = trip.latestAiPlanRequest?.transportModes ?? [];
+      const fallbackTravelModes = preferredFallbackModes(configuredModes);
       const estimate = await this.routes.transit({
         originGooglePlaceId,
         destinationGooglePlaceId,
         departureTime: input.departureTime,
+        fallbackTravelModes,
       });
       if (!estimate) {
-        writeStructuredLog('warn', 'routes.transit.not_found', { tripId, departureTime: input.departureTime ?? null });
+        writeStructuredLog('warn', 'routes.transit.not_found', {
+          tripId, departureTime: input.departureTime ?? null,
+          attemptedModes: ['public_transit', ...fallbackTravelModes],
+        });
         return this.unavailable('ROUTE_NOT_FOUND');
+      }
+      if (estimate.isFallback) {
+        writeStructuredLog('info', 'routes.transit.fallback', {
+          tripId, travelMode: estimate.travelMode, durationMinutes: estimate.durationMinutes,
+        });
       }
       return { status: TransitRouteStatus.Available, ...estimate, reason: null };
     } catch (error) {
@@ -65,6 +79,20 @@ export class RoutesService {
   }
 
   private unavailable(reason: string): TransitRouteResponseDto {
-    return { status: TransitRouteStatus.Unavailable, durationMinutes: null, distanceMeters: null, reason };
+    return {
+      status: TransitRouteStatus.Unavailable, durationMinutes: null, distanceMeters: null,
+      reason, travelMode: null, isFallback: false,
+    };
   }
+}
+
+function preferredFallbackModes(configuredModes: string[]): Array<Exclude<RouteTravelMode, 'public_transit'>> {
+  const selected = new Set(configuredModes);
+  const result: Array<'walking' | 'car'> = [];
+  if (selected.has('walking')) result.push('walking');
+  if (selected.has('car')) result.push('car');
+  // Walking remains a truthful first/last-mile alternative when Google's transit
+  // coverage returns no route, even for older trips that stored no preferences.
+  if (!selected.has('walking')) result.push('walking');
+  return result;
 }

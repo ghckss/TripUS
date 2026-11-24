@@ -8,6 +8,7 @@ export function RouteConnector({ tripId, origin, destination, timezone }: {
   tripId: string; origin: ItineraryItem; destination: ItineraryItem; timezone?: string;
 }) {
   const result = useTransitLeg(tripId, origin, destination, timezone);
+  const modeLabel = result.travelMode === "walking" ? "도보 " : result.travelMode === "car" ? "차량 " : "";
   return <View style={styles.connector} testID={`route-connector-${origin.id}-${destination.id}`}>
     <View style={styles.line} />
     {result.status === "loading"
@@ -17,7 +18,7 @@ export function RouteConnector({ tripId, origin, destination, timezone }: {
           <AppText variant="caption" color={colors.secondary}>확인 불가 · 다시 조회</AppText>
         </Pressable>
         : <AppText variant="caption" color={colors.muted} accessibilityLabel={`이동 시간 ${result.durationMinutes}분`}>
-          {`${result.durationMinutes}분`}
+          {`${modeLabel}${result.durationMinutes}분`}
         </AppText>}
   </View>;
 }

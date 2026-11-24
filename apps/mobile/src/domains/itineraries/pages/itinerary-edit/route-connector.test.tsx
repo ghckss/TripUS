@@ -10,7 +10,10 @@ const item = (id: string, extra: Partial<ItineraryItem> = {}): ItineraryItem => 
   id, savedPlaceId: id, placeName: id, date: "2026-12-01", position: 0,
   ...extra,
 } as ItineraryItem);
-const available = (durationMinutes: number): TransitRoute => ({ status: "available", durationMinutes, distanceMeters: null, reason: null });
+const available = (durationMinutes: number): TransitRoute => ({
+  status: "available", durationMinutes, distanceMeters: null, reason: null,
+  travelMode: "public_transit", isFallback: false,
+});
 function deferred() {
   let resolve!: (value: TransitRoute) => void;
   const promise = new Promise<TransitRoute>((done) => { resolve = done; });
@@ -60,6 +63,15 @@ it("shows unavailable on failure without falling back to stored AI minutes", asy
   await render(<RouteConnector tripId="failure-trip" origin={item("A")} destination={item("B", { travelDurationMinutes: 77 })} />);
   await waitFor(() => expect(screen.getByText("확인 불가 · 다시 조회")).toBeTruthy());
   expect(screen.queryByText("77분")).toBeNull();
+});
+
+it("labels an honest walking fallback when transit coverage returns no route", async () => {
+  lookup.mockResolvedValue({
+    status: "available", durationMinutes: 27, distanceMeters: 2100, reason: null,
+    travelMode: "walking", isFallback: true,
+  } satisfies TransitRoute);
+  await render(<RouteConnector tripId="walking-fallback-trip" origin={item("A")} destination={item("B")} />);
+  await waitFor(() => expect(screen.getByText("도보 27분")).toBeTruthy());
 });
 
 it("retries only the failed leg when the user asks", async () => {

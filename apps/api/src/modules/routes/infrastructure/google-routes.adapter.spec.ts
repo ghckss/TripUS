@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { representativeDepartureTime } from './google-routes.adapter';
+import { GoogleRoutesAdapter, representativeDepartureTime } from './google-routes.adapter';
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('representativeDepartureTime', () => {
   it('keeps a future departure unchanged', () => {
@@ -15,5 +17,26 @@ describe('representativeDepartureTime', () => {
 
   it('omits a departure when none was supplied', () => {
     expect(representativeDepartureTime()).toBeUndefined();
+  });
+});
+
+describe('GoogleRoutesAdapter route coverage fallback', () => {
+  it('returns a labelled walking duration when transit has no route', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ routes: [{ duration: '1621s', distanceMeters: 2100 }] }) });
+    vi.stubGlobal('fetch', fetch);
+    const adapter = new GoogleRoutesAdapter({ getOrThrow: () => 'key' } as never);
+
+    await expect(adapter.transit({
+      originGooglePlaceId: 'origin', destinationGooglePlaceId: 'destination',
+      departureTime: '2026-12-01T11:00:00.000Z', fallbackTravelModes: ['walking'],
+    })).resolves.toEqual({ durationMinutes: 28, distanceMeters: 2100, travelMode: 'walking', isFallback: true });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const transitRequest = JSON.parse((fetch.mock.calls[0]?.[1] as RequestInit).body as string) as Record<string, unknown>;
+    const walkingRequest = JSON.parse((fetch.mock.calls[1]?.[1] as RequestInit).body as string) as Record<string, unknown>;
+    expect(transitRequest).toMatchObject({ travelMode: 'TRANSIT', departureTime: '2026-12-01T11:00:00.000Z' });
+    expect(walkingRequest).toMatchObject({ travelMode: 'WALK' });
+    expect(walkingRequest).not.toHaveProperty('departureTime');
   });
 });

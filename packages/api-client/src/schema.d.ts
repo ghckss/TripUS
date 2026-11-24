@@ -794,11 +794,15 @@ export interface components {
         };
         /** @enum {string} */
         TransitRouteStatus: "available" | "unavailable";
+        /** @enum {string} */
+        TransitRouteTravelMode: "public_transit" | "walking" | "car";
         TransitRouteResponseDto: {
             status: components["schemas"]["TransitRouteStatus"];
             durationMinutes?: number | null;
             distanceMeters?: number | null;
             reason?: string | null;
+            travelMode?: components["schemas"]["TransitRouteTravelMode"] | null;
+            isFallback: boolean;
         };
         CreatePhotoUploadDto: {
             /** Format: uuid */

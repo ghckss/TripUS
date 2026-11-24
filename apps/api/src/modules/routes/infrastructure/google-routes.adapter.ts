@@ -1,7 +1,7 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { RoutesPort, TransitRouteEstimate, TransitRouteInput } from '../domain/routes.port';
+import { RouteTravelMode, RoutesPort, TransitRouteEstimate, TransitRouteInput } from '../domain/routes.port';
 
 interface GoogleRoutesResponse {
   routes?: Array<{ duration?: string; distanceMeters?: number }>;
@@ -27,6 +27,31 @@ export class GoogleRoutesAdapter implements RoutesPort {
 
   async transit(input: TransitRouteInput): Promise<TransitRouteEstimate | null> {
     const departureTime = representativeDepartureTime(input.departureTime);
+    const modes: Array<{ api: 'TRANSIT' | 'WALK' | 'DRIVE'; domain: RouteTravelMode }> = [
+      { api: 'TRANSIT', domain: 'public_transit' },
+      ...(input.fallbackTravelModes ?? []).map((mode) => mode === 'car'
+        ? { api: 'DRIVE' as const, domain: mode }
+        : { api: 'WALK' as const, domain: mode }),
+    ];
+
+    for (const [index, mode] of modes.entries()) {
+      const route = await this.computeRoute(input, mode.api, mode.api === 'TRANSIT' ? departureTime : undefined);
+      if (!route?.duration) continue;
+      return {
+        durationMinutes: Math.max(1, Math.ceil(Number.parseFloat(route.duration.replace('s', '')) / 60)),
+        distanceMeters: route.distanceMeters ?? null,
+        travelMode: mode.domain,
+        isFallback: index > 0,
+      };
+    }
+    return null;
+  }
+
+  private async computeRoute(
+    input: TransitRouteInput,
+    travelMode: 'TRANSIT' | 'WALK' | 'DRIVE',
+    departureTime?: string,
+  ): Promise<NonNullable<GoogleRoutesResponse['routes']>[number] | null> {
     const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
       method: 'POST',
       headers: {
@@ -37,7 +62,7 @@ export class GoogleRoutesAdapter implements RoutesPort {
       body: JSON.stringify({
         origin: { placeId: input.originGooglePlaceId },
         destination: { placeId: input.destinationGooglePlaceId },
-        travelMode: 'TRANSIT',
+        travelMode,
         languageCode: 'ko',
         units: 'METRIC',
         ...(departureTime ? { departureTime } : {}),
@@ -46,11 +71,6 @@ export class GoogleRoutesAdapter implements RoutesPort {
     });
     if (!response.ok) throw new ServiceUnavailableException(`Google Routes request failed (${response.status})`);
     const body = await response.json() as GoogleRoutesResponse;
-    const route = body.routes?.[0];
-    if (!route?.duration) return null;
-    return {
-      durationMinutes: Math.max(1, Math.ceil(Number.parseFloat(route.duration.replace('s', '')) / 60)),
-      distanceMeters: route.distanceMeters ?? null,
-    };
+    return body.routes?.[0] ?? null;
   }
 }

@@ -2621,6 +2621,14 @@
           "unavailable"
         ]
       },
+      "TransitRouteTravelMode": {
+        "type": "string",
+        "enum": [
+          "public_transit",
+          "walking",
+          "car"
+        ]
+      },
       "TransitRouteResponseDto": {
         "type": "object",
         "properties": {
@@ -2642,10 +2650,22 @@
           "reason": {
             "type": "string",
             "nullable": true
+          },
+          "travelMode": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransitRouteTravelMode"
+              }
+            ]
+          },
+          "isFallback": {
+            "type": "boolean"
           }
         },
         "required": [
-          "status"
+          "status",
+          "isFallback"
         ]
       },
       "CreatePhotoUploadDto": {

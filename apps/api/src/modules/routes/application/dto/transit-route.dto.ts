@@ -1,6 +1,7 @@
 import { ItineraryBoundaryType } from '../../../itineraries/application/dto/itinerary.dto';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsDateString, IsEnum, IsOptional, IsUUID } from 'class-validator';
+import type { RouteTravelMode } from '../../domain/routes.port';
 
 export class TransitRouteRequestDto {
   @ApiPropertyOptional({ type: String, format: 'uuid' })
@@ -46,4 +47,10 @@ export class TransitRouteResponseDto {
 
   @ApiPropertyOptional({ type: String, nullable: true })
   reason!: string | null;
+
+  @ApiPropertyOptional({ enum: ['public_transit', 'walking', 'car'], enumName: 'TransitRouteTravelMode', nullable: true })
+  travelMode!: RouteTravelMode | null;
+
+  @ApiProperty({ type: Boolean })
+  isFallback!: boolean;
 }

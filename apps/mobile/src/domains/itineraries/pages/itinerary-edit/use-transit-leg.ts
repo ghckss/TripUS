@@ -5,6 +5,8 @@ import { getTransitLeg, type ItineraryItem, type TransitRouteRequest } from "../
 export type TransitLegState = {
   status: "loading" | "available" | "unavailable";
   durationMinutes: number | null;
+  travelMode: "public_transit" | "walking" | "car" | null;
+  isFallback: boolean;
   retry: () => void;
 };
 type TransitLegResult = Omit<TransitLegState, "retry">;
@@ -47,14 +49,14 @@ export function useTransitLeg(tripId: string, origin: ItineraryItem, destination
     queryFn: async (): Promise<TransitLegResult> => {
       const route = await getTransitLeg(tripId, request).catch(() => null);
       return route?.status === "available" && route.durationMinutes != null
-        ? { status: "available", durationMinutes: route.durationMinutes }
-        : { status: "unavailable", durationMinutes: null };
+        ? { status: "available", durationMinutes: route.durationMinutes, travelMode: route.travelMode ?? "public_transit", isFallback: route.isFallback }
+        : { status: "unavailable", durationMinutes: null, travelMode: null, isFallback: false };
     },
     staleTime: (query) => query.state.data?.status === "available" ? 5 * 60_000 : 15_000,
     gcTime: 5 * 60_000,
     retry: false,
   }, queryClient);
   const retry = () => { void query.refetch(); };
-  if (query.isFetching || query.isPending) return { status: "loading", durationMinutes: null, retry };
-  return { ...(query.data ?? { status: "unavailable", durationMinutes: null }), retry };
+  if (query.isFetching || query.isPending) return { status: "loading", durationMinutes: null, travelMode: null, isFallback: false, retry };
+  return { ...(query.data ?? { status: "unavailable", durationMinutes: null, travelMode: null, isFallback: false }), retry };
 }
