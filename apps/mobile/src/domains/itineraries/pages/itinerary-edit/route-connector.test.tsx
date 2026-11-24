@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import type { ItineraryItem, TransitRoute } from "../../api/itineraries.api";
 import { getTransitLeg } from "../../api/itineraries.api";
 import { RouteConnector } from "./route-connector";
@@ -58,8 +58,17 @@ it("reuses unchanged and recently visited legs while keeping direction in the ca
 it("shows unavailable on failure without falling back to stored AI minutes", async () => {
   lookup.mockRejectedValue(new Error("route unavailable"));
   await render(<RouteConnector tripId="failure-trip" origin={item("A")} destination={item("B", { travelDurationMinutes: 77 })} />);
-  await waitFor(() => expect(screen.getByText("확인 불가")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("확인 불가 · 다시 조회")).toBeTruthy());
   expect(screen.queryByText("77분")).toBeNull();
+});
+
+it("retries only the failed leg when the user asks", async () => {
+  lookup.mockRejectedValueOnce(new Error("temporary failure")).mockResolvedValueOnce(available(21));
+  await render(<RouteConnector tripId="retry-trip" origin={item("A")} destination={item("B")} />);
+  const retry = await screen.findByLabelText("이동 시간 다시 조회");
+  await fireEvent.press(retry);
+  await waitFor(() => expect(screen.getByText("21분")).toBeTruthy());
+  expect(lookup).toHaveBeenCalledTimes(2);
 });
 
 it("uses owned boundary references and the trip timezone rather than the phone timezone", () => {

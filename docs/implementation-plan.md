@@ -95,7 +95,8 @@ Expo React Native 앱과 독립 NestJS API의 기반을 만들고, 실제 지도
 - Maestro 핵심 흐름 E2E — 로컬 iOS·Android Development Build flow 통과
 - SQLite 기반 오프라인 최소 일정 — 완료
 - 장소 저장 custom scheme 딥링크와 외부 검색어 전달 — 완료
-- 네이티브 공유 확장과 실제 도메인 유니버설 링크 — 배포 도메인·서명 설정 대기
+- iOS Share Extension — 현재 버전 제외, 다음 버전 업데이트 예정
+- 실제 도메인 유니버설 링크 — 배포 도메인·서명 설정 대기
 - 접근성 기본 속성, 오프라인 배너와 오류 복구 — 완료, 실제 저사양 기기 점검 대기
 - 관측성, 오류 추적과 제품 이벤트 — 구조화 서버 로그·모바일 오류 경계·운영 대시보드 완료
 - iOS TestFlight와 Android 내부 테스트 — EAS 프로필·수동 CI 완료, Expo/스토어 계정 연결 대기

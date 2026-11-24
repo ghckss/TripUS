@@ -10,7 +10,16 @@ export function resolveTripProgress(
   endDate: string,
   timezone: string,
   now = new Date(),
+  archivedAt?: string | null,
 ): TripProgress {
+  if (archivedAt) {
+    return {
+      phase: "after",
+      badgeLabel: "여행 완료",
+      heading: "여행은 즐거우셨나요?",
+      message: "여행의 순간을 정리해 보세요",
+    };
+  }
   const today = dateInTimezone(now, timezone);
   const daysUntilStart = dayNumber(startDate) - dayNumber(today);
 

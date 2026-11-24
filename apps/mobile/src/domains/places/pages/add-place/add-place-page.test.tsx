@@ -90,4 +90,23 @@ describe("AddPlacePage", () => {
     expect(screen.getByTestId("add-place-note")).toHaveProp("value", "A 메모");
   });
 
+  it("clears hidden candidate drafts after a place is saved", async () => {
+    const candidates = [{ googlePlaceId: "a", name: "장소 A" }, { googlePlaceId: "b", name: "장소 B" }];
+    mockSearchPlaces.mockResolvedValue(candidates);
+    mockSavePlace.mockResolvedValue({ status: "created" });
+    const screen = await render(<AppDialogProvider><AddPlacePage /></AppDialogProvider>);
+    await fireEvent.changeText(screen.getByTestId("add-place-query"), "카페");
+    await fireEvent.press(screen.getByTestId("add-place-search"));
+    await screen.findByText("장소 A");
+    await fireEvent.changeText(screen.getByTestId("add-place-note"), "A 메모");
+    await fireEvent.press(screen.getByTestId("add-place-select-b"));
+    await fireEvent.press(screen.getByTestId("add-place-b"));
+    await screen.findByText("장소 추가 완료");
+
+    await fireEvent.changeText(screen.getByTestId("add-place-query"), "카페");
+    await fireEvent.press(screen.getByTestId("add-place-search"));
+    await screen.findByText("장소 A");
+    expect(screen.getByTestId("add-place-note")).toHaveProp("value", "");
+  });
+
 });

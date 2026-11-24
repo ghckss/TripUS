@@ -7,6 +7,16 @@ interface GoogleRoutesResponse {
   routes?: Array<{ duration?: string; distanceMeters?: number }>;
 }
 
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function representativeDepartureTime(departureTime?: string, now = new Date()): string | undefined {
+  if (!departureTime) return undefined;
+  const departure = Date.parse(departureTime);
+  if (!Number.isFinite(departure) || departure > now.getTime()) return departureTime;
+  const weeksAhead = Math.floor((now.getTime() - departure) / WEEK_MS) + 1;
+  return new Date(departure + weeksAhead * WEEK_MS).toISOString();
+}
+
 @Injectable()
 export class GoogleRoutesAdapter implements RoutesPort {
   private readonly apiKey: string;
@@ -16,6 +26,7 @@ export class GoogleRoutesAdapter implements RoutesPort {
   }
 
   async transit(input: TransitRouteInput): Promise<TransitRouteEstimate | null> {
+    const departureTime = representativeDepartureTime(input.departureTime);
     const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
       method: 'POST',
       headers: {
@@ -29,7 +40,7 @@ export class GoogleRoutesAdapter implements RoutesPort {
         travelMode: 'TRANSIT',
         languageCode: 'ko',
         units: 'METRIC',
-        ...(input.departureTime ? { departureTime: input.departureTime } : {}),
+        ...(departureTime ? { departureTime } : {}),
       }),
       signal: AbortSignal.timeout(8_000),
     });

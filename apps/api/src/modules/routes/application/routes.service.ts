@@ -7,6 +7,7 @@ import { SavedPlaceEntity } from '../../places/domain/entities/saved-place.entit
 import { TripEntity } from '../../trips/domain/entities/trip.entity';
 import { ROUTES_PORT, type RoutesPort } from '../domain/routes.port';
 import { TransitRouteRequestDto, TransitRouteResponseDto, TransitRouteStatus } from './dto/transit-route.dto';
+import { writeStructuredLog } from '../../../common/http/json-logger';
 
 @Injectable()
 export class RoutesService {
@@ -49,10 +50,16 @@ export class RoutesService {
         destinationGooglePlaceId,
         departureTime: input.departureTime,
       });
-      return estimate
-        ? { status: TransitRouteStatus.Available, ...estimate, reason: null }
-        : this.unavailable('ROUTE_NOT_FOUND');
-    } catch {
+      if (!estimate) {
+        writeStructuredLog('warn', 'routes.transit.not_found', { tripId, departureTime: input.departureTime ?? null });
+        return this.unavailable('ROUTE_NOT_FOUND');
+      }
+      return { status: TransitRouteStatus.Available, ...estimate, reason: null };
+    } catch (error) {
+      writeStructuredLog('warn', 'routes.transit.provider_failed', {
+        tripId,
+        error: error instanceof Error ? { name: error.name, message: error.message } : { name: 'UnknownError' },
+      });
       return this.unavailable('PROVIDER_FAILURE');
     }
   }

@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { RoutesService } from './routes.service';
 import { ItineraryBoundaryType } from '../../itineraries/application/dto/itinerary.dto';
 
+vi.mock('../../../common/http/json-logger', () => ({ writeStructuredLog: vi.fn() }));
+
 function setup() {
   const trips = { findOneBy: vi.fn().mockResolvedValue({ startPoint: { googlePlaceId: 'airport' }, endPoint: { googlePlaceId: 'end-airport' } }) };
   const places = { findBy: vi.fn().mockResolvedValue([{ id: 'hotel', googlePlaceId: 'google-hotel' }, { id: 'visit', googlePlaceId: 'google-visit' }]) };

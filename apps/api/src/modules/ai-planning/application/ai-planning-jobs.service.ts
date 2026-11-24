@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException, Scope } from '@nestjs/common';
+import { BadRequestException, HttpException, Inject, Injectable, NotFoundException, Scope } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 
@@ -116,12 +116,22 @@ export class AiPlanningJobsService {
       job.failureReason = result.failureReason;
     } catch (error) {
       job.status = AiPlanGenerationJobStatus.Unavailable;
-      job.failureReason = error instanceof Error ? error.message.slice(0, 120) : 'provider_failure';
+      job.failureReason = jobFailureReason(error);
     } finally {
       job.completedAt = new Date();
       await this.jobs.save(job);
     }
   }
+}
+
+function jobFailureReason(error: unknown): string {
+  if (error instanceof HttpException) {
+    const response = error.getResponse();
+    if (typeof response === 'object' && response !== null && 'code' in response && typeof response.code === 'string') {
+      return response.code.slice(0, 120);
+    }
+  }
+  return error instanceof Error ? error.message.slice(0, 120) : 'provider_failure';
 }
 
 function isUniqueViolation(error: unknown): boolean {

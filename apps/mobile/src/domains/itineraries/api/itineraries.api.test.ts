@@ -47,6 +47,16 @@ describe("generateAiPlan", () => {
     expect(mockWriteCache).not.toHaveBeenCalled();
   });
 
+  it("shows the plan limit message returned by a background generation", async () => {
+    mockGet.mockImplementation((path: string) => Promise.resolve({ data: path.endsWith("/status")
+      ? { generationId: "plan-limit-job", status: "unavailable", failureReason: "AI_GENERATION_LIMIT_REACHED" }
+      : { items: [], unplaced: [] } }));
+    mockPost.mockResolvedValue({ data: { generationId: "plan-limit-job", status: "running" } });
+    await expect(generateAiPlan("trip-1", { themes: ["highlights"] } as AiPlanRequest))
+      .rejects.toThrow("무료 AI 일정 생성 횟수를 모두 사용했어요");
+    expect(mockWriteCache).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
   });

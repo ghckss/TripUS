@@ -2,8 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { queryClient, resourceKey } from "@/shared/query/query-client";
 import { getTransitLeg, type ItineraryItem, type TransitRouteRequest } from "../../api/itineraries.api";
 
-export type TransitLegState = { status: "loading" | "available" | "unavailable"; durationMinutes: number | null };
-const LOADING: TransitLegState = { status: "loading", durationMinutes: null };
+export type TransitLegState = {
+  status: "loading" | "available" | "unavailable";
+  durationMinutes: number | null;
+  retry: () => void;
+};
+type TransitLegResult = Omit<TransitLegState, "retry">;
 
 /** Convert a known local departure time to an instant; never use the device's timezone. */
 export function departureInstant(item: ItineraryItem, timezone?: string): string | undefined {
@@ -40,7 +44,7 @@ export function useTransitLeg(tripId: string, origin: ItineraryItem, destination
   const key = `trips:${tripId}:route:${JSON.stringify([origin.date, "transit", request, locations])}`;
   const query = useQuery({
     queryKey: resourceKey(key),
-    queryFn: async (): Promise<TransitLegState> => {
+    queryFn: async (): Promise<TransitLegResult> => {
       const route = await getTransitLeg(tripId, request).catch(() => null);
       return route?.status === "available" && route.durationMinutes != null
         ? { status: "available", durationMinutes: route.durationMinutes }
@@ -50,6 +54,7 @@ export function useTransitLeg(tripId: string, origin: ItineraryItem, destination
     gcTime: 5 * 60_000,
     retry: false,
   }, queryClient);
-  if (query.isFetching || query.isPending) return LOADING;
-  return query.data ?? { status: "unavailable", durationMinutes: null };
+  const retry = () => { void query.refetch(); };
+  if (query.isFetching || query.isPending) return { status: "loading", durationMinutes: null, retry };
+  return { ...(query.data ?? { status: "unavailable", durationMinutes: null }), retry };
 }

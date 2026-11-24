@@ -29,4 +29,10 @@ describe("resolveTripProgress", () => {
       phase: "after", badgeLabel: "여행 완료", heading: "여행은 즐거우셨나요?", message: "여행의 순간을 정리해 보세요",
     });
   });
+
+  it("shows the completed state for an archived trip even during its original dates", () => {
+    expect(resolveTripProgress("2026-11-15", "2026-11-18", timezone, new Date("2026-11-16T03:00:00Z"), "2026-11-16T04:00:00Z")).toEqual({
+      phase: "after", badgeLabel: "여행 완료", heading: "여행은 즐거우셨나요?", message: "여행의 순간을 정리해 보세요",
+    });
+  });
 });

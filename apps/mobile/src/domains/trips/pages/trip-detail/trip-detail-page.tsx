@@ -22,7 +22,7 @@ export default function TripHomeScreen() {
   const path = `/trips/${tripId}` as const;
   const { showDialog } = useAppDialog();
   const progress = trip
-    ? resolveTripProgress(trip.startDate, trip.endDate, trip.timezone)
+    ? resolveTripProgress(trip.startDate, trip.endDate, trip.timezone, undefined, trip.archivedAt)
     : { badgeLabel: "여행 예정", heading: "준비가 한창이에요", message: null };
   return (
     <Screen bottomSlot={<TripNavigation tripId={tripId} active="home" />}>
@@ -47,7 +47,7 @@ export default function TripHomeScreen() {
       <Button label="＋ 장소 추가" testID="trip-add-place" variant="ghost" onPress={() => router.push(`${path}/places/new`)} />
       {trip && <Button label="여행 삭제" variant="danger" onPress={() => showDialog({
         title: "여행을 삭제할까요?",
-        message: `${trip.title}의 일정, 사진과 기록을 더 이상 앱에서 볼 수 없어요.`,
+        message: `삭제하면 ${trip.title}의 일정, 사진과 기록을 복구할 수 없어요.`,
         actions: [
           { label: "취소", variant: "ghost" },
           { label: "삭제", variant: "danger", onPress: () => void deleteTrip(tripId).then(async () => {

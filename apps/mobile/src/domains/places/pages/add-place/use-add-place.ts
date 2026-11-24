@@ -72,7 +72,9 @@ export function useAddPlace(tripId: string, initialQuery = "") {
       setQuery("");
       setResults([]);
       setSelectedId(undefined);
-      setNotes((current) => { const next = { ...current }; delete next[candidate.googlePlaceId]; return next; });
+      // Saving clears the search results, so drafts for other candidates are no longer
+      // visible or actionable. Clear them together to avoid a hidden dirty state.
+      setNotes({});
       showDialog({
         title: result.status === "created" ? "장소 추가 완료" : "이미 추가된 장소",
         message: result.status === "created" ? `${candidate.name}을(를) 추가했어요.` : "이미 추가한 장소예요.",

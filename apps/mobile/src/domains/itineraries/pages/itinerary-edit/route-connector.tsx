@@ -1,4 +1,4 @@
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { colors, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import type { ItineraryItem } from "../../api/itineraries.api";
@@ -12,9 +12,13 @@ export function RouteConnector({ tripId, origin, destination, timezone }: {
     <View style={styles.line} />
     {result.status === "loading"
       ? <ActivityIndicator size="small" color={colors.secondary} accessibilityLabel="이동 시간 계산 중" testID={`route-loading-${destination.id}`} />
-      : <AppText variant="caption" color={colors.muted} accessibilityLabel={result.durationMinutes == null ? "이동 시간 확인 불가" : `이동 시간 ${result.durationMinutes}분`}>
-        {result.durationMinutes == null ? "확인 불가" : `${result.durationMinutes}분`}
-      </AppText>}
+      : result.status === "unavailable"
+        ? <Pressable accessibilityRole="button" accessibilityLabel="이동 시간 다시 조회" onPress={result.retry} hitSlop={8}>
+          <AppText variant="caption" color={colors.secondary}>확인 불가 · 다시 조회</AppText>
+        </Pressable>
+        : <AppText variant="caption" color={colors.muted} accessibilityLabel={`이동 시간 ${result.durationMinutes}분`}>
+          {`${result.durationMinutes}분`}
+        </AppText>}
   </View>;
 }
 const styles = StyleSheet.create({

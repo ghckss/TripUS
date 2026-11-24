@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TravelTheme } from '../domain/ai-planner.port';
@@ -51,6 +52,18 @@ describe('AiPlanningJobsService', () => {
     });
     await vi.waitFor(() => expect(generate).toHaveBeenCalledOnce());
     await vi.waitFor(() => expect(records[0]?.status).toBe(AiPlanGenerationJobStatus.Generated));
+  });
+
+  it('persists a structured entitlement code when a background generation is rejected', async () => {
+    const generate = vi.fn().mockRejectedValue(new ConflictException({ code: 'AI_GENERATION_LIMIT_REACHED' }));
+    const { service, records } = createService(generate);
+
+    await service.start('trip-1', request);
+    await vi.waitFor(() => expect(records[0]?.status).toBe(AiPlanGenerationJobStatus.Unavailable));
+    await expect(service.getStatus('trip-1')).resolves.toMatchObject({
+      status: 'unavailable',
+      failureReason: 'AI_GENERATION_LIMIT_REACHED',
+    });
   });
 });
 

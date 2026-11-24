@@ -62,7 +62,7 @@ export class EntitlementsService {
   async assertCanGenerateAiPlan(): Promise<void> {
     const entitlement = await this.get();
     if (entitlement.aiGenerationLimit !== null && entitlement.aiGenerationsUsed >= entitlement.aiGenerationLimit) {
-      throw new ConflictException('무료 AI 일정 생성 1회를 모두 사용했어요. Plus에서 AI 일정을 더 만들 수 있어요.');
+      throw new ConflictException({ code: 'AI_GENERATION_LIMIT_REACHED' });
     }
   }
 

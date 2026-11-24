@@ -82,7 +82,9 @@ async function waitForGeneration(
         throw new Error("AI 일정에 충돌이 있어요. 일정 편집에서 다시 배치해 주세요.");
       }
       if (execution.generationId === generationId && execution.status === "unavailable") {
-        throw new Error(execution.failureReason === "timeout"
+        throw new Error(execution.failureReason === "AI_GENERATION_LIMIT_REACHED"
+          ? "무료 AI 일정 생성 횟수를 모두 사용했어요."
+          : execution.failureReason === "timeout"
           ? "일정을 구성하지 못했어요. AI 응답 대기 시간을 초과했어요. 잠시 후 다시 시도해 주세요."
           : execution.failureReason === "output_limit"
             ? "일정을 구성하지 못했어요. AI 응답 분량 제한으로 생성이 중단됐어요."
@@ -90,7 +92,9 @@ async function waitForGeneration(
       }
     } catch (error) {
       if (account !== getAccountScope()) throw error;
-      if (error instanceof Error && (error.message.startsWith("AI 일정에 충돌") || error.message.startsWith("일정을 구성하지 못했어요"))) {
+      if (error instanceof Error && (error.message.startsWith("AI 일정에 충돌")
+        || error.message.startsWith("일정을 구성하지 못했어요")
+        || error.message.startsWith("무료 AI 일정 생성 횟수"))) {
         throw error;
       }
       // Keep the loading state through transient status polling failures.
