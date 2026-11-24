@@ -1,6 +1,9 @@
 name: Deploy AWS API
 
 on:
+  push:
+    branches:
+      - dev
   workflow_dispatch:
     inputs:
       stage:
@@ -35,16 +38,64 @@ permissions:
   id-token: write
 
 concurrency:
-  group: aws-${{ inputs.stage }}
+  group: aws-${{ github.event_name == 'push' && 'dev' || inputs.stage }}
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  quality:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.stage }}
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: tripus
+          POSTGRES_USER: tripus
+          POSTGRES_PASSWORD: tripus_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tripus -d tripus"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://tripus:tripus_ci@127.0.0.1:5432/tripus
+      AUTH_MODE: development
+      ACCESS_TOKEN_SECRET: tripus-ci-secret-at-least-32-characters
+      AI_PLANNER_PROVIDER: mock
+      MAPS_PROVIDER: mock
+      PHOTO_STORAGE_PROVIDER: local
+      PHOTO_LOCAL_DIRECTORY: .data/photos
+      API_PUBLIC_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tripus/api migration:run
+      - run: pnpm contracts:generate
+      - name: Verify generated API contract
+        run: git diff --exit-code -- packages/contracts/openapi.json packages/api-client/src/schema.d.ts
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+
+  deploy:
+    needs: quality
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'push' && 'dev' || inputs.stage }}
     env:
       AWS_REGION: ap-northeast-2
       CDK_DEFAULT_REGION: ap-northeast-2
+      DEPLOY_OPERATION: ${{ github.event_name == 'push' && 'deploy' || inputs.operation }}
+      DEPLOY_PHASE: ${{ github.event_name == 'push' && 'steady' || inputs.phase }}
+      DEPLOY_STAGE: ${{ github.event_name == 'push' && 'dev' || inputs.stage }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -62,8 +113,8 @@ jobs:
       - run: pnpm --filter @tripus/infra test
       - name: Configure deployment phase
         env:
-          PHASE: ${{ inputs.phase }}
-          STAGE: ${{ inputs.stage }}
+          PHASE: ${{ env.DEPLOY_PHASE }}
+          STAGE: ${{ env.DEPLOY_STAGE }}
         run: |
           case "$PHASE" in
             steady)
@@ -100,18 +151,18 @@ jobs:
       - name: Synthesize infrastructure
         run: >-
           pnpm --filter @tripus/infra exec cdk synth --strict
-          --context stage=${{ inputs.stage }}
+          --context stage=$DEPLOY_STAGE
           --context applicationDatabaseRotation=$APP_DB_ROTATION
       - name: Show infrastructure diff
-        if: inputs.operation == 'diff'
+        if: env.DEPLOY_OPERATION == 'diff'
         run: >-
           pnpm --filter @tripus/infra exec cdk diff --strict $CDK_TARGET
-          --context stage=${{ inputs.stage }}
+          --context stage=$DEPLOY_STAGE
           --context applicationDatabaseRotation=$APP_DB_ROTATION
       - name: Deploy infrastructure
-        if: inputs.operation == 'deploy'
+        if: env.DEPLOY_OPERATION == 'deploy'
         run: >-
           pnpm --filter @tripus/infra exec cdk deploy $CDK_TARGET
-          --context stage=${{ inputs.stage }}
+          --context stage=$DEPLOY_STAGE
           --context applicationDatabaseRotation=$APP_DB_ROTATION
           --require-approval never

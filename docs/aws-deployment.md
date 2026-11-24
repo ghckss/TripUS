@@ -116,7 +116,9 @@ pnpm deploy:smoke https://<ApiEndpointDomain>
 4. migration이 `tripus_app` 계정을 만든 것을 확인한다.
 5. `stage=prod`, `phase=prod-db-rotation`
 
-이후 이미 초기화된 `dev` 또는 `prod` 환경의 일반 변경은 `phase=steady`, `operation=diff`로 변경 사항을 검토한 다음 같은 stage에서 `operation=deploy`를 사용한다. `steady`는 애플리케이션 DB 회전이 이미 활성화된 환경만 대상으로 한다.
+이후 이미 초기화된 `prod` 환경의 일반 변경은 `phase=steady`, `operation=diff`로 변경 사항을 검토한 다음 같은 stage에서 `operation=deploy`를 사용한다. `steady`는 애플리케이션 DB 회전이 이미 활성화된 환경만 대상으로 한다.
+
+`dev` 브랜치에 push하면 `Deploy AWS API` workflow가 자동으로 품질 검사, API 패키징과 CDK 검증을 수행한 뒤 `stage=dev`, `phase=steady`로 전체 dev 스택을 배포한다. 실행 중인 배포는 취소하지 않고 최신 대기 작업이 이어서 진행된다. 자동 배포가 실패하면 GitHub Actions 로그에서 `quality` 또는 `deploy` job을 확인하며, 운영 배포는 계속 수동 실행한다.
 
 최초 CDK bootstrap과 GitHub OIDC 역할 생성은 AWS 관리자 권한으로 별도 수행한다. `prod` Environment에는 required reviewer를 설정하고, 배포 전 `diff` 실행 결과와 IAM 변경을 검토한다. 워크플로 배포는 `cdk synth --strict`, 인프라 테스트, `cdk-nag`를 먼저 통과해야 시작된다.
 
