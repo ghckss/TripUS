@@ -1,6 +1,6 @@
 import type { AiPlannerInput } from '../domain/ai-planner.port';
 
-export const AI_PLANNER_PROMPT_VERSION = '2026-11-17-day-visits-v16';
+export const AI_PLANNER_PROMPT_VERSION = '2026-11-24-day-visits-v17';
 
 export const AI_PLANNER_SYSTEM_PROMPT = [
   '당신은 실제 방문 가능한 날짜별 여행 시간표를 작성하는 여행 플래너입니다. 한국어로 작성하고 지정된 JSON으로만 반환하세요.',
@@ -17,6 +17,10 @@ export const AI_PLANNER_SYSTEM_PROMPT = [
   '등록 장소는 가능한 한 방문하되 휴관·예약 제약·시간 부족·이동 부담이 있으면 생성 대상의 다른 날짜로 옮기거나 방문에서 제외할 수 있습니다. 제외한 장소의 별도 목록은 필요하지 않습니다. 더 나은 장소로 대체할 수 있으나 분량을 위한 방문을 추가하지 마세요.',
   'preferences.themes는 복수 선택한 여행 방식입니다. food는 현지 식당·먹거리, highlights는 대표 명소, cafes는 실제 카페·사진 명소, culture는 박물관·미술관·문화시설, shopping은 시장·상점·쇼핑 거리, nature는 공원·정원·자연 경관의 실제 방문을 우선합니다.',
   '선택한 방식은 여행 전체에서 고르게 반영하되 하루에 모두 억지로 넣지 마세요. 맛집·카페 선택도 관광을 전부 식사로 대체하는 뜻은 아니며 nature도 별도 휴식 활동을 뜻하지 않습니다. 방문 수는 가용 시간·관람 특성·동선·운영시간으로 결정하고 관광 장소의 목표·최소·최대 개수나 밀도를 정하지 마세요.',
+  'preferences.companions가 있으면 인원·연령·관계와 이동 부담을 일정 선택에 반영하되 입력되지 않은 동행자 특성을 만들지 마세요.',
+  'preferences.transportModes는 사용자가 선택한 이동 수단입니다. public_transit은 대중교통, walking은 도보, car는 자동차·렌터카이며 복수이면 구간 특성에 맞게 조합하세요. 선택하지 않은 이동 수단을 일정의 전제로 삼지 마세요.',
+  'preferences.budgetLevel은 budget=가성비, standard=가격과 만족도의 균형, premium=비용보다 특별한 경험 우선입니다. 장소와 식당 선택에 반영하되 확인되지 않은 가격을 단정하지 마세요.',
+  'preferences.additionalRequests는 사용자가 직접 작성한 필수 고려사항입니다. 여행 경계·안전·실제 운영 가능성과 충돌하지 않는 한 구체적인 장소·투어·시간대·선호·회피 요청을 일정에 반영하세요. 투어 약칭이나 여러 장소를 뜻하는 표현은 웹 검색으로 실제 방문 구성을 확인하고, 단순 집결지만 넣어 요청을 충족한 것으로 처리하지 마세요. 반영할 수 없다면 임의로 무시하지 말고 실행 가능한 가장 가까운 대안으로 구성하세요.',
 
   // 실행 가능성 확인
   '웹 검색은 실제 방문일의 관광지 휴관일·운영시간·입장 마감·예약 필요 여부, 식당 위치·영업시간·브레이크타임처럼 실행 가능성에 직접 영향을 주는 정보부터 확인하세요. 공식 시설·식당·교통기관 자료를 우선하고 같은 내용을 반복 검색하지 마세요.',
@@ -42,7 +46,7 @@ export function buildPlannerSystemPrompt(): string {
   return AI_PLANNER_SYSTEM_PROMPT;
 }
 
-/** Send the travel brief and selected themes, without legacy policies or reviewer context. */
+/** Send the travel brief and current user preferences, without retired policies or reviewer context. */
 export function buildPlannerUserInput(input: AiPlannerInput) {
   const nights = Math.max(0, Math.round((Date.parse(`${input.trip.endDate}T00:00:00Z`) - Date.parse(`${input.trip.startDate}T00:00:00Z`)) / 86_400_000));
   return {
@@ -60,6 +64,10 @@ export function buildPlannerUserInput(input: AiPlannerInput) {
     },
     preferences: {
       themes: input.preferences.themes,
+      companions: input.preferences.companions,
+      transportModes: input.preferences.transportModes,
+      budgetLevel: input.preferences.budgetLevel,
+      additionalRequests: input.preferences.additionalRequests,
     },
     lodgings: input.trip.lodgings ?? [],
     startPoint: input.trip.startPoint,

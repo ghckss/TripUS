@@ -42,6 +42,10 @@ export interface AiPlannerDay {
 export interface AiPlannerInput {
   preferences: {
     themes: TravelTheme[];
+    companions: string | null;
+    transportModes: Array<'public_transit' | 'walking' | 'car'>;
+    budgetLevel: 'budget' | 'standard' | 'premium';
+    additionalRequests: string | null;
   };
   trip: {
     title: string;

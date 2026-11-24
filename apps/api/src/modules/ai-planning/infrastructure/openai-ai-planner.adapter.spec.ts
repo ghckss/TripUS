@@ -42,7 +42,11 @@ describe('day visit response schema', () => {
 });
 
 const plannerInput: AiPlannerInput = {
-  preferences: { themes: [TravelTheme.Food, TravelTheme.Cafes] },
+  preferences: {
+    themes: [TravelTheme.Food, TravelTheme.Cafes], companions: '친구 2명',
+    transportModes: ['public_transit', 'walking'], budgetLevel: 'standard',
+    additionalRequests: '야경은 저녁에 보고 싶어요.',
+  },
   trip: { title: 'Paris', destination: '프랑스', regions: [], timezone: 'Europe/Paris', startDate: '2026-12-01', endDate: '2026-12-07', startPoint: null, endPoint: null, lodgings: [] },
   places: [], days: [],
 };

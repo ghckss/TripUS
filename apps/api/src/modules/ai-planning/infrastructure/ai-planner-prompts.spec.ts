@@ -3,7 +3,13 @@ import { TravelTheme, type AiPlannerInput } from '../domain/ai-planner.port';
 import { buildPlannerSystemPrompt, buildPlannerUserInput } from './ai-planner-prompts';
 
 const input: AiPlannerInput = {
-  preferences: { themes: [TravelTheme.Food, TravelTheme.Cafes] },
+  preferences: {
+    themes: [TravelTheme.Food, TravelTheme.Cafes],
+    companions: '부모님과 3명',
+    transportModes: ['public_transit', 'walking'],
+    budgetLevel: 'premium',
+    additionalRequests: '몽생미셸 투어를 포함하고 루브르는 오전에 방문',
+  },
   trip: {
     title: '유럽 여행', destination: '프랑스', regions: [{ name: '파리', address: null, latitude: 48.85, longitude: 2.35 }],
     timezone: 'Europe/Paris', startDate: '2026-12-01', endDate: '2026-12-07',
@@ -29,9 +35,15 @@ describe('travel brief and selected preferences', () => {
     expect(buildPlannerUserInput({ ...input, trip: { ...input.trip, startDate, endDate } }).trip).toMatchObject({ nights, days });
   });
 
-  it('passes selected themes without a density or sightseeing count target', () => {
+  it('passes all current preferences without a density or sightseeing count target', () => {
     const themes = Object.values(TravelTheme);
-    expect(buildPlannerUserInput({ ...input, preferences: { themes } }).preferences).toEqual({ themes });
+    expect(buildPlannerUserInput({ ...input, preferences: { ...input.preferences, themes } }).preferences).toEqual({ ...input.preferences, themes });
+    const prompt = buildPlannerSystemPrompt();
+    expect(prompt).toContain('preferences.companions');
+    expect(prompt).toContain('preferences.transportModes');
+    expect(prompt).toContain('preferences.budgetLevel');
+    expect(prompt).toContain('preferences.additionalRequests');
+    expect(prompt).toContain('투어 약칭이나 여러 장소를 뜻하는 표현은 웹 검색');
   });
 
   it('treats boundaries as ready-to-start and arrival times without adding airport procedures', () => {

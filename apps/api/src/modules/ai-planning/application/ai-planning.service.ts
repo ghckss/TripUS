@@ -159,7 +159,13 @@ export class AiPlanningService {
         themes: request.themes,
       });
       const plannerInput: AiPlannerInput = {
-        preferences: { themes: request.themes },
+        preferences: {
+          themes: request.themes,
+          companions: request.companions ?? null,
+          transportModes: request.transportModes,
+          budgetLevel: request.budgetLevel ?? AiBudgetLevel.Standard,
+          additionalRequests: request.additionalRequests ?? null,
+        },
         trip: {
           title: trip.title, destination: trip.destination,
           regions: (trip.regions ?? []).map(({ name, address, latitude, longitude }) => ({ name, address, latitude, longitude })),

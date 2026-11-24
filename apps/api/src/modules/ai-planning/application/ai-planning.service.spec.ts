@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AiPlanningService, addLodgingEndpoints } from './ai-planning.service';
 import { AiPlannerError, TravelTheme, type AiPlannerInput, type AiPlannerOutput, type AiPlannerVisit } from '../domain/ai-planner.port';
-import { AiTransportMode } from './dto/generate-ai-plan.dto';
+import { AiBudgetLevel, AiTransportMode } from './dto/generate-ai-plan.dto';
 import * as logs from '../../../common/http/json-logger';
 
 type StoredPlacement = { savedPlaceId: string; date: string; position: number; locked?: boolean; scheduledTime?: string; durationMinutes?: number };
@@ -11,7 +11,11 @@ const visit: AiPlannerVisit = {
   startTime: '23:00', durationMinutes: 30, description: '강변의 정원과 파리 풍경', mealType: 'lunch',
 };
 const draft: AiPlannerOutput = { days: [{ date, visits: [visit] }] };
-const request = { themes: [TravelTheme.Highlights], transportModes: [AiTransportMode.PublicTransit], additionalRequests: '와인과 치즈, 노르망디 투어' };
+const request = {
+  themes: [TravelTheme.Highlights], companions: '친구 2명',
+  transportModes: [AiTransportMode.PublicTransit, AiTransportMode.Walking],
+  budgetLevel: AiBudgetLevel.Premium, additionalRequests: '와인과 치즈, 노르망디 투어',
+};
 function place(id: string, note: string | null = null, lodging = false) {
   return { id, name: id, tripId: 'trip', tag: lodging ? 'lodging' : 'attraction', isPrimaryLodging: lodging, note, googlePlaceId: id, address: 'Paris', latitude: 48.85, longitude: 2.35 };
 }
@@ -214,7 +218,10 @@ describe('travel preferences compatibility', () => {
     const { service, generate } = setup({ ...request, density: 'busy' });
     expect((await service.getLatestRequest('trip')).request).not.toHaveProperty('density');
     await service.generateDay('trip', date);
-    expect(generate.mock.calls[0]?.[0].preferences).toEqual({ themes: request.themes });
+    expect(generate.mock.calls[0]?.[0].preferences).toEqual({
+      themes: request.themes, companions: request.companions, transportModes: request.transportModes,
+      budgetLevel: request.budgetLevel, additionalRequests: request.additionalRequests,
+    });
   });
   it('does not retain a legacy density when a queued request is saved again', async () => {
     const { service, saveTrip } = setup();
@@ -223,12 +230,14 @@ describe('travel preferences compatibility', () => {
     expect(saveTrip.mock.calls[0]?.[0]).toMatchObject({ latestAiPlanRequest: request });
     expect(saveTrip.mock.calls[0]?.[0]).not.toHaveProperty('latestAiPlanRequest.density');
   });
-  it.each([undefined, date])('passes themes without adding unrelated request fields for scope %s', async (targetDate) => {
+  it.each([undefined, date])('passes every current preference to the model for scope %s', async (targetDate) => {
     const { service, generate } = setup();
-    const preferences = { themes: [TravelTheme.Food, TravelTheme.Cafes, TravelTheme.Nature] };
-    await service.generate('trip', { ...request, ...preferences }, targetDate);
-    expect(generate.mock.calls[0]?.[0].preferences).toEqual(preferences);
+    const requested = { ...request, themes: [TravelTheme.Food, TravelTheme.Cafes, TravelTheme.Nature] };
+    await service.generate('trip', requested, targetDate);
+    expect(generate.mock.calls[0]?.[0].preferences).toEqual({
+      themes: requested.themes, companions: requested.companions, transportModes: requested.transportModes,
+      budgetLevel: requested.budgetLevel, additionalRequests: requested.additionalRequests,
+    });
     expect(generate.mock.calls[0]?.[0].days.map((day) => day.date)).toEqual([date]);
-    expect(generate.mock.calls[0]?.[0]).not.toHaveProperty('additionalRequests');
   });
 });
