@@ -13,8 +13,6 @@ export type AiPlanRequest = components["schemas"]["GenerateAiPlanDto"];
 export type AiTransportMode = components["schemas"]["AiTransportMode"];
 export type AiBudgetLevel = components["schemas"]["AiBudgetLevel"];
 export type ReplaceItineraryItem = components["schemas"]["ReplaceItineraryItemDto"];
-export type TransitRouteRequest = components["schemas"]["TransitRouteRequestDto"];
-export type TransitRoute = components["schemas"]["TransitRouteResponseDto"];
 type AiPlanExecutionStatus = components["schemas"]["AiPlanExecutionStatusResponseDto"];
 
 const GENERATION_POLL_MS = 2_000;
@@ -183,21 +181,4 @@ function serializeActivity(activity: ItineraryActivity): ItineraryActivity {
     savedPlaceId, locationName, fromLocation, toLocation, travelMethod } = activity;
   return { id, date, position, type, title, startTime, durationMinutes, locationType,
     savedPlaceId, locationName, fromLocation, toLocation, travelMethod };
-}
-
-export async function getTransitRoute(
-  tripId: string,
-  originSavedPlaceId: string,
-  destinationSavedPlaceId: string,
-): Promise<TransitRoute> {
-  return getTransitLeg(tripId, { originSavedPlaceId, destinationSavedPlaceId });
-}
-
-export async function getTransitLeg(tripId: string, request: TransitRouteRequest): Promise<TransitRoute> {
-  const { data, error } = await tripUsApi.POST("/v1/trips/{tripId}/routes/transit", {
-    params: { path: { tripId } },
-    body: request,
-  });
-  if (error) throw new Error(apiErrorMessage(error));
-  return data;
 }

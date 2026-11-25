@@ -3,7 +3,6 @@ import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 import ItineraryScreen from "./itinerary-edit-page";
 import { AppDialogProvider } from "@/shared/ui/app-dialog";
 
-jest.mock("./use-transit-leg", () => ({ useTransitLeg: () => ({ status: "available", durationMinutes: 18 }) }));
 
 const mockSetPlacesForDate = jest.fn();
 const mockRemoveFromItinerary = jest.fn();
@@ -203,7 +202,7 @@ describe("ItineraryScreen day editing", () => {
     expect(screen.getByLabelText("AI가 Day 1 일정을 업데이트하는 중")).toBeOnTheScreen();
   });
 
-  it("shows travel time on the connector between itinerary cards", async () => {
+  it("shows only a connector line between itinerary cards without travel time", async () => {
     mockItinerary = {
       items: [
         { id: "item-1", savedPlaceId: "place-1", placeName: "감천문화마을", date: "2026-11-08", position: 0 },
@@ -214,8 +213,9 @@ describe("ItineraryScreen day editing", () => {
 
     const screen = await renderItineraryScreen();
 
-    expect(screen.getByText("18분")).toBeOnTheScreen();
-    expect(screen.getByLabelText("이동 시간 18분")).toBeOnTheScreen();
+    expect(screen.getByTestId("route-connector")).toBeOnTheScreen();
+    expect(screen.queryByText("18분")).not.toBeOnTheScreen();
+    expect(screen.queryByLabelText("이동 시간 18분")).not.toBeOnTheScreen();
   });
 
   it("does not show transit or external directions actions between visits", async () => {

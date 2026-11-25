@@ -2,8 +2,6 @@ import { render, screen } from '@testing-library/react-native';
 import type { ItineraryActivity, ItineraryItem } from '../../api/itineraries.api';
 import { DayActivityTimeline, mergeDayTimeline, timeRange, timelineMapItems } from './day-activity-timeline';
 
-jest.mock('./use-transit-leg', () => ({ useTransitLeg: () => ({ status: 'available', durationMinutes: 18 }) }));
-
 const activity: ItineraryActivity = {
   id: 'arrival', date: '2026-12-01', position: 0, type: 'arrival', title: '입국 및 수하물 수령', startTime: '12:00', durationMinutes: 90,
   locationType: 'start_point', savedPlaceId: null, locationName: 'CDG', fromLocation: null, toLocation: null, travelMethod: null,
@@ -21,10 +19,11 @@ const activities = [
 it('keeps current place order and preserves day boundaries without inserting legacy activities', () => {
   expect(mergeDayTimeline(places, activities, 'airport', 'hotel').map((entry) => entry.id)).toEqual(['airport', 'visit', 'hotel']);
 });
-it('shows places and timed activities without transport methods or estimate explanations', async () => {
-  await render(<DayActivityTimeline tripId="timeline-test" items={places} activities={activities} startId='airport' endId='hotel' onPlacePress={jest.fn()} />);
+it('shows places and timed activities without travel durations, transport methods, or estimate explanations', async () => {
+  await render(<DayActivityTimeline items={places} activities={activities} startId='airport' endId='hotel' onPlacePress={jest.fn()} />);
   expect(screen.queryByText(/입국|짐 보관|휴식|대기/)).toBeNull();
-  expect(screen.getAllByText('18분')[0]).toBeTruthy();
+  expect(screen.queryByText('18분')).toBeNull();
+  expect(screen.getAllByTestId('route-connector')).toHaveLength(2);
   expect(screen.queryByText('CDG → 호텔')).toBeNull();
   expect(screen.getByText('파리를 대표하는 철제 전망탑')).toBeTruthy();
   expect(screen.queryByText(/택시|추정|예상 소요시간/)).toBeNull();

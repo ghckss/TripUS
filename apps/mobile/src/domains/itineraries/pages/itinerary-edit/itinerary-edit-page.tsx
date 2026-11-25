@@ -36,7 +36,7 @@ const ITINERARY_ITEM_HEIGHT = ITINERARY_CARD_HEIGHT + TRAVEL_CONNECTOR_HEIGHT;
 export default function ItineraryScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const {
-    dates, timezone, error, hasChanges, itinerary, places, reload,
+    dates, error, hasChanges, itinerary, places, reload,
     removeFromItinerary, reorderWithinDay, replaceDayLodging, save, saving, setPlacesForDate,
     updateDayWithAi, updatingDate,
   } = useItineraryEdit(tripId);
@@ -166,11 +166,11 @@ export default function ItineraryScreen() {
       </View>
       {items.length === 0 && <AppText color={colors.muted}>아직 배치된 장소가 없어요.</AppText>}
       {dayActivities.length > 0 && <>
-        <DayActivityTimeline tripId={tripId} timezone={timezone} items={items} activities={dayActivities}
+        <DayActivityTimeline items={items} activities={dayActivities}
           startId={hasFixedStart ? firstItem?.id : undefined} endId={hasFixedEnd ? lastItem?.id : undefined}
           onPlacePress={focusPlaceOnMap} />
         <Button label={showPlaceEditor ? "장소 순서 편집 닫기" : "장소 순서 편집"} variant="ghost" onPress={() => setShowPlaceEditor(!showPlaceEditor)} />
-        {showPlaceEditor && <AppText variant="caption" color={colors.muted}>이동시간은 변경된 구간에 맞춰 갱신돼요. 방문 시각까지 다시 구성하려면 일정 업데이트를 사용하세요.</AppText>}
+        {showPlaceEditor && <AppText variant="caption" color={colors.muted}>방문 시각까지 다시 구성하려면 일정 업데이트를 사용하세요.</AppText>}
       </>}
       {(dayActivities.length === 0 || showPlaceEditor) && <View style={styles.placeList}>
         {hasFixedStart && <DraggableItineraryItem
@@ -187,7 +187,7 @@ export default function ItineraryScreen() {
           scheduledTime={items[0].scheduledTime}
           timePrefix="출발"
         />}
-        {hasFixedStart && items.length > 1 && <RouteConnector tripId={tripId} origin={items[0]} destination={items[1]} timezone={timezone} />}
+        {hasFixedStart && items.length > 1 && <RouteConnector />}
         {movableItems.length > 0 && <View
           style={[styles.sortableViewport, { height: sortableHeight }]}
           testID="itinerary-sortable-list"
@@ -226,7 +226,7 @@ export default function ItineraryScreen() {
                   placeName={item.placeName}
                   scheduledTime={item.scheduledTime}
                 />
-                {placeIndex < items.length - 1 && <RouteConnector tripId={tripId} origin={item} destination={items[placeIndex + 1]} timezone={timezone} />}
+                {placeIndex < items.length - 1 && <RouteConnector />}
               </SortableItem>;
             }}
           />

@@ -7,7 +7,7 @@ import type { ItineraryActivity, ItineraryItem } from "../../api/itineraries.api
 
 type Entry = { id: string; time: string | null; duration: number | null; position: number; title: string; label: string; detail?: string | null; place: ItineraryItem; anchor: number };
 
-/** Place order follows the current itinerary; route connectors fetch their own durations. */
+/** Place order follows the current itinerary. */
 export function mergeDayTimeline(items: ItineraryItem[], _activities: ItineraryActivity[], startId?: string, endId?: string): Entry[] {
   const places: Entry[] = items.map((item) => ({ id: item.id, time: item.scheduledTime ?? null, duration: item.durationMinutes ?? null,
     position: item.position ?? 0, title: item.placeName, label: item.id === startId ? "출발" : item.id === endId ? "도착" : "방문",
@@ -32,13 +32,13 @@ export function timeRange(time: string | null, duration: number | null): string 
   return `${time}–${nextDay ? `다음 날 ${nextDay > 1 ? `+${nextDay}일 ` : ""}` : ""}${String(Math.floor(end / 60) % 24).padStart(2, "0")}:${String(end % 60).padStart(2, "0")} · ${duration}분`;
 }
 
-export function DayActivityTimeline({ tripId, timezone, items, activities, startId, endId, onPlacePress }: {
-  tripId: string; timezone?: string; items: ItineraryItem[]; activities: ItineraryActivity[]; startId?: string; endId?: string; onPlacePress: (id: string) => void;
+export function DayActivityTimeline({ items, activities, startId, endId, onPlacePress }: {
+  items: ItineraryItem[]; activities: ItineraryActivity[]; startId?: string; endId?: string; onPlacePress: (id: string) => void;
 }) {
   const entries = mergeDayTimeline(items, activities, startId, endId);
   return <View testID="day-activity-timeline" style={styles.list}>
     {entries.map((entry, index) => <View key={entry.id}>
-      {index > 0 && <RouteConnector tripId={tripId} origin={entries[index - 1].place} destination={entry.place} timezone={timezone} />}
+      {index > 0 && <RouteConnector />}
       <View style={styles.row}>
         <AppText variant="caption" color={colors.primary}>{entry.label} · {timeRange(entry.time, entry.duration)}</AppText>
         <Pressable accessibilityRole="button" accessibilityLabel={`${entry.title} 지도에서 보기`} onPress={() => onPlacePress(entry.id)}>
