@@ -6,6 +6,8 @@ import CompleteTripScreen from "./complete-trip-page";
 
 const mockComplete = jest.fn();
 const mockAddPhoto = jest.fn();
+const mockDeletePhoto = jest.fn();
+const mockDownloadOriginal = jest.fn();
 let mockTrip: { archivedAt?: string | null };
 let mockItinerary: { items: Record<string, unknown>[] };
 let mockPhotos: Record<string, unknown>[];
@@ -20,9 +22,12 @@ jest.mock("./use-complete-trip", () => ({
     accessToken: "access-token",
     addPhoto: mockAddPhoto,
     complete: mockComplete,
+    downloadOriginal: mockDownloadOriginal,
     error: undefined,
     itinerary: mockItinerary,
     photos: mockPhotos,
+    message: undefined,
+    removePhoto: mockDeletePhoto,
     retry: jest.fn(),
     saving: false,
     trip: mockTrip,
@@ -58,7 +63,9 @@ describe("CompleteTripScreen", () => {
     const screen = await render(<CompleteTripScreen />);
 
     expect(screen.getByLabelText("서울숲 대표 사진")).toBeOnTheScreen();
-    expect(screen.getByRole("button", { name: "사진 등록 완료" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "사진 교체" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "원본 저장" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "사진 삭제" })).toBeEnabled();
     expect(screen.getAllByText("사진 추가")).toHaveLength(1);
     expect(mockAddPhoto).not.toHaveBeenCalled();
   });

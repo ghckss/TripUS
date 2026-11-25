@@ -9,6 +9,8 @@ import { DataSource, EntityManager, IsNull, MoreThan, Repository } from 'typeorm
 import { AuthMode } from '../../../config/environment';
 import { DEVELOPMENT_USER_ID } from '../../identity/infrastructure/development-identity.service';
 import { UserEntity } from '../../users/domain/entities/user.entity';
+import { TripEntity } from '../../trips/domain/entities/trip.entity';
+import { PhotosService } from '../../photos/application/photos.service';
 import { AuthIdentityEntity } from '../domain/entities/auth-identity.entity';
 import { RefreshTokenEntity } from '../domain/entities/refresh-token.entity';
 import { SOCIAL_IDENTITY_PORT, type SocialIdentityPort } from '../domain/social-identity.port';
@@ -26,6 +28,7 @@ export class AuthService {
     @Inject(SOCIAL_IDENTITY_PORT) private readonly socialIdentity: SocialIdentityPort,
     @Inject(ConfigService) private readonly config: ConfigService,
     @Inject(DataSource) private readonly dataSource: DataSource,
+    @Inject(PhotosService) private readonly photos: PhotosService,
   ) {}
 
   async socialLogin(input: SocialLoginDto): Promise<AuthSessionDto> {
@@ -87,6 +90,16 @@ export class AuthService {
       token.revokedAt = new Date();
       await this.refreshTokens.save(token);
     }
+  }
+
+  async deleteAccount(userId: string): Promise<void> {
+    const user = await this.users.findOneBy({ id: userId });
+    if (!user) return;
+    await this.photos.deleteAllForUser(userId);
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(TripEntity, { ownerId: userId });
+      await manager.delete(UserEntity, { id: userId });
+    });
   }
 
   private async issueSession(user: UserEntity): Promise<AuthSessionDto> {

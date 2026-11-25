@@ -1,6 +1,6 @@
 import type { Readable } from 'node:stream';
 
-import { BadRequestException, Body, Controller, Get, Headers, HttpCode, Inject, Param, ParseUUIDPipe, Post, Put, Req, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Headers, HttpCode, Inject, Param, ParseUUIDPipe, Post, Put, Req, Res } from '@nestjs/common';
 import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiParam, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 
@@ -67,6 +67,18 @@ export class PhotosController {
   ): Promise<void> {
     const file = await this.photos.readFile(tripId, photoId, variant);
     response.type(file.mimeType).send(Buffer.from(file.body));
+  }
+
+  @Delete(':photoId')
+  @HttpCode(204)
+  @ApiParam({ name: 'tripId', type: String, format: 'uuid' })
+  @ApiParam({ name: 'photoId', type: String, format: 'uuid' })
+  @ApiNoContentResponse()
+  async delete(
+    @Param('tripId', new ParseUUIDPipe()) tripId: string,
+    @Param('photoId', new ParseUUIDPipe()) photoId: string,
+  ): Promise<void> {
+    await this.photos.delete(tripId, photoId);
   }
 }
 

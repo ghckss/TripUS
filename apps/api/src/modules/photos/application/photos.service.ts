@@ -40,7 +40,10 @@ export class PhotosService {
       }
       const item = await this.itineraryItems.findOneBy({ id: input.itineraryItemId, tripId });
       if (!item) throw new NotFoundException('Itinerary item not found');
-      await this.assertPlacePhotoSlotAvailable(tripId, item.savedPlaceId);
+      if (input.replacesPhotoId) await this.assertReplacementMatchesPlace(tripId, input.replacesPhotoId, item.savedPlaceId);
+      await this.assertPlacePhotoSlotAvailable(tripId, item.savedPlaceId, input.replacesPhotoId);
+    } else if (input.replacesPhotoId) {
+      throw new BadRequestException({ code: 'PHOTO_REPLACEMENT_ITEM_REQUIRED' });
     }
     const id = randomUUID();
     const originalKey = `${userId}/${tripId}/${id}/original.${extensionFor(input.mimeType)}`;
@@ -48,6 +51,7 @@ export class PhotosService {
       id,
       tripId,
       itineraryItemId: input.itineraryItemId ?? null,
+      replacesPhotoId: input.replacesPhotoId ?? null,
       originalKey,
       optimizedKey: null,
       thumbnailKey: null,
@@ -82,7 +86,10 @@ export class PhotosService {
 
   async confirm(tripId: string, photoId: string): Promise<PhotoResponseDto> {
     const photo = await this.getOwnedPhoto(tripId, photoId);
-    if (photo.status === PhotoStatus.Ready) return this.toResponse(photo);
+    if (photo.status === PhotoStatus.Ready) {
+      await this.finalizeReplacement(photo);
+      return this.toResponse(photo);
+    }
     try {
       const original = await this.storage.read(photo.originalKey);
       const derivatives = await this.processor.createDerivatives(original);
@@ -94,6 +101,7 @@ export class PhotosService {
       ]);
       photo.status = PhotoStatus.Ready;
       await this.photos.save(photo);
+      await this.finalizeReplacement(photo);
       return this.toResponse(photo);
     } catch (error) {
       photo.status = PhotoStatus.Failed;
@@ -117,6 +125,21 @@ export class PhotosService {
     const key = variant === 'original' ? photo.originalKey : variant === 'optimized' ? photo.optimizedKey : photo.thumbnailKey;
     if (!key) throw new NotFoundException('Photo variant not found');
     return { body: await this.storage.read(key), mimeType: variant === 'original' ? photo.mimeType : 'image/jpeg' };
+  }
+
+  async delete(tripId: string, photoId: string): Promise<void> {
+    const photo = await this.getOwnedPhoto(tripId, photoId);
+    await this.deletePhoto(photo);
+  }
+
+  async deleteAllForUser(userId: string): Promise<void> {
+    const photos = await this.photos.createQueryBuilder('photo')
+      .innerJoin(TripEntity, 'trip', 'trip.id = photo.tripId')
+      .where('trip.ownerId = :userId', { userId })
+      .getMany();
+    await Promise.all(photos.flatMap((photo) => [photo.originalKey, photo.optimizedKey, photo.thumbnailKey]
+      .filter((key): key is string => Boolean(key))
+      .map((key) => this.storage.delete(key))));
   }
 
   private async toResponse(photo: PhotoEntity): Promise<PhotoResponseDto> {
@@ -150,18 +173,45 @@ export class PhotosService {
     if (!trip) throw new NotFoundException('Trip not found');
   }
 
-  private async assertPlacePhotoSlotAvailable(tripId: string, savedPlaceId: string): Promise<void> {
+  private async assertPlacePhotoSlotAvailable(tripId: string, savedPlaceId: string, replacesPhotoId?: string): Promise<void> {
     const activeUploadCutoff = new Date(Date.now() - 15 * 60 * 1_000);
     const existing = await this.photos.createQueryBuilder('photo')
       .innerJoin(ItineraryItemEntity, 'item', 'item.id = photo.itineraryItemId')
       .where('photo.tripId = :tripId', { tripId })
       .andWhere('item.savedPlaceId = :savedPlaceId', { savedPlaceId })
+      .andWhere(replacesPhotoId ? 'photo.id != :replacesPhotoId' : '1 = 1', { replacesPhotoId })
       .andWhere(
         '(photo.status = :ready OR (photo.status = :pending AND photo.createdAt > :activeUploadCutoff))',
         { ready: PhotoStatus.Ready, pending: PhotoStatus.Pending, activeUploadCutoff },
       )
       .getExists();
     if (existing) throw new ConflictException({ code: 'PLACE_PHOTO_LIMIT_REACHED' });
+  }
+
+  private async assertReplacementMatchesPlace(tripId: string, photoId: string, savedPlaceId: string): Promise<void> {
+    const replacement = await this.photos.createQueryBuilder('photo')
+      .innerJoin(ItineraryItemEntity, 'item', 'item.id = photo.itineraryItemId')
+      .where('photo.id = :photoId', { photoId })
+      .andWhere('photo.tripId = :tripId', { tripId })
+      .andWhere('item.savedPlaceId = :savedPlaceId', { savedPlaceId })
+      .andWhere('photo.status = :status', { status: PhotoStatus.Ready })
+      .getOne();
+    if (!replacement) throw new BadRequestException({ code: 'PHOTO_REPLACEMENT_MISMATCH' });
+  }
+
+  private async finalizeReplacement(photo: PhotoEntity): Promise<void> {
+    if (!photo.replacesPhotoId) return;
+    const previous = await this.photos.findOneBy({ id: photo.replacesPhotoId, tripId: photo.tripId });
+    if (previous) await this.deletePhoto(previous);
+    photo.replacesPhotoId = null;
+    await this.photos.save(photo);
+  }
+
+  private async deletePhoto(photo: PhotoEntity): Promise<void> {
+    await Promise.all([photo.originalKey, photo.optimizedKey, photo.thumbnailKey]
+      .filter((key): key is string => Boolean(key))
+      .map((key) => this.storage.delete(key)));
+    await this.photos.delete({ id: photo.id, tripId: photo.tripId });
   }
 }
 

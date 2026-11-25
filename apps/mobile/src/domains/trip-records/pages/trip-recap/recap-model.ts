@@ -1,4 +1,4 @@
-import type { Itinerary, ItineraryItem } from "@/domains/itineraries";
+import { isItineraryBoundary, type Itinerary, type ItineraryItem } from "@/domains/itineraries";
 import type { Trip } from "@/domains/trips";
 import type { TripPhoto } from "../../api/photos.api";
 
@@ -43,7 +43,7 @@ function tripDates(trip: Trip): string[] {
 function groupDays(trip: Trip, itinerary: Itinerary): RecapDay[] {
   const groups = new Map<string, ItineraryItem[]>();
   itinerary.items
-    .filter((item) => item.date && item.visitStatus !== "not_visited")
+    .filter((item) => item.date && !isItineraryBoundary(item) && item.visitStatus !== "not_visited")
     .forEach((item) => {
       const date = item.date!;
       const group = groups.get(date) ?? [];

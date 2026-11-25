@@ -10,6 +10,11 @@ export class CreatePhotoUploadDto {
   @IsUUID()
   itineraryItemId?: string;
 
+  @ApiPropertyOptional({ type: String, format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  replacesPhotoId?: string;
+
   @ApiProperty({ type: String, example: 'image/jpeg' })
   @IsString()
   @Matches(/^image\/(jpeg|png|webp|heic|heif)$/)

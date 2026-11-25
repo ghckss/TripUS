@@ -33,7 +33,7 @@ export default function CompleteTripScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const { showDialog } = useAppDialog();
   const [reviews, setReviews] = useState<Record<string, Review>>({});
-  const { accessToken, addPhoto, complete, error, itinerary, photos, retry, saving, trip, uploadingItemId } = useCompleteTrip(tripId);
+  const { accessToken, addPhoto, complete, downloadOriginal, error, itinerary, managingPhotoId, message, photos, removePhoto, retry, saving, trip, uploadingItemId } = useCompleteTrip(tripId);
   const allowNavigation = useUnsavedChanges(Object.keys(reviews).length > 0, saving || Boolean(uploadingItemId));
   const placeGroups = useMemo(() => groupPlaces(itinerary?.items ?? []), [itinerary]);
   const completed = Boolean(trip?.archivedAt) || Boolean(itinerary?.items.some((item) => item.visitStatus));
@@ -75,6 +75,7 @@ export default function CompleteTripScreen() {
     }} />}>
       <EditorialHeading eyebrow="KEEP A MOMENT" title={completed ? "여행의 기억을 다듬어요." : "어떤 순간이\n가장 오래 남았나요?"} /><AppText color={colors.muted}>{completed ? "완료한 여행도 사진, 별점과 후기를 언제든 다시 추가하거나 수정할 수 있어요." : "탭을 고르지 않아도 돼요. 방문 장소는 별점을 주고, 가지 못한 곳만 미방문으로 표시하세요."}</AppText>
       {error && <Card><AppText color={colors.danger}>{error}</AppText><Button label="다시 시도" variant="ghost" onPress={() => void retry()} /></Card>}
+      {message && <AppText color={colors.primary}>{message}</AppText>}
       {!itinerary && !error && <Card><AppText color={colors.muted}>방문 장소를 불러오는 중이에요…</AppText></Card>}
       {placeGroups.map((group) => {
         const place = group[0];
@@ -94,7 +95,16 @@ export default function CompleteTripScreen() {
             {photoSource && <Image source={photoSource} style={styles.placePhoto} contentFit="cover" accessibilityLabel={`${place.placeName} 대표 사진`} />}
             <View accessibilityRole="radiogroup" accessibilityLabel={`${place.placeName} 나의 별점`} style={styles.stars}>{[1, 2, 3, 4, 5].map((rating) => <Pressable key={rating} accessibilityRole="radio" accessibilityState={{ checked: review?.rating === rating }} style={styles.starTouch} accessibilityLabel={`${rating}점`} testID={`complete-rating-${place.id}-${rating}`} onPress={() => setRating(place.savedPlaceId, rating)}><AppText style={styles.starGlyph} color={(review?.rating ?? 0) >= rating ? colors.primary : colors.muted}>{(review?.rating ?? 0) >= rating ? "★" : "☆"}</AppText></Pressable>)}</View>
             <TextInput value={review?.review ?? ""} onChangeText={(value) => setReview(place.savedPlaceId, value)} multiline placeholder="이 장소의 기억을 남겨 보세요" placeholderTextColor={colors.muted} style={styles.input} />
-            <Button label={uploading ? "사진 처리 중…" : photo ? "사진 등록 완료" : "사진 추가"} disabled={Boolean(uploadingItemId) || Boolean(photo)} variant="secondary" onPress={() => void addPhoto(place.id)} />
+            {photo ? <View style={styles.photoActions}>
+              <Button label={uploading ? "교체 중…" : "사진 교체"} disabled={Boolean(uploadingItemId) || Boolean(managingPhotoId)} style={styles.photoAction} variant="secondary" onPress={() => void addPhoto(place.id, photo.id)} />
+              <Button label={managingPhotoId === photo.id ? "처리 중…" : "원본 저장"} disabled={Boolean(uploadingItemId) || Boolean(managingPhotoId)} style={styles.photoAction} variant="ghost" onPress={() => void downloadOriginal(photo)} />
+              <Button label="사진 삭제" disabled={Boolean(uploadingItemId) || Boolean(managingPhotoId)} style={styles.photoAction} variant="danger" onPress={() => showDialog({
+                title: "이 사진을 삭제할까요?", message: "원본과 최적화된 이미지가 모두 삭제되며 복구할 수 없어요.", actions: [
+                  { label: "취소", variant: "ghost" },
+                  { label: "삭제", variant: "danger", onPress: () => void removePhoto(photo.id) },
+                ],
+              })} />
+            </View> : <Button label={uploading ? "사진 처리 중…" : "사진 추가"} disabled={Boolean(uploadingItemId) || Boolean(managingPhotoId)} variant="secondary" onPress={() => void addPhoto(place.id)} />}
           </>}
           <Button label={review?.unvisited ? "미방문 취소" : "미방문으로 설정"} disabled={Boolean(uploadingItemId)} variant="ghost" onPress={() => toggleUnvisited(place.savedPlaceId)} />
           {!review?.rating && !review?.unvisited && <AppText variant="caption" color={colors.muted}>별점 없이 정리하면 미평가로 보관돼요.</AppText>}
@@ -105,4 +115,4 @@ export default function CompleteTripScreen() {
     </Screen>
   );
 }
-const styles = StyleSheet.create({ placePhoto: { width: "100%", aspectRatio: 16 / 9, borderRadius: radius.sm, backgroundColor: colors.secondarySoft }, starTouch: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }, starGlyph: { fontSize: 30, lineHeight: 40 }, row: { flexDirection: "row", alignItems: "center", gap: spacing.sm }, placeName: { flex: 1, flexShrink: 1 }, unvisitedChip: { flexShrink: 0 }, stars: { flexDirection: "row", gap: spacing.sm, paddingVertical: spacing.sm }, input: { fontFamily: fonts.sans, minHeight: 88, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, padding: spacing.md, color: colors.ink, backgroundColor: colors.surface, textAlignVertical: "top" } });
+const styles = StyleSheet.create({ photoActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, photoAction: { flexGrow: 1 }, placePhoto: { width: "100%", aspectRatio: 16 / 9, borderRadius: radius.sm, backgroundColor: colors.secondarySoft }, starTouch: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }, starGlyph: { fontSize: 30, lineHeight: 40 }, row: { flexDirection: "row", alignItems: "center", gap: spacing.sm }, placeName: { flex: 1, flexShrink: 1 }, unvisitedChip: { flexShrink: 0 }, stars: { flexDirection: "row", gap: spacing.sm, paddingVertical: spacing.sm }, input: { fontFamily: fonts.sans, minHeight: 88, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, padding: spacing.md, color: colors.ink, backgroundColor: colors.surface, textAlignVertical: "top" } });

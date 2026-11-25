@@ -150,6 +150,268 @@
         ]
       }
     },
+    "/v1/account": {
+      "delete": {
+        "operationId": "AccountController_delete",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/v1/trips/{tripId}/photos": {
+      "post": {
+        "operationId": "PhotosController_create",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePhotoUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoUploadTargetDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "photos"
+        ]
+      },
+      "get": {
+        "operationId": "PhotosController_list",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PhotoResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "photos"
+        ]
+      }
+    },
+    "/v1/trips/{tripId}/photos/{photoId}/content": {
+      "put": {
+        "operationId": "PhotosController_upload",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "photos"
+        ]
+      }
+    },
+    "/v1/trips/{tripId}/photos/{photoId}/confirm": {
+      "post": {
+        "operationId": "PhotosController_confirm",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "photos"
+        ]
+      }
+    },
+    "/v1/trips/{tripId}/photos/{photoId}/files/{variant}": {
+      "get": {
+        "operationId": "PhotosController_file",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "variant",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "original",
+                "optimized",
+                "thumbnail"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "photos"
+        ]
+      }
+    },
+    "/v1/trips/{tripId}/photos/{photoId}": {
+      "delete": {
+        "operationId": "PhotosController_delete",
+        "parameters": [
+          {
+            "name": "tripId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "photos"
+        ]
+      }
+    },
     "/v1/trips/{tripId}/ai-plans/latest-request": {
       "get": {
         "operationId": "AiPlanningController_getLatestRequest",
@@ -1088,221 +1350,6 @@
         ]
       }
     },
-    "/v1/trips/{tripId}/photos": {
-      "post": {
-        "operationId": "PhotosController_create",
-        "parameters": [
-          {
-            "name": "tripId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreatePhotoUploadDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PhotoUploadTargetDto"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "photos"
-        ]
-      },
-      "get": {
-        "operationId": "PhotosController_list",
-        "parameters": [
-          {
-            "name": "tripId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/PhotoResponseDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "photos"
-        ]
-      }
-    },
-    "/v1/trips/{tripId}/photos/{photoId}/content": {
-      "put": {
-        "operationId": "PhotosController_upload",
-        "parameters": [
-          {
-            "name": "tripId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "photoId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "image/jpeg": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            },
-            "image/png": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            },
-            "image/webp": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "photos"
-        ]
-      }
-    },
-    "/v1/trips/{tripId}/photos/{photoId}/confirm": {
-      "post": {
-        "operationId": "PhotosController_confirm",
-        "parameters": [
-          {
-            "name": "tripId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "photoId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PhotoResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "photos"
-        ]
-      }
-    },
-    "/v1/trips/{tripId}/photos/{photoId}/files/{variant}": {
-      "get": {
-        "operationId": "PhotosController_file",
-        "parameters": [
-          {
-            "name": "tripId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "photoId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "variant",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "enum": [
-                "original",
-                "optimized",
-                "thumbnail"
-              ],
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "photos"
-        ]
-      }
-    },
     "/v1/telemetry/events": {
       "post": {
         "operationId": "TelemetryController_ingest",
@@ -1425,6 +1472,126 @@
         },
         "required": [
           "refreshToken"
+        ]
+      },
+      "CreatePhotoUploadDto": {
+        "type": "object",
+        "properties": {
+          "itineraryItemId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "replacesPhotoId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "mimeType": {
+            "type": "string",
+            "example": "image/jpeg"
+          },
+          "byteSize": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 104857600
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "mimeType",
+          "byteSize",
+          "filename"
+        ]
+      },
+      "PhotoUploadTargetDto": {
+        "type": "object",
+        "properties": {
+          "photoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uploadUrl": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "PUT"
+            ]
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "photoId",
+          "uploadUrl",
+          "method",
+          "headers"
+        ]
+      },
+      "PhotoStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "ready",
+          "failed"
+        ]
+      },
+      "PhotoResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itineraryItemId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "byteSize": {
+            "type": "number"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PhotoStatus"
+              }
+            ]
+          },
+          "originalUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "optimizedUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "mimeType",
+          "byteSize",
+          "filename",
+          "status"
         ]
       },
       "TravelTheme": {
@@ -2666,121 +2833,6 @@
         "required": [
           "status",
           "isFallback"
-        ]
-      },
-      "CreatePhotoUploadDto": {
-        "type": "object",
-        "properties": {
-          "itineraryItemId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "mimeType": {
-            "type": "string",
-            "example": "image/jpeg"
-          },
-          "byteSize": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 104857600
-          },
-          "filename": {
-            "type": "string",
-            "maxLength": 255
-          }
-        },
-        "required": [
-          "mimeType",
-          "byteSize",
-          "filename"
-        ]
-      },
-      "PhotoUploadTargetDto": {
-        "type": "object",
-        "properties": {
-          "photoId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "uploadUrl": {
-            "type": "string"
-          },
-          "method": {
-            "type": "string",
-            "enum": [
-              "PUT"
-            ]
-          },
-          "headers": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "photoId",
-          "uploadUrl",
-          "method",
-          "headers"
-        ]
-      },
-      "PhotoStatus": {
-        "type": "string",
-        "enum": [
-          "pending",
-          "ready",
-          "failed"
-        ]
-      },
-      "PhotoResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "itineraryItemId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "mimeType": {
-            "type": "string"
-          },
-          "byteSize": {
-            "type": "number"
-          },
-          "filename": {
-            "type": "string"
-          },
-          "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PhotoStatus"
-              }
-            ]
-          },
-          "originalUrl": {
-            "type": "string",
-            "nullable": true
-          },
-          "optimizedUrl": {
-            "type": "string",
-            "nullable": true
-          },
-          "thumbnailUrl": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "id",
-          "mimeType",
-          "byteSize",
-          "filename",
-          "status"
         ]
       },
       "ProductEventDto": {

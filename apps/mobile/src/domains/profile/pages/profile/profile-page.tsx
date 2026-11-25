@@ -1,14 +1,19 @@
+import { useState } from "react";
+import { router } from "expo-router";
+
+import { deleteAccount, logout } from "@/domains/auth/api/auth.api";
+import { colors } from "@/shared/design/tokens";
+import { useAppDialog } from "@/shared/ui/app-dialog";
 import { AppText } from "@/shared/ui/app-text";
+import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { EditorialHeading } from "@/shared/ui/field-notes";
 import { Screen } from "@/shared/ui/screen";
-import { colors } from "@/shared/design/tokens";
-import { Button } from "@/shared/ui/button";
-import { router } from "expo-router";
-import { logout } from "@/domains/auth/api/auth.api";
 import { useProfile } from "./use-profile";
 
 export default function ProfileScreen() {
+  const { showDialog } = useAppDialog();
+  const [deleting, setDeleting] = useState(false);
   const { entitlements, loading, user } = useProfile();
   const tierLabel = entitlements?.tier === "plus" ? "Plus" : entitlements?.tier === "free" ? "Free" : undefined;
   return <Screen contentStyle={{ paddingTop: 64 }}>
@@ -28,5 +33,19 @@ export default function ProfileScreen() {
       {entitlements?.tier === "free" && <Button label="Plus 알아보기" variant="secondary" testID="profile-upgrade-plan" onPress={() => router.push("/profile/upgrade")} />}
     </Card>
     <Button label="로그아웃" variant="ghost" onPress={() => void logout().finally(() => router.replace("/(auth)/login"))} />
+    <Button label={deleting ? "계정 삭제 중…" : "계정 탈퇴"} disabled={deleting} variant="danger" onPress={() => showDialog({
+      title: "TripUS 계정을 탈퇴할까요?",
+      message: "모든 여행, 일정, 사진과 기록이 영구 삭제되며 복구할 수 없어요.",
+      actions: [
+        { label: "취소", variant: "ghost" },
+        { label: "계정 탈퇴", variant: "danger", onPress: () => {
+          setDeleting(true);
+          void deleteAccount()
+            .then(() => router.replace("/(auth)/login"))
+            .catch(() => showDialog({ title: "계정을 삭제하지 못했어요", message: "잠시 후 다시 시도해 주세요.", actions: [{ label: "확인" }] }))
+            .finally(() => setDeleting(false));
+        } },
+      ],
+    })} />
   </Screen>;
 }

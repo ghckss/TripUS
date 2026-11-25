@@ -30,5 +30,6 @@ import { PhotosController } from './presentation/photos.controller';
           : local,
     },
   ],
+  exports: [PhotosService],
 })
 export class PhotosModule {}

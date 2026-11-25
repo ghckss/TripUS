@@ -35,6 +35,23 @@ describe("trip recap model", () => {
     expect(slides[0]).toMatchObject({ kind: "cover", dayCount: 3, placeCount: 2 });
   });
 
+  it("excludes virtual start and end points from schedules and place totals", () => {
+    const withBoundaries = {
+      ...itinerary,
+      items: [
+        { ...itinerary.items[0], id: "boundary:start", savedPlaceId: "trip-1", placeName: "인천공항", boundaryType: "start_point" as const, visitStatus: null },
+        ...itinerary.items,
+        { ...itinerary.items[1], id: "boundary:end", savedPlaceId: "trip-1", placeName: "김포공항", boundaryType: "end_point" as const, visitStatus: null },
+      ],
+    };
+
+    const slides = buildRecapSlides({ trip, itinerary: withBoundaries, photos: [] });
+
+    expect(slides[0]).toMatchObject({ kind: "cover", placeCount: 2 });
+    expect(slides.flatMap((slide) => slide.kind === "day-schedule" ? slide.day.items.map((item) => item.placeName) : []))
+      .toEqual(["북촌", "서울숲"]);
+  });
+
   it("adds at most one highlight after a day schedule and chooses the highest-rated photographed place", () => {
     const sameDayItems = [
       { ...itinerary.items[0], rating: 4 },

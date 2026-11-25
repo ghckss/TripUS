@@ -217,6 +217,8 @@ POST /v1/trips/:tripId/routes/transit
 POST /v1/trips/:tripId/completion
 POST /v1/trips/:tripId/photos
 POST /v1/trips/:tripId/photos/:photoId/confirm
+DELETE /v1/trips/:tripId/photos/:photoId
+DELETE /v1/account
 ```
 
 AI 일정 생성 POST는 `202 Accepted`와 `generationId`를 즉시 반환한다. 작업 요청과 상태는 `ai_plan_generations`에 저장하며 실제 OpenAI 호출과 일정 저장은 응답 수명과 분리해 실행한다. 모바일은 상태 API에서 같은 `generationId`가 `generated`, `conflict`, `unavailable` 중 하나가 될 때까지 조회한다. 작업자는 `queued` 행을 조건부 UPDATE로 `running`으로 바꾼 경우에만 실행해 여러 Lambda 인스턴스의 중복 모델 호출을 막는다. 서버 중단으로 `running` 상태가 15분 이상 유지된 작업은 상태 조회 시 `queued`로 되돌려 재개하며, 여행별 부분 고유 인덱스로 동시 활성 작업을 하나로 제한한다.
@@ -279,7 +281,16 @@ MVP 기반에서는 Google Maps와 OpenAI 포트에 결정적 목업 어댑터�
 - S3 모드는 AWS SDK v3의 `S3Client`와 presigner를 사용한다. 원본 업로드 URL은 10분, 조회 URL은 1시간 유효하며 업로드의 `content-type`도 서명한다.
 - S3 호환 개발 저장소는 `PHOTO_S3_ENDPOINT`와 path-style 요청으로 연결할 수 있다.
 - 모바일은 HEIC/HEIF 사진을 기기에서 JPEG로 변환한 뒤 업로드한다. 서버 파생 이미지 처리기는 JPEG, PNG, WebP만 수락해 실행 환경의 HEVC 디코더 유무에 따라 업로드 결과가 달라지지 않게 한다.
+- 장소별 사진은 한 장만 유지한다. 교체는 새 원본과 파생본 생성이 성공한 뒤 기존 사진과 S3 객체를 삭제하고, 삭제는 원본·최적화본·썸네일과 DB 레코드를 함께 제거한다.
+- 원본 다운로드는 인증된 로컬 파일 URL 또는 단기 S3 서명 URL을 기기에 내려받은 뒤 사진 보관함 권한을 받아 저장한다. 권한 거부나 다운로드 실패 시 기존 서버 사진은 변경하지 않는다.
 - 원본 저장 용량 확대는 Plus 혜택이 아니며 사용자별 원본 총량 제한을 두지 않는다.
+
+### 계정 삭제와 지난 여행 통계
+
+- 계정 삭제는 인증된 사용자 본인만 요청할 수 있다. 소유 여행과 종속 기록을 삭제하고 사진 저장소 객체까지 제거한 뒤 로컬 인증 세션을 비운다.
+- 지난 여행의 방문 수·지도·캐러셀은 시작/종료 가상 경계와 미방문 장소를 공통으로 제외해 같은 집계를 사용한다.
+- 이동 거리는 위치 추적값이나 실제 도로 경로가 아니라, 날짜별 방문 순서의 좌표를 직선으로 연결한 재구성 거리다. 화면에 이 한계를 명시한다.
+- 지역 통계는 장소 주소·이름의 지역명 일치 또는 저장된 지역 좌표와의 근접도를 사용하며 실제 행정구역 판정으로 보증하지 않는다.
 
 ## 8. 테스트
 

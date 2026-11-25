@@ -32,3 +32,9 @@ export async function logout(): Promise<void> {
     await clearSession();
   }
 }
+
+export async function deleteAccount(): Promise<void> {
+  const { error } = await tripUsApi.DELETE("/v1/account");
+  if (error) throw new Error(apiErrorMessage(error));
+  await clearSession();
+}

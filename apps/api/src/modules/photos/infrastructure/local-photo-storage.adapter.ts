@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 
 import { Inject, Injectable } from '@nestjs/common';
@@ -26,6 +26,14 @@ export class LocalPhotoStorageAdapter implements PhotoStoragePort {
 
   read(key: string): Promise<Uint8Array> {
     return readFile(this.pathFor(key));
+  }
+
+  async delete(key: string): Promise<void> {
+    try {
+      await unlink(this.pathFor(key));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
   }
 
   async write(key: string, body: Uint8Array): Promise<void> {

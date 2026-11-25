@@ -8,7 +8,7 @@ type UploadTarget = components["schemas"]["PhotoUploadTargetDto"];
 
 export async function createPhotoUpload(
   tripId: string,
-  input: { itineraryItemId?: string; mimeType: string; byteSize: number; filename: string },
+  input: { itineraryItemId?: string; replacesPhotoId?: string; mimeType: string; byteSize: number; filename: string },
 ): Promise<UploadTarget> {
   const { data, error } = await tripUsApi.POST("/v1/trips/{tripId}/photos", { params: { path: { tripId } }, body: input });
   if (error) throw new Error(apiErrorMessage(error));
@@ -22,15 +22,25 @@ export async function uploadPhotoBytes(target: UploadTarget, uri: string): Promi
   if (!response.ok) throw new Error(`사진 업로드에 실패했어요. (${response.status})`);
 }
 
-export async function confirmPhoto(tripId: string, photoId: string): Promise<TripPhoto> {
+export async function confirmPhoto(tripId: string, photoId: string, replacesPhotoId?: string): Promise<TripPhoto> {
   const account = getAccountScope();
   const { data, error } = await tripUsApi.POST("/v1/trips/{tripId}/photos/{photoId}/confirm", {
     params: { path: { tripId, photoId } },
   });
   if (error) throw new Error(apiErrorMessage(error));
   if (account !== getAccountScope()) throw new Error("Session changed during request");
-  setResource<TripPhoto[]>(`trips:${tripId}:photos`, (current) => current ? [...current.filter((photo) => photo.id !== data.id), data] : undefined);
+  setResource<TripPhoto[]>(`trips:${tripId}:photos`, (current) => current
+    ? [...current.filter((photo) => photo.id !== data.id && photo.id !== replacesPhotoId), data]
+    : undefined);
   return data;
+}
+
+export async function deletePhoto(tripId: string, photoId: string): Promise<void> {
+  const { error } = await tripUsApi.DELETE("/v1/trips/{tripId}/photos/{photoId}", {
+    params: { path: { tripId, photoId } },
+  });
+  if (error) throw new Error(apiErrorMessage(error));
+  setResource<TripPhoto[]>(`trips:${tripId}:photos`, (current) => current?.filter((photo) => photo.id !== photoId));
 }
 
 export const listPhotos = defineQuery((tripId: string) => ({

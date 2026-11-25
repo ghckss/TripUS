@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { TripEntity } from '../../trips/domain/entities/trip.entity';
 import { UserEntity } from '../../users/domain/entities/user.entity';
 import { RefreshTokenEntity } from '../domain/entities/refresh-token.entity';
 import { AuthService } from './auth.service';
@@ -35,6 +36,7 @@ describe('AuthService refresh', () => {
       {} as never,
       config as never,
       dataSource as never,
+      {} as never,
     );
 
     const session = await service.refresh({ refreshToken: 'raw-refresh-token' });
@@ -47,5 +49,30 @@ describe('AuthService refresh', () => {
     expect(token.revokedAt).toBeInstanceOf(Date);
     expect(token.replacedByTokenId).toBe('next-token');
     expect(session.user.id).toBe(user.id);
+  });
+
+  it('removes photo objects and owned trips before deleting the user account', async () => {
+    const userId = '00000000-0000-4000-8000-000000000001';
+    const users = { findOneBy: vi.fn().mockResolvedValue({ id: userId }) };
+    const manager = { delete: vi.fn().mockResolvedValue({ affected: 1 }) };
+    const dataSource = {
+      transaction: vi.fn((callback: (transactionManager: typeof manager) => Promise<unknown>) => callback(manager)),
+    };
+    const photos = { deleteAllForUser: vi.fn().mockResolvedValue(undefined) };
+    const service = new AuthService(
+      users as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      dataSource as never,
+      photos as never,
+    );
+
+    await service.deleteAccount(userId);
+
+    expect(photos.deleteAllForUser).toHaveBeenCalledWith(userId);
+    expect(manager.delete).toHaveBeenNthCalledWith(1, TripEntity, { ownerId: userId });
+    expect(manager.delete).toHaveBeenNthCalledWith(2, UserEntity, { id: userId });
   });
 });

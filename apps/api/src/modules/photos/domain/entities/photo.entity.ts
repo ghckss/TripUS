@@ -26,6 +26,9 @@ export class PhotoEntity {
   @Column({ name: 'itinerary_item_id', type: 'uuid', nullable: true })
   itineraryItemId!: string | null;
 
+  @Column({ name: 'replaces_photo_id', type: 'uuid', nullable: true })
+  replacesPhotoId!: string | null;
+
   @ManyToOne(() => ItineraryItemEntity, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'itinerary_item_id', foreignKeyConstraintName: 'fk_photos_itinerary_item' })
   itineraryItem!: ItineraryItemEntity | null;

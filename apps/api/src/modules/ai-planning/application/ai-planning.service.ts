@@ -578,6 +578,19 @@ function mergeLockedPlacements(
         if (item) result.push({ ...item, position, locked: false });
       }
     }
-    return result;
+    // Preserved traveler visits keep their date, time and content, but their old
+    // position must not make the newly generated timetable run backwards.
+    // Unknown times remain after timed visits in their existing relative order.
+    return result
+      .map((item, index) => ({ item, index }))
+      .sort((left, right) => {
+        const leftTime = left.item.scheduledTime;
+        const rightTime = right.item.scheduledTime;
+        if (leftTime && rightTime) return leftTime.localeCompare(rightTime) || left.index - right.index;
+        if (leftTime) return -1;
+        if (rightTime) return 1;
+        return left.index - right.index;
+      })
+      .map(({ item }, position) => ({ ...item, position }));
   });
 }

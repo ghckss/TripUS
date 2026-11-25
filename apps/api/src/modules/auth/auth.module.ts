@@ -11,10 +11,13 @@ import { SOCIAL_IDENTITY_PORT } from './domain/social-identity.port';
 import { AccessTokenGuard } from './infrastructure/access-token.guard';
 import { OidcSocialIdentityAdapter } from './infrastructure/oidc-social-identity.adapter';
 import { AuthController } from './presentation/auth.controller';
+import { AccountController } from './presentation/account.controller';
+import { IdentityModule } from '../identity/identity.module';
+import { PhotosModule } from '../photos/photos.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UserEntity, AuthIdentityEntity, RefreshTokenEntity])],
-  controllers: [AuthController],
+  imports: [TypeOrmModule.forFeature([UserEntity, AuthIdentityEntity, RefreshTokenEntity]), IdentityModule, PhotosModule],
+  controllers: [AuthController, AccountController],
   providers: [
     AuthService,
     { provide: SOCIAL_IDENTITY_PORT, inject: [ConfigService], useFactory: (config: ConfigService) => new OidcSocialIdentityAdapter(config) },

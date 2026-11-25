@@ -105,6 +105,24 @@ describe('day visit materialization', () => {
     expect(replace.mock.calls[0]![1]).toHaveLength(2);
   });
 
+  it('reorders generated visits around a preserved visit so stored times never run backwards', async () => {
+    const { service, original, savedPlaces, generate, replace } = setup();
+    savedPlaces.push(place('locked'));
+    original.items.push({ savedPlaceId: 'locked', date, position: 0, locked: true, scheduledTime: '17:05', durationMinutes: 30 });
+    generate.mockResolvedValue({ days: [{ date, visits: [
+      { ...visit, placeName: '이른 식당', startTime: '16:45' },
+      { ...visit, placeName: '저녁 장소', startTime: '18:00' },
+    ] }] });
+
+    await service.generate('trip', request);
+
+    expect((replace.mock.calls[0]![1] as StoredPlacement[]).map((item) => [item.savedPlaceId, item.scheduledTime, item.position])).toEqual([
+      ['place-1', '16:45', 0],
+      ['locked', '17:05', 1],
+      ['place-1', '18:00', 2],
+    ]);
+  });
+
   it('keeps unused registered places and previous AI recommendations in the library', async () => {
     const { service, original, savedPlaces, remove } = setup();
     savedPlaces.push(place('unused'), place('old-ai', 'AI 추천 · 이전 설명'));
