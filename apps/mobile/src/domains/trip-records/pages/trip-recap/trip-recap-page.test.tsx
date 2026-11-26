@@ -3,6 +3,12 @@ import * as Sharing from "expo-sharing";
 import TripRecapPage from "./trip-recap-page";
 
 const mockCapture = jest.fn().mockResolvedValue("file:///recap.png");
+let mockTripRecap = {
+  trip: { title: "파리 여행", startDate: "2026-12-01", endDate: "2026-12-01" },
+  itinerary: { items: [{ id: "item-1", savedPlaceId: "place-1", placeName: "루브르 박물관", date: "2026-12-01", position: 0, locked: false, source: "manual", visitStatus: "rated", rating: 5 }] },
+  photos: [{ id: "photo-1", itineraryItemId: "item-1", status: "ready", filename: "louvre.jpg", optimizedUrl: "https://example.com/louvre.jpg" }],
+  loading: false,
+};
 jest.mock("expo-router", () => ({ useLocalSearchParams: () => ({ tripId: "trip-1" }) }));
 jest.mock("expo-media-library", () => ({ requestPermissionsAsync: jest.fn(), Asset: { create: jest.fn() } }));
 jest.mock("expo-sharing", () => ({ isAvailableAsync: jest.fn().mockResolvedValue(true), shareAsync: jest.fn().mockResolvedValue(undefined) }));
@@ -18,19 +24,22 @@ jest.mock("react-native-view-shot", () => {
   };
 });
 jest.mock("./use-trip-recap", () => ({
-  useTripRecap: () => ({
-    trip: { title: "파리 여행", startDate: "2026-12-01", endDate: "2026-12-01" },
-    itinerary: { items: [{ id: "item-1", savedPlaceId: "place-1", placeName: "루브르 박물관", date: "2026-12-01", position: 0, locked: false, source: "manual", visitStatus: "rated", rating: 5 }] },
-    photos: [{ id: "photo-1", itineraryItemId: "item-1", status: "ready", filename: "louvre.jpg", optimizedUrl: "https://example.com/louvre.jpg" }],
-    loading: false,
-  }),
+  useTripRecap: () => mockTripRecap,
 }));
 
 const scrollAt = (x: number) => ({
   nativeEvent: { contentOffset: { x, y: 0 }, contentSize: { width: 3000, height: 500 }, layoutMeasurement: { width: 400, height: 500 } },
 });
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockTripRecap = {
+    trip: { title: "파리 여행", startDate: "2026-12-01", endDate: "2026-12-01" },
+    itinerary: { items: [{ id: "item-1", savedPlaceId: "place-1", placeName: "루브르 박물관", date: "2026-12-01", position: 0, locked: false, source: "manual", visitStatus: "rated", rating: 5 }] },
+    photos: [{ id: "photo-1", itineraryItemId: "item-1", status: "ready", filename: "louvre.jpg", optimizedUrl: "https://example.com/louvre.jpg" }],
+    loading: false,
+  };
+});
 
 it("updates page dots during consecutive scroll events before momentum ends", async () => {
   const screen = await render(<TripRecapPage />);
@@ -55,4 +64,13 @@ it("clamps page indicators during overscroll and settles on the final snap", asy
   expect(screen.getByLabelText("전체 3장 중 3번째 이미지")).toBeOnTheScreen();
   await fireEvent(carousel, "momentumScrollEnd", scrollAt(interval));
   expect(screen.getByLabelText("전체 3장 중 2번째 이미지")).toBeOnTheScreen();
+});
+
+it("reserves a separate title area on a cover without photos", async () => {
+  mockTripRecap = { ...mockTripRecap, photos: [] };
+  const screen = await render(<TripRecapPage />);
+
+  expect(screen.getByTestId("recap-cover-memory")).toBeOnTheScreen();
+  expect(screen.getByTestId("recap-cover-paper")).toHaveStyle({ position: "relative" });
+  expect(screen.getByText("사진 대신 여행의 기억을\n한 장에 담았어요")).toBeOnTheScreen();
 });

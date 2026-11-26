@@ -1,6 +1,9 @@
 import { fireEvent, render } from "@testing-library/react-native";
 import PlacesScreen from "./place-library-page";
 
+const mockUpdatePlacesTag = jest.fn().mockResolvedValue(true);
+let mockSelectedIds = new Set<string>();
+
 jest.mock("expo-router", () => ({ useFocusEffect: jest.fn(), router: { push: jest.fn(), replace: jest.fn() }, useLocalSearchParams: () => ({ tripId: "trip-1" }) }));
 jest.mock("@/domains/places/api/places.api", () => ({ getPlacePhoto: jest.fn().mockResolvedValue({ imageUrl: null }) }));
 jest.mock("./use-place-library", () => ({
@@ -9,10 +12,14 @@ jest.mock("./use-place-library", () => ({
       { id: "park", name: "서울숲", tag: "attraction", note: "오래 걷기" },
       { id: "cafe", name: "오월카페", tag: "cafe", note: "창가에서 쉬기" },
     ],
-    selectedIds: new Set(), loading: false, saving: false, message: undefined,
-    clearSelection: jest.fn(), reload: jest.fn(), removePlaces: jest.fn(), selectPlaces: jest.fn(), toggleSelection: jest.fn(),
+    selectedIds: mockSelectedIds, loading: false, saving: false, message: undefined,
+    clearSelection: jest.fn(), reload: jest.fn(), removePlaces: jest.fn(), selectPlaces: jest.fn(), toggleSelection: jest.fn(), updatePlacesTag: mockUpdatePlacesTag,
   }),
 }));
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockSelectedIds = new Set();
+});
 it("combines the selected category with name or memo search", async () => {
   const screen = await render(<PlacesScreen />);
   await fireEvent.changeText(screen.getByLabelText("저장한 장소 검색"), "창가");
@@ -29,4 +36,13 @@ it("keeps bulk removal inside the explicit management panel", async () => {
   await fireEvent.press(screen.getByRole("button", { name: "장소 선택·관리" }));
   expect(screen.getByText("전체 제거")).toBeOnTheScreen();
   expect(screen.getByRole("button", { name: "선택 제거" })).toBeDisabled();
+});
+it("changes the tag for the selected places from the management panel", async () => {
+  mockSelectedIds = new Set(["park"]);
+  const screen = await render(<PlacesScreen />);
+  await fireEvent.press(screen.getByRole("button", { name: "장소 선택·관리" }));
+  await fireEvent.press(screen.getByRole("button", { name: "태그 변경" }));
+  expect(screen.getByText("선택한 1개 장소에 적용해요.")).toBeOnTheScreen();
+  await fireEvent.press(screen.getAllByRole("button", { name: "카페" }).at(-1)!);
+  expect(mockUpdatePlacesTag).toHaveBeenCalledWith(["park"], "cafe");
 });

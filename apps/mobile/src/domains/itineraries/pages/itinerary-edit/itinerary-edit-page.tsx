@@ -245,22 +245,24 @@ export default function ItineraryScreen() {
           scheduledTime={items.at(-1)!.scheduledTime}
         />}
       </View>}
-      <Button label="＋" variant="ghost" testID={`itinerary-add-places-${selectedDate}`} onPress={() => setPlacePickerDay({ date: selectedDate, index: dayIndex })} />
+      <View style={styles.addPlaceAction}>
+        <Button label="＋" accessibilityLabel={`Day ${dayIndex + 1} 장소 추가`} variant="ghost" testID={`itinerary-add-places-${selectedDate}`} onPress={() => setPlacePickerDay({ date: selectedDate, index: dayIndex })} />
+      </View>
     </View>}
 
     <Button label={saving ? "저장 중…" : "변경한 일정 저장"} disabled={!itinerary || saving} testID="itinerary-save" onPress={() => void save().then((saved) => { if (saved) { allowNavigation(); router.back(); } })} />
-    {placePickerDay && <DayPlacePicker tripId={tripId} date={placePickerDay.date} dayIndex={placePickerDay.index} items={itinerary?.items ?? []} places={places} onApply={setPlacesForDate} onClose={() => setPlacePickerDay(undefined)} />}
-    {lodgingPicker && <LodgingEndpointPicker
-      current={lodgingPicker.current}
-      date={lodgingPicker.date}
-      dayIndex={lodgingPicker.dayIndex}
-      edge={lodgingPicker.edge}
-      places={places}
-      tripId={tripId}
-      onApply={(place, availablePlaces) => replaceDayLodging(lodgingPicker.date, lodgingPicker.edge, place, availablePlaces)}
-      onClose={() => setLodgingPicker(undefined)}
-    />}
   </Screen>
+  {placePickerDay && <DayPlacePicker tripId={tripId} date={placePickerDay.date} dayIndex={placePickerDay.index} items={itinerary?.items ?? []} places={places} onApply={setPlacesForDate} onClose={() => setPlacePickerDay(undefined)} />}
+  {lodgingPicker && <LodgingEndpointPicker
+    current={lodgingPicker.current}
+    date={lodgingPicker.date}
+    dayIndex={lodgingPicker.dayIndex}
+    edge={lodgingPicker.edge}
+    places={places}
+    tripId={tripId}
+    onApply={(place, availablePlaces) => replaceDayLodging(lodgingPicker.date, lodgingPicker.edge, place, availablePlaces)}
+    onClose={() => setLodgingPicker(undefined)}
+  />}
   {updatingDate && <Modal
     animationType="fade"
     onRequestClose={() => undefined}
@@ -282,6 +284,7 @@ const styles = StyleSheet.create({
   selectedTab: { borderColor: colors.primary, backgroundColor: colors.primary },
   scheduleHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: spacing.sm },
   updateButton: { minHeight: 44, paddingHorizontal: spacing.md },
+  addPlaceAction: { position: "relative", zIndex: 10, elevation: 10 },
   placeList: { overflow: "visible" },
   sortableViewport: { zIndex: 2, elevation: 2, overflow: "visible" },
   sortableList: { flex: 1, overflow: "visible", backgroundColor: "transparent" },

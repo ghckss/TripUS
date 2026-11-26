@@ -1,4 +1,5 @@
-import MapView, { Marker, Polyline } from "react-native-maps";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
+import MapView, { AnimatedRegion, Marker, Polyline } from "react-native-maps";
 import { StyleSheet, View } from "react-native";
 
 import type { ItineraryItem } from "@/domains/itineraries";
@@ -6,8 +7,16 @@ import type { Trip } from "@/domains/trips";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Card } from "@/shared/ui/card";
+import { Button } from "@/shared/ui/button";
 
 type Coordinate = { latitude: number; longitude: number };
+const coordinateDelta = { latitudeDelta: 0, longitudeDelta: 0 };
+const ReplayMarker = Marker.Animated as unknown as ComponentType<{
+  coordinate: AnimatedRegion;
+  pinColor?: string;
+  testID?: string;
+  zIndex?: number;
+}>;
 
 function hasCoordinate(item: ItineraryItem): item is ItineraryItem & Coordinate {
   return typeof item.latitude === "number" && typeof item.longitude === "number";
@@ -53,11 +62,75 @@ export function regionVisitCounts(trip: Trip, items: ItineraryItem[]): { name: s
 }
 
 export function TripHistoryInsights({ trip, items }: { trip: Trip; items: ItineraryItem[] }) {
-  const visited = visitedHistoryItems(items);
-  const coordinates = visited.filter(hasCoordinate);
+  const visited = useMemo(() => visitedHistoryItems(items), [items]);
+  const coordinates = useMemo(() => visited.filter(hasCoordinate), [visited]);
+  const routeDays = useMemo(() => {
+    const groups = new Map<string, (ItineraryItem & Coordinate)[]>();
+    for (const item of coordinates) {
+      if (!item.date) continue;
+      const day = groups.get(item.date) ?? [];
+      day.push(item);
+      groups.set(item.date, day);
+    }
+    return [...groups.values()];
+  }, [coordinates]);
   const regions = regionVisitCounts(trip, items);
   const distance = straightLineDistanceKm(items);
   const initial = coordinates[0];
+  const [replaying, setReplaying] = useState(false);
+  const [replayMarkerVisible, setReplayMarkerVisible] = useState(false);
+  const [replayCoordinate] = useState(() => new AnimatedRegion({
+    latitude: initial?.latitude ?? 37.5665,
+    longitude: initial?.longitude ?? 126.978,
+    ...coordinateDelta,
+  }));
+  const coordinateSignature = coordinates.map((item) => `${item.id}:${item.latitude}:${item.longitude}`).join("|");
+
+  useEffect(() => {
+    replayCoordinate.stopAnimation(() => undefined);
+    if (!replaying || coordinates.length < 2) return;
+    let cancelled = false;
+    let activeAnimation: ReturnType<AnimatedRegion["timing"]> | undefined;
+    let resetTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const animateSegment = (index: number) => {
+      if (cancelled) return;
+      const destination = coordinates[index + 1];
+      activeAnimation = replayCoordinate.timing({
+        latitude: destination.latitude,
+        longitude: destination.longitude,
+        ...coordinateDelta,
+        duration: 900,
+        toValue: 0,
+        useNativeDriver: false,
+      });
+      activeAnimation.start(({ finished }) => {
+        if (cancelled || !finished) return;
+        if (index < coordinates.length - 2) return animateSegment(index + 1);
+        setReplayMarkerVisible(false);
+        resetTimer = setTimeout(() => {
+          if (cancelled) return;
+          replayCoordinate.setValue({ ...coordinates[0], ...coordinateDelta });
+          setReplaying(false);
+        }, 350);
+      });
+    };
+
+    replayCoordinate.setValue({ ...coordinates[0], ...coordinateDelta });
+    animateSegment(0);
+    return () => {
+      cancelled = true;
+      activeAnimation?.stop();
+      replayCoordinate.stopAnimation(() => undefined);
+      if (resetTimer) clearTimeout(resetTimer);
+    };
+  }, [coordinateSignature, coordinates, replayCoordinate, replaying]);
+
+  const startReplay = () => {
+    replayCoordinate.setValue({ ...coordinates[0], ...coordinateDelta });
+    setReplayMarkerVisible(true);
+    setReplaying(true);
+  };
 
   return <View style={styles.section}>
     <AppText variant="heading">여행 다시보기</AppText>
@@ -73,8 +146,10 @@ export function TripHistoryInsights({ trip, items }: { trip: Trip; items: Itiner
         zoomEnabled={false}
       >
         {coordinates.map((item, index) => <Marker key={item.id} coordinate={item} title={`${index + 1}. ${item.placeName}`} />)}
-        {coordinates.length > 1 && <Polyline coordinates={coordinates} strokeColor={colors.primary} strokeWidth={3} />}
+        {routeDays.map((day) => day.length > 1 && <Polyline key={day.map((item) => item.id).join("-")} coordinates={day} strokeColor={colors.primary} strokeWidth={3} />)}
+        {replayMarkerVisible && <ReplayMarker coordinate={replayCoordinate} pinColor={colors.secondary} testID="trip-history-replay-marker" zIndex={0} />}
       </MapView>
+      {coordinates.length > 1 && <Button label={replaying ? "방문 순서 재생 중…" : "방문 순서 재생"} variant="secondary" disabled={replaying} testID="trip-history-replay" onPress={startReplay} />}
       <AppText variant="caption" color={colors.muted}>실제 GPS 기록이 아니라 방문 순서를 직선으로 연결한 다시보기예요.</AppText>
     </View> : <Card><AppText color={colors.muted}>지도에 표시할 장소 위치가 없어요.</AppText></Card>}
     <View style={styles.stats}>

@@ -1,4 +1,6 @@
-import { regionVisitCounts, straightLineDistanceKm, visitedHistoryItems } from "./trip-history-insights";
+import { act, fireEvent, render } from "@testing-library/react-native";
+import { createElement } from "react";
+import { regionVisitCounts, straightLineDistanceKm, TripHistoryInsights, visitedHistoryItems } from "./trip-history-insights";
 
 const trip = { title: "도쿄", destination: "일본", startDate: "2026-11-01", endDate: "2026-11-02", regions: [
   { googlePlaceId: null, name: "도쿄", address: null, latitude: 35.68, longitude: 139.76 },
@@ -19,4 +21,20 @@ it("excludes boundaries and unvisited places from completed-trip insights", () =
 it("computes only same-day straight-line segments", () => {
   expect(straightLineDistanceKm(items)).toBeGreaterThan(20);
   expect(straightLineDistanceKm(items)).toBeLessThan(40);
+});
+
+it("replays the visited places in order and resets without animating back to the start", async () => {
+  jest.useFakeTimers();
+  const screen = await render(createElement(TripHistoryInsights, { trip, items }));
+
+  expect(screen.queryByTestId("trip-history-replay-marker")).not.toBeOnTheScreen();
+  await fireEvent.press(screen.getByTestId("trip-history-replay"));
+  expect(screen.getByTestId("trip-history-replay-marker")).toBeOnTheScreen();
+  expect(screen.getByText("방문 순서 재생 중…")).toBeOnTheScreen();
+
+  await act(() => { jest.advanceTimersByTime(900); });
+  expect(screen.queryByTestId("trip-history-replay-marker")).not.toBeOnTheScreen();
+  await act(() => { jest.advanceTimersByTime(350); });
+  expect(screen.getByText("방문 순서 재생")).toBeOnTheScreen();
+  jest.useRealTimers();
 });

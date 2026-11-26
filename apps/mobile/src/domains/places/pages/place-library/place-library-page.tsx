@@ -2,7 +2,7 @@ import { useApiQuery } from "@/shared/query/use-resource";
 import { router, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { getPlacePhoto } from "@/domains/places/api/places.api";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
@@ -13,18 +13,19 @@ import { EditorialHeading, FieldIcon, FieldIllustration } from "@/shared/ui/fiel
 import { TripNavigation } from "@/shared/ui/trip-navigation";
 import { colors, fonts, spacing } from "@/shared/design/tokens";
 import { placeDescription } from "./place-description";
-import { usePlaceLibrary } from "./use-place-library";
+import { type PlaceTag, usePlaceLibrary } from "./use-place-library";
 import { useAppDialog } from "@/shared/ui/app-dialog";
 
 export default function PlacesScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const {
     clearSelection, places, loading, saving, message, reload,
-    removePlaces, selectPlaces, selectedIds, toggleSelection,
+    removePlaces, selectPlaces, selectedIds, toggleSelection, updatePlacesTag,
   } = usePlaceLibrary(tripId);
   const { showDialog } = useAppDialog();
   const [query, setQuery] = useState("");
   const [managing, setManaging] = useState(false);
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const selectedCount = selectedIds.size;
   const [activeTag, setActiveTag] = useState<string>("all");
   const tags = useMemo(() => [...new Set(places.map((place) => place.tag))].sort(), [places]);
@@ -73,9 +74,10 @@ export default function PlacesScreen() {
             </Pressable>
           </View>
           <View style={styles.managementActions}>
+            <Button label="태그 변경" variant="secondary" disabled={saving || selectedCount === 0} style={styles.actionButton} onPress={() => setTagPickerOpen(true)} />
             <Button label={`선택 제거${selectedCount > 0 ? ` (${selectedCount})` : ""}`} variant="danger" disabled={saving || selectedCount === 0} style={styles.actionButton} onPress={confirmSelectedRemoval} />
-            <Button label="전체 제거" variant="ghost" disabled={saving} style={styles.actionButton} onPress={confirmAllRemoval} />
           </View>
+          <Button label="전체 제거" variant="ghost" disabled={saving} onPress={confirmAllRemoval} />
         </Card>}
         {message && <AppText color={colors.secondary}>{message}</AppText>}
         {loading && <Card><AppText color={colors.muted}>장소를 불러오는 중이에요…</AppText></Card>}
@@ -106,6 +108,13 @@ export default function PlacesScreen() {
         {message && <Button label="다시 불러오기" variant="ghost" onPress={() => void reload()} />}
         {!loading && places.length > 0 && filteredPlaces.length === 0 && <AppText color={colors.muted}>검색 조건에 맞는 장소가 없어요.</AppText>}
         <AppText variant="micro" color={colors.muted}>장소를 선택해 관리하거나, 모아둔 곳으로 하루를 구성해 보세요.</AppText>
+        <PlaceTagPicker
+          visible={tagPickerOpen}
+          saving={saving}
+          selectedCount={selectedCount}
+          onClose={() => setTagPickerOpen(false)}
+          onSelect={(tag) => void updatePlacesTag([...selectedIds], tag).then((updated) => { if (updated) setTagPickerOpen(false); })}
+        />
     </Screen>
   );
 }
@@ -116,6 +125,30 @@ const tagLabels: Record<string, string> = {
 };
 
 function tagLabel(tag: string) { return tagLabels[tag] ?? tag; }
+
+const editableTags = Object.keys(tagLabels) as PlaceTag[];
+
+function PlaceTagPicker({ onClose, onSelect, saving, selectedCount, visible }: {
+  onClose: () => void;
+  onSelect: (tag: PlaceTag) => void;
+  saving: boolean;
+  selectedCount: number;
+  visible: boolean;
+}) {
+  return <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}>
+    <View style={styles.tagModalBackdrop}>
+      <View accessibilityViewIsModal style={styles.tagModalSheet}>
+        <View style={styles.tagModalHeader}>
+          <View style={styles.tagModalTitle}><AppText variant="heading">태그 변경</AppText><AppText color={colors.muted}>선택한 {selectedCount}개 장소에 적용해요.</AppText></View>
+          <Pressable accessibilityLabel="태그 선택 닫기" accessibilityRole="button" hitSlop={8} onPress={onClose} style={styles.tagModalClose}><AppText variant="title">×</AppText></Pressable>
+        </View>
+        <View style={styles.tagOptions}>
+          {editableTags.map((tag) => <Button key={tag} label={tagLabel(tag)} variant="ghost" disabled={saving} style={styles.tagOption} onPress={() => onSelect(tag)} />)}
+        </View>
+      </View>
+    </View>
+  </Modal>;
+}
 
 function PlaceCardVisual({ placeId, tag, tripId }: { placeId: string; tag: string; tripId: string }) {
   const { data: photo } = useApiQuery(`trips:${tripId}:photo:${placeId}`, getPlacePhoto, tripId, placeId);
@@ -155,4 +188,11 @@ const styles = StyleSheet.create({
   addButton: { width: 50, paddingHorizontal: 0 },
   planButton: { flex: 1 },
   bottomAction: { flexDirection: "row", alignItems: "center", backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: colors.line, padding: spacing.md, gap: spacing.sm },
+  tagModalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(15, 19, 18, 0.42)" },
+  tagModalSheet: { gap: spacing.lg, borderTopLeftRadius: spacing.lg, borderTopRightRadius: spacing.lg, backgroundColor: colors.surface, padding: spacing.lg, paddingBottom: spacing.xl },
+  tagModalHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.md },
+  tagModalTitle: { flex: 1, gap: spacing.xs },
+  tagModalClose: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  tagOptions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  tagOption: { minWidth: "30%", flexGrow: 1 },
 });

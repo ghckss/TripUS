@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useApiQuery } from "@/shared/query/use-resource";
 
-import { deletePlaces, filterTravelPlaces, listPlaces, type SavedPlace } from "@/domains/places/api/places.api";
+import { deletePlaces, filterTravelPlaces, listPlaces, updatePlace, type SavedPlace } from "@/domains/places/api/places.api";
 import { safeErrorMessage } from "@/shared/api/trip-us-api";
 
 export function togglePlaceSelection(current: Set<string>, placeId: string): Set<string> {
@@ -13,6 +13,12 @@ export function togglePlaceSelection(current: Set<string>, placeId: string): Set
 
 export function allPlaceIds(places: Pick<SavedPlace, "id">[]): Set<string> {
   return new Set(places.map((place) => place.id));
+}
+
+export type PlaceTag = SavedPlace["tag"];
+
+export async function updatePlaceTags(tripId: string, placeIds: string[], tag: PlaceTag): Promise<void> {
+  await Promise.all(placeIds.map((placeId) => updatePlace(tripId, placeId, { tag })));
 }
 
 export function usePlaceLibrary(tripId: string) {
@@ -53,6 +59,22 @@ export function usePlaceLibrary(tripId: string) {
     }
   }, [tripId]);
 
+  const updatePlacesTag = useCallback(async (placeIds: string[], tag: PlaceTag) => {
+    if (placeIds.length === 0) return false;
+    setSaving(true); setMessage(undefined);
+    try {
+      await updatePlaceTags(tripId, placeIds, tag);
+      setSelectedIds(new Set());
+      setMessage(`${placeIds.length}개 장소의 태그를 변경했어요.`);
+      return true;
+    } catch (caught) {
+      setMessage(safeErrorMessage(caught, "장소 태그를 변경하지 못했어요."));
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }, [tripId]);
+
   return {
     clearSelection,
     places,
@@ -64,5 +86,6 @@ export function usePlaceLibrary(tripId: string) {
     selectPlaces,
     selectedIds,
     toggleSelection,
+    updatePlacesTag,
   };
 }
