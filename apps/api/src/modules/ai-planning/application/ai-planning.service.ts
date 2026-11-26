@@ -113,7 +113,10 @@ export class AiPlanningService {
       trip.latestAiPlanRequest = normalizeLatestAiPlanRequest(request);
       await this.trips.save(trip);
     }
-    const places = await this.places.find({ where: { tripId }, order: { createdAt: 'ASC' } });
+    const loadedPlaces = await this.places.find({ where: { tripId }, order: { createdAt: 'ASC' } });
+    const invalidAiPlaceholders = loadedPlaces.filter(isInvalidAiPlaceholderPlace);
+    if (invalidAiPlaceholders.length > 0) await this.places.remove(invalidAiPlaceholders);
+    const places = loadedPlaces.filter((place) => !invalidAiPlaceholders.includes(place));
     const primaryLodging = places.find((place) => place.isPrimaryLodging);
     const current = await this.itineraries.get(tripId);
     const placesById = new Map(places.map((place) => [place.id, place]));
@@ -335,17 +338,23 @@ export class AiPlanningService {
     const unresolved: Array<{ placeName: string; reason: string }> = [];
     try {
       for (const day of days) {
-        for (const [position, visit] of day.visits.entries()) {
+        let materializedPosition = 0;
+        for (const visit of day.visits) {
           if (visit.savedPlaceId && lockedIds.has(visit.savedPlaceId)) continue;
           let entity = existingPlaces.find((place) => place.id === visit.savedPlaceId);
           if (!entity) {
             let candidate: PlaceSearchCandidate | undefined;
+            let unresolvedReason: 'not_found' | 'lookup_failed' = 'not_found';
             try {
               candidate = (await this.placeSearch.search(visit.placeName, `${visit.regionName}, ${destination}`))[0];
-              if (!candidate) unresolved.push({ placeName: visit.placeName, reason: 'not_found' });
             } catch {
-              unresolved.push({ placeName: visit.placeName, reason: 'lookup_failed' });
+              unresolvedReason = 'lookup_failed';
             }
+            if (!candidate && isGenericActivityName(visit.placeName)) {
+              unresolved.push({ placeName: visit.placeName, reason: 'generic_activity' });
+              continue;
+            }
+            if (!candidate) unresolved.push({ placeName: visit.placeName, reason: unresolvedReason });
             // Lookup supplies metadata only. Missing search results do not delete AI visits.
             entity = [...existingPlaces, ...created].find((place) => candidate?.googlePlaceId
               ? place.googlePlaceId === candidate.googlePlaceId
@@ -371,7 +380,7 @@ export class AiPlanningService {
             }
           }
           placements.push({
-            savedPlaceId: entity.id, date: day.date, position,
+            savedPlaceId: entity.id, date: day.date, position: materializedPosition++,
             scheduledTime: visit.startTime, durationMinutes: visit.durationMinutes,
             activitySummary: visit.description,
           });
@@ -499,6 +508,18 @@ export function enumerateTripDates(startDate: string, endDate: string): string[]
 
 export function isAiRecommendedPlace(place: Pick<SavedPlaceEntity, 'note'>): boolean {
   return place.note?.startsWith('AI 추천 ·') ?? false;
+}
+
+export function isGenericActivityName(name: string): boolean {
+  const normalized = name.trim().replace(/\s+/g, ' ');
+  return /(?:픽업|수령|구매|구입|식사|아침|점심|저녁|산책|휴식|자유\s*시간|체크인|체크아웃|짐\s*(?:보관|수령)|이동|환승|탑승|하차|둘러보기|구경)(?:\s*[·.!?…]*)$/u.test(normalized);
+}
+
+function isInvalidAiPlaceholderPlace(place: Pick<SavedPlaceEntity, 'note' | 'name' | 'latitude' | 'longitude'>): boolean {
+  return isAiRecommendedPlace(place)
+    && place.latitude === null
+    && place.longitude === null
+    && isGenericActivityName(place.name);
 }
 
 function normalizeLatestAiPlanRequest(input: TripAiPlanRequest | null): GenerateAiPlanDto | null {

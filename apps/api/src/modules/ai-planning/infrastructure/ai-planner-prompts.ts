@@ -1,6 +1,6 @@
 import type { AiPlannerInput } from '../domain/ai-planner.port';
 
-export const AI_PLANNER_PROMPT_VERSION = '2026-11-26-personal-time-window-v19';
+export const AI_PLANNER_PROMPT_VERSION = '2026-11-27-searchable-place-v20';
 
 export type RequestedDailyTimeWindow = { startTime: string; endTime: string };
 
@@ -62,7 +62,7 @@ export const AI_PLANNER_SYSTEM_PROMPT = [
   // 하나의 시간표 출력
   '응답은 {"days":[{"date":"YYYY-MM-DD","visits":[...]}]} 구조입니다. days에는 itineraryDates의 각 날짜를 날짜순으로 작성하고, visits는 실제 방문 시작 시각순으로 작성하세요. visits 배열 순서가 그날의 방문 순서이며 position이나 별도 방문 배열은 필요하지 않습니다.',
   'visit의 필드는 savedPlaceId, placeName, regionName, startTime, durationMinutes, description, mealType입니다. 등록 장소는 places[].id를 savedPlaceId에 그대로 사용하고 이름과 지역도 기재하세요. 새 장소의 savedPlaceId는 null이며 placeName과 regionName에 검색 가능한 실제 고유명칭과 지역을 쓰세요. ID를 새로 만들지 마세요.',
-  '한 visit은 지도에서 하나의 실제 장소로 검색·연결할 수 있어야 합니다. 서로 다른 명소를 슬래시나 및으로 묶거나 대안 여러 곳을 한 항목에 넣지 마세요. placeName에는 식사 종류·레스토랑 같은 분류·활동 설명을 덧붙이지 말고 실제 장소 고유명칭만 쓰세요. 관람 내용은 description에 작성하세요.',
+  '한 visit은 지도에서 하나의 실제 장소로 검색·연결할 수 있어야 합니다. 서로 다른 명소를 슬래시나 및으로 묶거나 대안 여러 곳을 한 항목에 넣지 마세요. placeName에는 식사 종류·레스토랑 같은 분류·활동 설명을 덧붙이지 말고 실제 장소 고유명칭만 쓰세요. `편의점 도시락 픽업`, `점심 식사`, `기념품 구매`, `주변 산책`처럼 상호·지점명이 없는 행동 문구는 장소가 아니므로 절대 visit으로 만들지 말고, 필요한 일정이면 지도에서 검색 가능한 실제 업장·시설의 고유명칭으로 교체하세요. 관람 내용은 description에 작성하세요.',
   'startTime은 현지 HH:mm, durationMinutes는 체류 분입니다. 점심은 mealType=lunch, 저녁은 mealType=dinner, 아침은 breakfast, 관광 등 식사 이외 방문은 null입니다.',
   'description은 장소의 특징·볼거리·매력만 설명하는 짧은 문장입니다. 교통수단·노선·환승 방법·추정 여부·검증 과정·추천 이유·출처 URL은 쓰지 마세요. 필드가 지원하지 않는 내용을 위해 스키마에 없는 필드를 추가하지 마세요.',
   '반환 전에 대상 날짜 누락·범위 초과, 첫날 시작 이전 방문·마지막 날 종료 초과, 시간 겹침·이동 여유 누락, 운영시간 충돌, 점심·저녁 누락, 과도한 체류·공백·왕복을 확인하고 시간표 안에서 수정하세요. 최종 결과는 관광과 식사가 담긴 날짜별 실제 방문 시간표여야 합니다.',
@@ -77,6 +77,7 @@ export const AI_PLANNER_REVIEW_SYSTEM_PROMPT = [
   '초안의 장소별 방문 날짜를 기준으로 공식 시설·정부·운영 주체 웹사이트를 우선 검색하세요. 일반적인 요일별 영업시간만으로 통과시키지 말고 해당 여행 연도·월의 공식 달력에서 임시 휴관, 공휴일 대체 휴관, 계절 휴장, 공사와 입장 마감을 확인하세요. 방문일에 닫힌 장소는 열려 있는 날짜로 옮기거나 같은 선호를 만족하는 실제 대안으로 교체하세요.',
   'preferences.additionalRequests의 시작·종료 시간대, 피하고 싶은 장소 유형, 최대 도보 시간과 같은 구체 조건을 하나씩 대조하세요. preferences.transportModes 밖의 이동 수단을 전제로 하지 말고, 도보 제한이 있으면 가까운 장소끼리 묶고 그 한도를 넘을 가능성이 큰 구간은 선택한 다른 이동 수단을 사용할 수 있는 동선으로 바꾸세요.',
   'preferences.dailyTimeWindow가 있으면 모든 visit의 시작과 종료가 범위 안인지 검사하고, 관광·식사 종류와 관계없이 범위 밖 방문을 이동·교체·제거해 전체 시간표를 직접 고치세요.',
+  '모든 placeName을 다시 검사해 지도에서 검색 가능한 실제 업장·시설 고유명칭만 남기세요. `편의점 도시락 픽업`, `점심 식사`, `기념품 구매`, `주변 산책`처럼 상호·지점명 없이 행동만 설명한 visit은 실제 장소로 교체하거나 제거하세요.',
   'preferences.budgetLevel을 장소와 식당 선택에 다시 적용하세요. budget이면 무료·저가·가성비 선택을 우선하고 고가 체험을 핵심 일정으로 넣지 마세요. 확인되지 않은 가격을 만들지 마세요.',
   '첫 방문과 마지막 방문의 시각, 체류시간과 필요한 이동 여유를 포함해 사용자 시간 범위를 지키세요. 수정과 무관한 정상 방문과 등록 장소의 savedPlaceId는 가능한 한 유지하되, 휴관·요청 충돌을 그대로 두기 위해 보존하지 마세요.',
   '검토 과정, 판정표, 출처와 설명을 별도 필드로 반환하지 마세요. 문제를 수정한 days와 visits 전체만 반환하세요.',

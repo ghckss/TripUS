@@ -71,8 +71,10 @@ describe('travel brief and selected preferences', () => {
     expect(prompt).toContain('수속 여유를 다시 빼지 마세요');
     expect(prompt).not.toContain('arrival(입국 심사 및 수하물 수령) →');
     expect(prompt).toContain('장소의 특징·볼거리·매력');
+    expect(prompt).toContain('편의점 도시락 픽업');
     expect(prompt).toContain('preferences.dailyTimeWindow');
     expect(AI_PLANNER_REVIEW_SYSTEM_PROMPT).toContain('모든 visit의 시작과 종료가 범위 안인지');
+    expect(AI_PLANNER_REVIEW_SYSTEM_PROMPT).toContain('실제 업장·시설 고유명칭');
   });
 
   it('does not invent breaks, waiting, hotel stays or model route fields', () => {

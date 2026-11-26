@@ -115,10 +115,11 @@ export async function updatePlace(
   let updatedPlace = data;
   const places = setResource<SavedPlace[]>(cacheKeys.places(tripId), (current) => current?.map((place) => {
     if (place.id !== placeId) return place;
+    // PATCH only changes fields the user submitted. Keep every other display field
+    // from the loaded place even if an older/partial API response sends empty defaults.
     updatedPlace = {
       ...place,
-      ...data,
-      name: data.name?.trim() ? data.name : place.name,
+      ...input,
     };
     return updatedPlace;
   }));

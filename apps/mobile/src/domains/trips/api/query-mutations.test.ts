@@ -55,22 +55,24 @@ it("shares a single places request across library, lodging and itinerary callers
   expect(tripUsApi.GET).toHaveBeenCalledTimes(1);
 });
 
-it("keeps the existing place name when a tag PATCH response omits display fields", async () => {
+it("keeps existing display fields when a tag PATCH response clears unrelated fields", async () => {
   const place = {
     id: "place-to-tag", tripId: trip.id, googlePlaceId: null, name: "신주쿠 중앙공원",
     address: null, latitude: null, longitude: null, tag: "attraction",
-    preference: "want_to_visit", note: null, isPrimaryLodging: false,
+    preference: "want_to_visit", note: "잔디광장 쪽으로 가기", isPrimaryLodging: false,
   } as const;
   setResource(cacheKeys.places(trip.id), [place]);
-  (tripUsApi.PATCH as jest.Mock).mockResolvedValue({ data: { id: place.id, tag: "other" } });
+  (tripUsApi.PATCH as jest.Mock).mockResolvedValue({ data: {
+    id: place.id, tag: "other", name: "", note: null, address: null,
+  } });
 
   const updated = await updatePlace(trip.id, place.id, { tag: "other" });
 
-  expect(updated).toMatchObject({ id: place.id, name: place.name, tag: "other" });
+  expect(updated).toMatchObject({ id: place.id, name: place.name, note: place.note, tag: "other" });
   expect(queryClient.getQueryData(resourceKey(cacheKeys.places(trip.id)))).toEqual([
-    expect.objectContaining({ id: place.id, name: place.name, tag: "other" }),
+    expect.objectContaining({ id: place.id, name: place.name, note: place.note, tag: "other" }),
   ]);
   expect(writeCache).toHaveBeenCalledWith(cacheKeys.places(trip.id), [
-    expect.objectContaining({ id: place.id, name: place.name, tag: "other" }),
+    expect.objectContaining({ id: place.id, name: place.name, note: place.note, tag: "other" }),
   ]);
 });

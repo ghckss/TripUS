@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AiPlanningService, addLodgingEndpoints } from './ai-planning.service';
+import { AiPlanningService, addLodgingEndpoints, isGenericActivityName } from './ai-planning.service';
 import { AiPlannerError, TravelTheme, type AiPlannerInput, type AiPlannerOutput, type AiPlannerVisit } from '../domain/ai-planner.port';
 import { AiBudgetLevel, AiTransportMode } from './dto/generate-ai-plan.dto';
 import * as logs from '../../../common/http/json-logger';
@@ -76,6 +76,39 @@ describe('day visit materialization', () => {
     expect((await service.generate('trip', request)).status).toBe('generated');
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ name: visit.placeName, googlePlaceId: null, latitude: null, longitude: null }));
     expect(replace.mock.calls[0]![1]).toHaveLength(2);
+  });
+
+  it('does not save an unresolved activity description as a map place', async () => {
+    const { service, search, generate, save, replace } = setup();
+    generate.mockResolvedValue({ days: [{ date, visits: [
+      { ...visit, placeName: '편의점 도시락 픽업' },
+      { ...visit, placeName: '에펠탑', startTime: '14:00' },
+    ] }] });
+    search.mockResolvedValue([]);
+
+    expect((await service.generate('trip', request)).status).toBe('generated');
+
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ name: '에펠탑' }));
+    expect(replace.mock.calls[0]![1]).toEqual([
+      expect.objectContaining({ savedPlaceId: 'place-1', position: 0, scheduledTime: '14:00' }),
+    ]);
+  });
+
+  it('removes a previously saved coordinate-less AI activity placeholder before replanning', async () => {
+    const { service, savedPlaces, remove } = setup();
+    const placeholder = place('generic-ai', 'AI 추천 · 식사 준비');
+    Object.assign(placeholder, {
+      name: '편의점 도시락 픽업',
+      googlePlaceId: null,
+      latitude: null,
+      longitude: null,
+    });
+    savedPlaces.push(placeholder);
+
+    await service.generate('trip', request);
+
+    expect(remove).toHaveBeenCalledWith([placeholder]);
   });
 
   it('reuses a Google place entity while preserving visits on different dates', async () => {
@@ -170,6 +203,16 @@ describe('day visit materialization', () => {
     expect((await service.generate('trip', request)).status).toBe('conflict');
     expect(remove).toHaveBeenCalledWith([expect.objectContaining({ id: 'place-1' })]);
     expect(record).not.toHaveBeenCalled();
+  });
+});
+
+describe('AI place-name guard', () => {
+  it.each(['편의점 도시락 픽업', '점심 식사', '기념품 구매', '주변 산책…', '호텔 체크인'])('identifies a generic activity: %s', (name) => {
+    expect(isGenericActivityName(name)).toBe(true);
+  });
+
+  it.each(['세븐일레븐 시부야 마크시티점', '에펠탑', '츠키지 스시세이 본점'])('keeps a searchable proper place name: %s', (name) => {
+    expect(isGenericActivityName(name)).toBe(false);
   });
 });
 
