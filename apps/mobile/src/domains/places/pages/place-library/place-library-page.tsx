@@ -113,7 +113,11 @@ export default function PlacesScreen() {
           saving={saving}
           selectedCount={selectedCount}
           onClose={() => setTagPickerOpen(false)}
-          onSelect={(tag) => void updatePlacesTag([...selectedIds], tag).then((updated) => { if (updated) setTagPickerOpen(false); })}
+          onSelect={(tag) => void updatePlacesTag([...selectedIds], tag).then((updated) => {
+            if (!updated) return;
+            setActiveTag("all");
+            setTagPickerOpen(false);
+          })}
         />
     </Screen>
   );

@@ -1,6 +1,31 @@
 import type { AiPlannerInput } from '../domain/ai-planner.port';
 
-export const AI_PLANNER_PROMPT_VERSION = '2026-11-24-final-review-v18';
+export const AI_PLANNER_PROMPT_VERSION = '2026-11-26-personal-time-window-v19';
+
+export type RequestedDailyTimeWindow = { startTime: string; endTime: string };
+
+function meridiemHour(value: number, meridiem?: string): number {
+  if (meridiem === '오후' && value < 12) return value + 12;
+  if (meridiem === '오전' && value === 12) return 0;
+  return value;
+}
+
+/** Extract an explicit daily range such as `14~18시` or `오후 2시부터 오후 6시까지`. */
+export function requestedDailyTimeWindow(additionalRequests: string | null): RequestedDailyTimeWindow | undefined {
+  if (!additionalRequests) return undefined;
+  const match = additionalRequests.match(/(오전|오후)?\s*(\d{1,2})(?::([0-5]\d))?\s*시?\s*(?:~|〜|–|—|-|부터)\s*(오전|오후)?\s*(\d{1,2})(?::([0-5]\d))?\s*시(?:까지)?/);
+  if (!match) return undefined;
+  const startHour = meridiemHour(Number(match[2]), match[1]);
+  const endHour = meridiemHour(Number(match[5]), match[4] ?? match[1]);
+  const startMinute = Number(match[3] ?? 0);
+  const endMinute = Number(match[6] ?? 0);
+  if (startHour > 23 || endHour > 23) return undefined;
+  const start = startHour * 60 + startMinute;
+  const end = endHour * 60 + endMinute;
+  if (start >= end) return undefined;
+  const hhmm = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+  return { startTime: hhmm(start), endTime: hhmm(end) };
+}
 
 export const AI_PLANNER_SYSTEM_PROMPT = [
   '당신은 실제 방문 가능한 날짜별 여행 시간표를 작성하는 여행 플래너입니다. 한국어로 작성하고 지정된 JSON으로만 반환하세요.',
@@ -21,6 +46,7 @@ export const AI_PLANNER_SYSTEM_PROMPT = [
   'preferences.transportModes는 사용자가 선택한 이동 수단입니다. public_transit은 대중교통, walking은 도보, car는 자동차·렌터카이며 복수이면 구간 특성에 맞게 조합하세요. 선택하지 않은 이동 수단을 일정의 전제로 삼지 마세요.',
   'preferences.budgetLevel은 budget=가성비, standard=가격과 만족도의 균형, premium=비용보다 특별한 경험 우선입니다. 장소와 식당 선택에 반영하되 확인되지 않은 가격을 단정하지 마세요.',
   'preferences.additionalRequests는 사용자가 직접 작성한 필수 고려사항입니다. 여행 경계·안전·실제 운영 가능성과 충돌하지 않는 한 구체적인 장소·투어·시간대·선호·회피 요청을 일정에 반영하세요. 투어 약칭이나 여러 장소를 뜻하는 표현은 웹 검색으로 실제 방문 구성을 확인하고, 단순 집결지만 넣어 요청을 충족한 것으로 처리하지 마세요. 반영할 수 없다면 임의로 무시하지 말고 실행 가능한 가장 가까운 대안으로 구성하세요.',
+  'preferences.dailyTimeWindow가 있으면 사용자가 명시한 날짜별 활동 가능 범위입니다. 관광뿐 아니라 식사·카페를 포함한 모든 visit은 startTime 이상에 시작하고 체류 종료도 endTime을 넘지 않아야 합니다. 일반적인 아침·점심·저녁 시간보다 이 범위를 우선하며, 범위 밖 식사를 억지로 추가하지 마세요.',
 
   // 실행 가능성 확인
   '웹 검색은 실제 방문일의 관광지 휴관일·운영시간·입장 마감·예약 필요 여부, 식당 위치·영업시간·브레이크타임처럼 실행 가능성에 직접 영향을 주는 정보부터 확인하세요. 공식 시설·식당·교통기관 자료를 우선하고 같은 내용을 반복 검색하지 마세요. 일반적인 요일별 영업시간만 보지 말고 여행 연도·월의 공식 달력에서 해당 날짜의 임시 휴관·공휴일 대체 휴관·행사 예외까지 확인하세요.',
@@ -50,6 +76,7 @@ export const AI_PLANNER_REVIEW_SYSTEM_PROMPT = [
   '당신은 여행 일정의 최종 검토자이자 수정자입니다. 입력된 request와 draft를 검토하고, 문제를 직접 고친 전체 시간표를 생성 단계와 동일한 JSON 구조로만 반환하세요.',
   '초안의 장소별 방문 날짜를 기준으로 공식 시설·정부·운영 주체 웹사이트를 우선 검색하세요. 일반적인 요일별 영업시간만으로 통과시키지 말고 해당 여행 연도·월의 공식 달력에서 임시 휴관, 공휴일 대체 휴관, 계절 휴장, 공사와 입장 마감을 확인하세요. 방문일에 닫힌 장소는 열려 있는 날짜로 옮기거나 같은 선호를 만족하는 실제 대안으로 교체하세요.',
   'preferences.additionalRequests의 시작·종료 시간대, 피하고 싶은 장소 유형, 최대 도보 시간과 같은 구체 조건을 하나씩 대조하세요. preferences.transportModes 밖의 이동 수단을 전제로 하지 말고, 도보 제한이 있으면 가까운 장소끼리 묶고 그 한도를 넘을 가능성이 큰 구간은 선택한 다른 이동 수단을 사용할 수 있는 동선으로 바꾸세요.',
+  'preferences.dailyTimeWindow가 있으면 모든 visit의 시작과 종료가 범위 안인지 검사하고, 관광·식사 종류와 관계없이 범위 밖 방문을 이동·교체·제거해 전체 시간표를 직접 고치세요.',
   'preferences.budgetLevel을 장소와 식당 선택에 다시 적용하세요. budget이면 무료·저가·가성비 선택을 우선하고 고가 체험을 핵심 일정으로 넣지 마세요. 확인되지 않은 가격을 만들지 마세요.',
   '첫 방문과 마지막 방문의 시각, 체류시간과 필요한 이동 여유를 포함해 사용자 시간 범위를 지키세요. 수정과 무관한 정상 방문과 등록 장소의 savedPlaceId는 가능한 한 유지하되, 휴관·요청 충돌을 그대로 두기 위해 보존하지 마세요.',
   '검토 과정, 판정표, 출처와 설명을 별도 필드로 반환하지 마세요. 문제를 수정한 days와 visits 전체만 반환하세요.',
@@ -58,6 +85,7 @@ export const AI_PLANNER_REVIEW_SYSTEM_PROMPT = [
 /** Send the travel brief and current user preferences, without retired policies or reviewer context. */
 export function buildPlannerUserInput(input: AiPlannerInput) {
   const nights = Math.max(0, Math.round((Date.parse(`${input.trip.endDate}T00:00:00Z`) - Date.parse(`${input.trip.startDate}T00:00:00Z`)) / 86_400_000));
+  const dailyTimeWindow = requestedDailyTimeWindow(input.preferences.additionalRequests);
   return {
     trip: {
       title: input.trip.title,
@@ -77,6 +105,7 @@ export function buildPlannerUserInput(input: AiPlannerInput) {
       transportModes: input.preferences.transportModes,
       budgetLevel: input.preferences.budgetLevel,
       additionalRequests: input.preferences.additionalRequests,
+      ...(dailyTimeWindow ? { dailyTimeWindow } : {}),
     },
     lodgings: input.trip.lodgings ?? [],
     startPoint: input.trip.startPoint,

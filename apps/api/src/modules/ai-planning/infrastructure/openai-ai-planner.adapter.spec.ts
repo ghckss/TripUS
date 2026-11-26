@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { TravelTheme, type AiPlannerInput } from '../domain/ai-planner.port';
 import { ConfigService } from '@nestjs/config';
-import { createAiPlanSchema, OpenAiPlannerAdapter } from './openai-ai-planner.adapter';
+import { constrainAiPlanToTimeWindow, createAiPlanSchema, OpenAiPlannerAdapter } from './openai-ai-planner.adapter';
 
 const date = '2026-11-08';
 const savedPlaceId = '30000000-0000-4000-8000-000000000001';
@@ -38,6 +38,17 @@ describe('day visit response schema', () => {
     for (const extra of [{ reason: '추천 근거' }, { travelDurationMinutes: 10 }, { type: 'transport' }]) {
       expect(schema.safeParse({ days: [{ date, visits: [{ ...visit, ...extra }] }] }).success).toBe(false);
     }
+  });
+  it('restricts every visit start to an explicitly requested daily time range', () => {
+    const schema = createAiPlanSchema([], [date], { startTime: '14:00', endTime: '18:00' });
+    expect(schema.safeParse({ days: [{ date, visits: [{ ...visit, startTime: '14:00' }, { ...visit, startTime: '17:59' }] }] }).success).toBe(true);
+    expect(schema.safeParse({ days: [{ date, visits: [{ ...visit, startTime: '09:00' }] }] }).success).toBe(false);
+    expect(schema.safeParse({ days: [{ date, visits: [{ ...visit, startTime: '18:00' }] }] }).success).toBe(false);
+  });
+  it('caps the final dwell time so a visit cannot finish after the requested range', () => {
+    const output = { days: [{ date, visits: [{ ...visit, startTime: '17:30', durationMinutes: 90 }] }] };
+    expect(constrainAiPlanToTimeWindow(output, { startTime: '14:00', endTime: '18:00' }).days[0]?.visits[0])
+      .toMatchObject({ startTime: '17:30', durationMinutes: 30 });
   });
 });
 

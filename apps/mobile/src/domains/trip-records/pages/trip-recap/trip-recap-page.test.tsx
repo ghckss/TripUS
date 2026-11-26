@@ -67,10 +67,12 @@ it("clamps page indicators during overscroll and settles on the final snap", asy
 });
 
 it("reserves a separate title area on a cover without photos", async () => {
-  mockTripRecap = { ...mockTripRecap, photos: [] };
+  mockTripRecap = { ...mockTripRecap, trip: { ...mockTripRecap.trip, title: "부모님과 함께 떠나는 아주 특별하고 긴 파리 여행" }, photos: [] };
   const screen = await render(<TripRecapPage />);
 
   expect(screen.getByTestId("recap-cover-memory")).toBeOnTheScreen();
   expect(screen.getByTestId("recap-cover-paper")).toHaveStyle({ position: "relative" });
-  expect(screen.getByText("사진 대신 여행의 기억을\n한 장에 담았어요")).toBeOnTheScreen();
+  expect(screen.getByTestId("recap-cover-memory-guide")).toHaveProp("numberOfLines", 2);
+  expect(screen.getByTestId("recap-cover-memory-guide")).toHaveProp("adjustsFontSizeToFit", true);
+  expect(screen.getByText("부모님과 함께 떠나는 아주 특별하고 긴 파리 여행")).toHaveProp("numberOfLines", 2);
 });

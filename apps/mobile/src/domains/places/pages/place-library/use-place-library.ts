@@ -18,7 +18,9 @@ export function allPlaceIds(places: Pick<SavedPlace, "id">[]): Set<string> {
 export type PlaceTag = SavedPlace["tag"];
 
 export async function updatePlaceTags(tripId: string, placeIds: string[], tag: PlaceTag): Promise<void> {
-  await Promise.all(placeIds.map((placeId) => updatePlace(tripId, placeId, { tag })));
+  // Each update writes the complete list snapshot to the offline cache. Keep those
+  // writes ordered so a slower response cannot restore an intermediate snapshot.
+  for (const placeId of placeIds) await updatePlace(tripId, placeId, { tag });
 }
 
 export function usePlaceLibrary(tripId: string) {

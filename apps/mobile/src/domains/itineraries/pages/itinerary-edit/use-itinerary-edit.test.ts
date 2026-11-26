@@ -144,4 +144,27 @@ describe("ensureLodgingEndpoints", () => {
       ["end_point", "인천공항 제2터미널"],
     ]);
   });
+
+  it("keeps configured boundaries at the edges when a trip has no lodging", () => {
+    const date = "2026-11-08";
+    const initial = {
+      items: [
+        { id: "boundary:start", savedPlaceId: "trip-1", placeName: "출발 공항", date, position: 0, boundaryType: "start_point", locked: true, source: "manual" },
+        { id: "visit-1", savedPlaceId: "place-1", placeName: "기존 장소", date, position: 1, boundaryType: null, locked: false, source: "manual" },
+        { id: "boundary:end", savedPlaceId: "trip-1", placeName: "도착 공항", date, position: 2, boundaryType: "end_point", locked: true, source: "manual" },
+        { id: "visit-2", savedPlaceId: "place-2", placeName: "새 장소", date, position: 3, boundaryType: null, locked: false, source: "manual" },
+      ],
+      unplaced: [],
+    } as Itinerary;
+
+    const result = ensureLodgingEndpoints(initial, [date], []);
+    const ordered = result.items.sort((left, right) => (left.position ?? 0) - (right.position ?? 0));
+
+    expect(ordered.map((item) => [item.boundaryType, item.placeName])).toEqual([
+      ["start_point", "출발 공항"],
+      [null, "기존 장소"],
+      [null, "새 장소"],
+      ["end_point", "도착 공항"],
+    ]);
+  });
 });

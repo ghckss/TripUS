@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react-native";
+import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import PlacesScreen from "./place-library-page";
 
 const mockUpdatePlacesTag = jest.fn().mockResolvedValue(true);
@@ -40,9 +40,12 @@ it("keeps bulk removal inside the explicit management panel", async () => {
 it("changes the tag for the selected places from the management panel", async () => {
   mockSelectedIds = new Set(["park"]);
   const screen = await render(<PlacesScreen />);
+  await fireEvent.press(screen.getByRole("button", { name: "명소" }));
+  expect(screen.queryByText("오월카페")).not.toBeOnTheScreen();
   await fireEvent.press(screen.getByRole("button", { name: "장소 선택·관리" }));
   await fireEvent.press(screen.getByRole("button", { name: "태그 변경" }));
   expect(screen.getByText("선택한 1개 장소에 적용해요.")).toBeOnTheScreen();
   await fireEvent.press(screen.getAllByRole("button", { name: "카페" }).at(-1)!);
   expect(mockUpdatePlacesTag).toHaveBeenCalledWith(["park"], "cafe");
+  await waitFor(() => expect(screen.getByText("오월카페")).toBeOnTheScreen());
 });

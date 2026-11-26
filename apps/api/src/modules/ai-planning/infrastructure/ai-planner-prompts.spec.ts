@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TravelTheme, type AiPlannerInput } from '../domain/ai-planner.port';
-import { AI_PLANNER_REVIEW_SYSTEM_PROMPT, buildPlannerSystemPrompt, buildPlannerUserInput } from './ai-planner-prompts';
+import { AI_PLANNER_REVIEW_SYSTEM_PROMPT, buildPlannerSystemPrompt, buildPlannerUserInput, requestedDailyTimeWindow } from './ai-planner-prompts';
 
 const input: AiPlannerInput = {
   preferences: {
@@ -50,6 +50,20 @@ describe('travel brief and selected preferences', () => {
     expect(AI_PLANNER_REVIEW_SYSTEM_PROMPT).toContain('preferences.budgetLevel');
   });
 
+  it.each([
+    ['14~18시 사이에만 여행', { startTime: '14:00', endTime: '18:00' }],
+    ['오후 2시부터 오후 6시까지 관광', { startTime: '14:00', endTime: '18:00' }],
+    ['10:30시~16:45시 일정', { startTime: '10:30', endTime: '16:45' }],
+  ])('structures an explicit user time range: %s', (additionalRequests, expected) => {
+    expect(requestedDailyTimeWindow(additionalRequests)).toEqual(expected);
+    expect(buildPlannerUserInput({ ...input, preferences: { ...input.preferences, additionalRequests } }).preferences)
+      .toMatchObject({ additionalRequests, dailyTimeWindow: expected });
+  });
+
+  it('does not interpret unrelated numeric ranges as a daily time window', () => {
+    expect(requestedDailyTimeWindow('도보 10분 이내, 여행 1~5일 전 준비')).toBeUndefined();
+  });
+
   it('treats boundaries as ready-to-start and arrival times without adding airport procedures', () => {
     const prompt = buildPlannerSystemPrompt();
     expect(prompt).toContain('필요한 수속을 마치고');
@@ -57,6 +71,8 @@ describe('travel brief and selected preferences', () => {
     expect(prompt).toContain('수속 여유를 다시 빼지 마세요');
     expect(prompt).not.toContain('arrival(입국 심사 및 수하물 수령) →');
     expect(prompt).toContain('장소의 특징·볼거리·매력');
+    expect(prompt).toContain('preferences.dailyTimeWindow');
+    expect(AI_PLANNER_REVIEW_SYSTEM_PROMPT).toContain('모든 visit의 시작과 종료가 범위 안인지');
   });
 
   it('does not invent breaks, waiting, hotel stays or model route fields', () => {

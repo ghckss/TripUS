@@ -36,7 +36,7 @@ function CoverSlide({ slide, accessToken }: { slide: Extract<RecapSlide, { kind:
       : <View style={styles.memoryHero} testID="recap-cover-memory">
         <View style={styles.memoryBadge}><AppText variant="caption" color={colors.secondary}>TRIPUS MEMORY</AppText></View>
         <View style={styles.memorySymbols}><View style={[styles.memorySymbol, styles.memorySymbolPrimary]}><AppText style={styles.memoryEmoji}>✦</AppText></View><View style={[styles.memorySymbol, styles.memorySymbolSecondary]}><AppText style={styles.memoryEmoji}>⌖</AppText></View><View style={[styles.memorySymbol, styles.memorySymbolWarm]}><AppText style={styles.memoryEmoji}>♡</AppText></View></View>
-        <AppText variant="title" color={colors.secondary}>사진 대신 여행의 기억을{`\n`}한 장에 담았어요</AppText>
+        <AppText adjustsFontSizeToFit minimumFontScale={0.86} numberOfLines={2} variant="heading" color={colors.secondary} testID="recap-cover-memory-guide">사진 대신 여행의 기억을{`\n`}한 장에 담았어요</AppText>
         <View style={styles.coverStats}><AppText variant="label">{slide.dayCount}일의 기록</AppText><AppText variant="label">{slide.placeCount}곳의 순간</AppText></View>
       </View>}
     <View style={[styles.coverPaper, !hasPhoto && styles.coverPaperWithoutPhoto]} testID="recap-cover-paper">
@@ -182,18 +182,18 @@ const styles = StyleSheet.create({
   pageNumber: { position: "absolute", zIndex: 10, top: spacing.md, right: spacing.md, borderRadius: radius.pill, backgroundColor: `${colors.ink}AA`, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
   coverPhoto: { width: "100%", height: "68%" },
   coverPaper: { position: "absolute", left: spacing.lg, right: spacing.lg, bottom: spacing.xl, gap: spacing.xs, borderRadius: radius.md, backgroundColor: `${colors.surface}F2`, padding: spacing.lg },
-  coverPaperWithoutPhoto: { position: "relative", left: undefined, right: undefined, bottom: undefined, flexShrink: 0, marginHorizontal: spacing.lg, marginBottom: spacing.lg, padding: spacing.md },
+  coverPaperWithoutPhoto: { position: "relative", left: undefined, right: undefined, bottom: undefined, flexShrink: 0, marginHorizontal: spacing.md, marginBottom: spacing.md, padding: spacing.sm },
   coverThumb: { position: "absolute", width: "27%", aspectRatio: 0.88, borderWidth: 5, borderColor: colors.white, borderRadius: radius.sm },
   thumbOne: { right: spacing.lg, top: "48%", transform: [{ rotate: "5deg" }] },
   thumbTwo: { right: "29%", top: "51%", transform: [{ rotate: "-4deg" }] },
-  memoryHero: { flex: 1, minHeight: 0, justifyContent: "center", padding: spacing.xl, gap: spacing.md, backgroundColor: colors.secondarySoft },
+  memoryHero: { flex: 1, minHeight: 0, justifyContent: "center", padding: spacing.lg, gap: spacing.sm, backgroundColor: colors.secondarySoft },
   memoryBadge: { alignSelf: "flex-start", borderRadius: radius.pill, backgroundColor: colors.white, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   memorySymbols: { flexDirection: "row", alignItems: "center", gap: -spacing.sm },
-  memorySymbol: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center", borderWidth: 5, borderColor: colors.secondarySoft },
+  memorySymbol: { width: 54, height: 54, borderRadius: 27, alignItems: "center", justifyContent: "center", borderWidth: 4, borderColor: colors.secondarySoft },
   memorySymbolPrimary: { backgroundColor: colors.primarySoft, transform: [{ rotate: "-7deg" }] },
   memorySymbolSecondary: { backgroundColor: colors.white, transform: [{ rotate: "4deg" }] },
   memorySymbolWarm: { backgroundColor: colors.primarySoft, transform: [{ rotate: "-2deg" }] },
-  memoryEmoji: { fontSize: 32, color: colors.secondary },
+  memoryEmoji: { fontSize: 24, color: colors.secondary },
   coverStats: { flexDirection: "row", gap: spacing.sm },
   scheduleHeader: { flexShrink: 0, gap: spacing.xs, paddingRight: 64 },
   scheduleDivider: { height: 1, flexShrink: 0, backgroundColor: colors.line },

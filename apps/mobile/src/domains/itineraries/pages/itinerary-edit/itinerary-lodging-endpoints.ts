@@ -70,7 +70,6 @@ export function replaceLodgingBoundary(
 
 export function ensureLodgingEndpoints(itinerary: Itinerary, dates: string[], places: SavedPlace[]): Itinerary {
   const lodging = places.find((place) => place.isPrimaryLodging);
-  if (!lodging) return itinerary;
   const placesById = new Map(places.map((place) => [place.id, place]));
   const datedItems = new Set(dates);
   const nextItems = itinerary.items.filter((item) => !datedItems.has(item.date ?? ""));
@@ -86,8 +85,8 @@ export function ensureLodgingEndpoints(itinerary: Itinerary, dates: string[], pl
     const existingEnd = includeEnd
       ? [...dayWithoutBoundaries].reverse().find((item) => item.id !== existingStart?.id && isLodgingItem(item))
       : undefined;
-    const start = includeStart ? existingStart ?? lodgingEndpoint(lodging, date, "start") : undefined;
-    const end = includeEnd ? existingEnd ?? lodgingEndpoint(lodging, date, "end") : undefined;
+    const start = includeStart ? existingStart ?? (lodging ? lodgingEndpoint(lodging, date, "start") : undefined) : undefined;
+    const end = includeEnd ? existingEnd ?? (lodging ? lodgingEndpoint(lodging, date, "end") : undefined) : undefined;
     const visits = dayWithoutBoundaries.filter((item) => !isLodgingItem(item));
     const boundaryStartItems = startBoundary ? [{ ...startBoundary, position: 0 }] : [];
     const startItems = start ? [{ ...start, position: boundaryStartItems.length }] : [];

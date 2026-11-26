@@ -17,11 +17,37 @@ import {
   AI_PLANNER_REVIEW_SYSTEM_PROMPT,
   buildPlannerSystemPrompt,
   buildPlannerUserInput,
+  requestedDailyTimeWindow,
+  type RequestedDailyTimeWindow,
 } from './ai-planner-prompts';
 export { AI_PLANNER_SYSTEM_PROMPT } from './ai-planner-prompts';
 
 /** Restrict references and dates, without judging visit counts or itinerary quality. */
-export function createAiPlanSchema(allowedPlaceIds: string[], itineraryDates: string[]) {
+function allowedStartTimes(window: RequestedDailyTimeWindow): [string, ...string[]] {
+  const minutes = (value: string) => Number(value.slice(0, 2)) * 60 + Number(value.slice(3, 5));
+  const values: string[] = [];
+  for (let minute = minutes(window.startTime); minute < minutes(window.endTime); minute += 1) {
+    values.push(`${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`);
+  }
+  return values as [string, ...string[]];
+}
+
+export function constrainAiPlanToTimeWindow(output: AiPlannerOutput, window?: RequestedDailyTimeWindow): AiPlannerOutput {
+  if (!window) return output;
+  const endMinutes = Number(window.endTime.slice(0, 2)) * 60 + Number(window.endTime.slice(3, 5));
+  return {
+    ...output,
+    days: output.days.map((day) => ({
+      ...day,
+      visits: day.visits.map((visit) => {
+        const startMinutes = Number(visit.startTime.slice(0, 2)) * 60 + Number(visit.startTime.slice(3, 5));
+        return { ...visit, durationMinutes: Math.min(visit.durationMinutes, Math.max(0, endMinutes - startMinutes)) };
+      }),
+    })),
+  };
+}
+
+export function createAiPlanSchema(allowedPlaceIds: string[], itineraryDates: string[], timeWindow?: RequestedDailyTimeWindow) {
   const savedPlaceId = allowedPlaceIds.length > 0
     ? z.enum(allowedPlaceIds as [string, ...string[]]).nullable()
     : z.null();
@@ -32,7 +58,7 @@ export function createAiPlanSchema(allowedPlaceIds: string[], itineraryDates: st
     savedPlaceId,
     placeName: z.string().min(1),
     regionName: z.string().min(1),
-    startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+    startTime: timeWindow ? z.enum(allowedStartTimes(timeWindow)) : z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
     durationMinutes: z.number().int().min(0),
     description: z.string().min(1).max(500),
     mealType: z.enum(['breakfast', 'lunch', 'dinner']).nullable(),
@@ -71,9 +97,11 @@ export class OpenAiPlannerAdapter implements AiPlannerPort {
     let lastProgressLogAt = 0;
     let completedSearches = 0;
     try {
+      const timeWindow = requestedDailyTimeWindow(input.preferences.additionalRequests);
       const schema = createAiPlanSchema(
         input.places.map((place) => place.id),
         input.days.map((day) => day.date),
+        timeWindow,
       );
       const request = buildPlannerUserInput(input);
       const runPass = async (
@@ -129,10 +157,10 @@ export class OpenAiPlannerAdapter implements AiPlannerPort {
           throw new AiPlannerError('refused', { responseId, pass });
         }
         if (!response.output_parsed) throw new AiPlannerError('invalid_output', { responseId, pass });
-        return {
+        return constrainAiPlanToTimeWindow({
           ...response.output_parsed,
           usage: { inputTokens: response.usage?.input_tokens ?? 0, outputTokens: response.usage?.output_tokens ?? 0 },
-        };
+        }, timeWindow);
       };
 
       const draft = await runPass('generate', [
