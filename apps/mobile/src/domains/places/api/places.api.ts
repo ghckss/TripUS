@@ -112,13 +112,22 @@ export async function updatePlace(
   });
   if (error) throw new Error(apiErrorMessage(error));
   if (account !== getAccountScope()) throw new Error("Session changed during request");
-  const places = setResource<SavedPlace[]>(cacheKeys.places(tripId), (current) => current?.map((place) => place.id === placeId ? data : place));
+  let updatedPlace = data;
+  const places = setResource<SavedPlace[]>(cacheKeys.places(tripId), (current) => current?.map((place) => {
+    if (place.id !== placeId) return place;
+    updatedPlace = {
+      ...place,
+      ...data,
+      name: data.name?.trim() ? data.name : place.name,
+    };
+    return updatedPlace;
+  }));
   if (places) await writeCache(cacheKeys.places(tripId), places);
   if (account !== getAccountScope()) throw new Error("Session changed during request");
   removeResources(`trips:${tripId}:photo:${placeId}`);
   removeResources(`trips:${tripId}:route:`);
   void invalidateResource(cacheKeys.itinerary(tripId));
-  return data;
+  return updatedPlace;
 }
 
 export async function deletePlace(tripId: string, placeId: string): Promise<void> {
