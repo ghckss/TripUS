@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AiPlanningService, addLodgingEndpoints, isGenericActivityName } from './ai-planning.service';
+import { AiPlanningService, addLodgingEndpoints, isGenericActivityName, isInvalidAiPlaceholderPlace } from './ai-planning.service';
 import { AiPlannerError, TravelTheme, type AiPlannerInput, type AiPlannerOutput, type AiPlannerVisit } from '../domain/ai-planner.port';
 import { AiBudgetLevel, AiTransportMode } from './dto/generate-ai-plan.dto';
 import * as logs from '../../../common/http/json-logger';
@@ -97,9 +97,9 @@ describe('day visit materialization', () => {
 
   it('removes a previously saved coordinate-less AI activity placeholder before replanning', async () => {
     const { service, savedPlaces, remove } = setup();
-    const placeholder = place('generic-ai', 'AI 추천 · 식사 준비');
+    const placeholder = place('generic-ai', 'AI 추천 · 야식 준비');
     Object.assign(placeholder, {
-      name: '편의점 도시락 픽업',
+      name: '편의점 도시락 픽업 및 야식 준비',
       googlePlaceId: null,
       latitude: null,
       longitude: null,
@@ -207,12 +207,24 @@ describe('day visit materialization', () => {
 });
 
 describe('AI place-name guard', () => {
-  it.each(['편의점 도시락 픽업', '점심 식사', '기념품 구매', '주변 산책…', '호텔 체크인'])('identifies a generic activity: %s', (name) => {
+  it.each(['편의점 도시락 픽업', '편의점 도시락 픽업 및 야식 준비', '점심 식사', '기념품 구매', '주변 산책…', '호텔 체크인'])('identifies a generic activity: %s', (name) => {
     expect(isGenericActivityName(name)).toBe(true);
   });
 
   it.each(['세븐일레븐 시부야 마크시티점', '에펠탑', '츠키지 스시세이 본점'])('keeps a searchable proper place name: %s', (name) => {
     expect(isGenericActivityName(name)).toBe(false);
+  });
+
+  it('cleans only an AI-authored coordinate-less activity placeholder', () => {
+    expect(isInvalidAiPlaceholderPlace({
+      name: '편의점 도시락 픽업 및 야식 준비', note: 'AI 추천 · 야식 준비', latitude: null, longitude: null,
+    })).toBe(true);
+    expect(isInvalidAiPlaceholderPlace({
+      name: '편의점 도시락 픽업 및 야식 준비', note: '사용자가 직접 적은 메모', latitude: null, longitude: null,
+    })).toBe(false);
+    expect(isInvalidAiPlaceholderPlace({
+      name: '세븐일레븐 시부야 마크시티점', note: 'AI 추천 · 실제 지점', latitude: 35.65, longitude: 139.7,
+    })).toBe(false);
   });
 });
 

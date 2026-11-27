@@ -115,7 +115,6 @@ export class AiPlanningService {
     }
     const loadedPlaces = await this.places.find({ where: { tripId }, order: { createdAt: 'ASC' } });
     const invalidAiPlaceholders = loadedPlaces.filter(isInvalidAiPlaceholderPlace);
-    if (invalidAiPlaceholders.length > 0) await this.places.remove(invalidAiPlaceholders);
     const places = loadedPlaces.filter((place) => !invalidAiPlaceholders.includes(place));
     const primaryLodging = places.find((place) => place.isPrimaryLodging);
     const current = await this.itineraries.get(tripId);
@@ -156,6 +155,15 @@ export class AiPlanningService {
         savedPlaceCount: planningPlaces.length,
         themes: request.themes,
       });
+      if (invalidAiPlaceholders.length > 0) {
+        await this.places.remove(invalidAiPlaceholders);
+        writeStructuredLog('info', 'ai.generation.invalid_place_cleanup', {
+          generationId,
+          tripId,
+          removedCount: invalidAiPlaceholders.length,
+          removedPlaceIds: invalidAiPlaceholders.map((place) => place.id),
+        });
+      }
       const plannerInput: AiPlannerInput = {
         preferences: {
           themes: request.themes,
@@ -512,10 +520,12 @@ export function isAiRecommendedPlace(place: Pick<SavedPlaceEntity, 'note'>): boo
 
 export function isGenericActivityName(name: string): boolean {
   const normalized = name.trim().replace(/\s+/g, ' ');
-  return /(?:픽업|수령|구매|구입|식사|아침|점심|저녁|산책|휴식|자유\s*시간|체크인|체크아웃|짐\s*(?:보관|수령)|이동|환승|탑승|하차|둘러보기|구경)(?:\s*[·.!?…]*)$/u.test(normalized);
+  const endsWithActivity = /(?:픽업|수령|구매|구입|식사|아침|점심|저녁|산책|휴식|준비|자유\s*시간|체크인|체크아웃|짐\s*(?:보관|수령)|이동|환승|탑승|하차|둘러보기|구경)(?:\s*[·.!?…]*)$/u.test(normalized);
+  const genericSubjectWithAction = /(?:편의점|도시락|기념품|간식|야식|주변|자유\s*시간|짐|호텔).*(?:픽업|수령|구매|구입|식사|산책|휴식|준비|체크인|체크아웃|보관|이동|둘러보기|구경)/u.test(normalized);
+  return endsWithActivity || genericSubjectWithAction;
 }
 
-function isInvalidAiPlaceholderPlace(place: Pick<SavedPlaceEntity, 'note' | 'name' | 'latitude' | 'longitude'>): boolean {
+export function isInvalidAiPlaceholderPlace(place: Pick<SavedPlaceEntity, 'note' | 'name' | 'latitude' | 'longitude'>): boolean {
   return isAiRecommendedPlace(place)
     && place.latitude === null
     && place.longitude === null
