@@ -1,0 +1,37 @@
+name: Mobile CI
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - "apps/mobile/**"
+      - "packages/api-client/**"
+      - "packages/contracts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tripus/api-client typecheck
+      - run: pnpm --filter @tripus/mobile typecheck
+      - run: pnpm --filter @tripus/mobile lint
+      - run: pnpm --filter @tripus/mobile test
