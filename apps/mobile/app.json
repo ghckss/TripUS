@@ -4,11 +4,11 @@
     "slug": "tripus",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/branding/tripus-app-icon-t-filled-1024.png",
     "scheme": "tripus",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/branding/tripus-app-icon-t-filled-1024.png",
       "supportsTablet": false,
       "bundleIdentifier": "com.tripus.app",
       "usesAppleSignIn": true,
@@ -21,15 +21,14 @@
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#F7F4ED",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/android-icon-transparent.png",
+        "backgroundImage": "./assets/branding/tripus-app-icon-t-filled-1024.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "server",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/branding/tripus-google-play-icon-t-filled-512.png"
     },
     "plugins": [
       "./plugins/with-hidden-dev-menu-fab",
