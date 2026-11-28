@@ -18,7 +18,6 @@ import {
   type AiPlannerInput,
   type AiPlannerOutput,
   type AiPlannerPort,
-  TravelTheme,
 } from '../domain/ai-planner.port';
 import {
   AiPlanExecutionStatus,
@@ -35,7 +34,7 @@ import {
   type PlaceSearchCandidate,
   type PlaceSearchPort,
 } from '../../places/domain/place-search.port';
-import { AiBudgetLevel, AiTransportMode, type GenerateAiPlanDto } from './dto/generate-ai-plan.dto';
+import type { GenerateAiPlanDto } from './dto/generate-ai-plan.dto';
 import { writeStructuredLog } from '../../../common/http/json-logger';
 
 type PlannedPlacement = {
@@ -153,7 +152,7 @@ export class AiPlanningService {
         tripId,
         dayCount: days.length,
         savedPlaceCount: planningPlaces.length,
-        themes: request.themes,
+        hasAdditionalRequests: Boolean(request.additionalRequests?.trim()),
       });
       if (invalidAiPlaceholders.length > 0) {
         await this.places.remove(invalidAiPlaceholders);
@@ -165,13 +164,7 @@ export class AiPlanningService {
         });
       }
       const plannerInput: AiPlannerInput = {
-        preferences: {
-          themes: request.themes,
-          companions: request.companions ?? null,
-          transportModes: request.transportModes,
-          budgetLevel: request.budgetLevel ?? AiBudgetLevel.Standard,
-          additionalRequests: request.additionalRequests ?? null,
-        },
+        additionalRequests: request.additionalRequests?.trim() || null,
         trip: {
           title: trip.title, destination: trip.destination,
           regions: (trip.regions ?? []).map(({ name, address, latitude, longitude }) => ({ name, address, latitude, longitude })),
@@ -263,7 +256,6 @@ export class AiPlanningService {
       });
       return {
         status: result.status === ItineraryUpdateStatus.Updated ? AiPlanGenerationStatus.Generated : AiPlanGenerationStatus.Conflict,
-        themes: request.themes,
         conflicts: result.conflicts,
         itinerary: finalItinerary,
         failureReason: null,
@@ -293,7 +285,6 @@ export class AiPlanningService {
       });
       return {
         status: AiPlanGenerationStatus.Unavailable,
-        themes: request.themes,
         conflicts: [],
         itinerary: await this.itineraries.get(tripId),
         failureReason: reason,
@@ -534,37 +525,12 @@ export function isInvalidAiPlaceholderPlace(place: Pick<SavedPlaceEntity, 'note'
 
 function normalizeLatestAiPlanRequest(input: TripAiPlanRequest | null): GenerateAiPlanDto | null {
   if (!input) return null;
-  const themeValues = new Set(Object.values(TravelTheme));
-  const transportValues = new Set(Object.values(AiTransportMode));
-  const budgetValues = new Set(Object.values(AiBudgetLevel));
-  const themes = (input.themes ?? []).filter((theme): theme is TravelTheme => themeValues.has(theme as TravelTheme));
-  if (themes.length === 0) themes.push(input.style === 'food' ? TravelTheme.Food : TravelTheme.Highlights);
-  const transportModes = (input.transportModes ?? [])
-    .filter((mode): mode is AiTransportMode => transportValues.has(mode as AiTransportMode));
-  if (transportModes.length === 0) {
-    if (input.transportMode === 'mixed') transportModes.push(AiTransportMode.PublicTransit, AiTransportMode.Walking);
-    else if (transportValues.has(input.transportMode as AiTransportMode)) transportModes.push(input.transportMode as AiTransportMode);
-    else transportModes.push(AiTransportMode.PublicTransit);
-  }
-  const legacyRequests = [
-    input.preferences ? `좋아하는 것: ${input.preferences}` : '',
-    input.avoidances ? `피하고 싶은 것: ${input.avoidances}` : '',
-  ].filter(Boolean).join('\n');
-  return {
-    themes,
-    transportModes,
-    ...(input.companions ? { companions: input.companions } : {}),
-    ...(budgetValues.has(input.budgetLevel as AiBudgetLevel) ? { budgetLevel: input.budgetLevel as AiBudgetLevel } : {}),
-    ...((input.additionalRequests || legacyRequests) ? { additionalRequests: input.additionalRequests || legacyRequests } : {}),
-  };
+  const additionalRequests = input.additionalRequests?.trim();
+  return additionalRequests ? { additionalRequests } : null;
 }
 
 function defaultAiPlanRequest(): GenerateAiPlanDto {
-  return {
-    themes: [TravelTheme.Highlights],
-    transportModes: [AiTransportMode.PublicTransit],
-    budgetLevel: AiBudgetLevel.Standard,
-  };
+  return {};
 }
 
 function isLodging(

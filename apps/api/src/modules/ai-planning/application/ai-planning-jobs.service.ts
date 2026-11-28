@@ -6,12 +6,10 @@ import { IDENTITY_PORT, type IdentityPort } from '../../identity/domain/identity
 import { TripEntity } from '../../trips/domain/entities/trip.entity';
 import { AiPlanGenerationEntity, AiPlanGenerationJobStatus } from '../domain/entities/ai-plan-generation.entity';
 import { AiPlanningService } from './ai-planning.service';
-import { TravelTheme } from '../domain/ai-planner.port';
 import {
   AiPlanExecutionStatus,
   type AiPlanExecutionStatusResponseDto,
   AiPlanGenerationStatus,
-  AiTransportMode,
   type GenerateAiPlanDto,
   type StartAiPlanGenerationResponseDto,
 } from './dto/generate-ai-plan.dto';
@@ -32,10 +30,7 @@ export class AiPlanningJobsService {
 
   async startDay(tripId: string, date: string): Promise<StartAiPlanGenerationResponseDto> {
     const latest = await this.planning.getLatestRequest(tripId);
-    return this.start(tripId, latest.request ?? {
-      themes: [TravelTheme.Highlights],
-      transportModes: [AiTransportMode.PublicTransit, AiTransportMode.Walking],
-    }, date);
+    return this.start(tripId, latest.request ?? {}, date);
   }
 
   async start(tripId: string, request: GenerateAiPlanDto, targetDate: string | null = null): Promise<StartAiPlanGenerationResponseDto> {

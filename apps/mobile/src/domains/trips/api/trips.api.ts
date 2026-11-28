@@ -90,7 +90,6 @@ export async function deleteTrip(tripId: string): Promise<void> {
   trackEvent("trip.deleted", { tripId });
 }
 
-// Photo URLs are short-lived; do not persist them in the offline trip cache.
 export const getTripCover = defineQuery((tripId: string) => ({
   key: `trips:${tripId}:cover`, staleTime: 300000,
   request: async (): Promise<components["schemas"]["PlacePhotoResponseDto"]> => {

@@ -12,7 +12,7 @@ jest.mock("./use-place-library", () => ({
       { id: "park", name: "서울숲", tag: "attraction", note: "오래 걷기" },
       { id: "cafe", name: "오월카페", tag: "cafe", note: "창가에서 쉬기" },
     ],
-    selectedIds: mockSelectedIds, loading: false, saving: false, message: undefined,
+    selectedIds: mockSelectedIds, loading: false, saving: false, message: undefined, messageTone: undefined,
     clearSelection: jest.fn(), reload: jest.fn(), removePlaces: jest.fn(), selectPlaces: jest.fn(), toggleSelection: jest.fn(), updatePlacesTag: mockUpdatePlacesTag,
   }),
 }));

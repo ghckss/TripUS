@@ -23,6 +23,12 @@ it("computes only same-day straight-line segments", () => {
   expect(straightLineDistanceKm(items)).toBeLessThan(40);
 });
 
+it("allows the completed-trip map to zoom and pan", async () => {
+  const screen = await render(createElement(TripHistoryInsights, { trip, items }));
+  expect(screen.getByTestId("trip-history-map")).toHaveProp("zoomEnabled", true);
+  expect(screen.getByTestId("trip-history-map")).toHaveProp("scrollEnabled", true);
+});
+
 it("replays the visited places in order and resets without animating back to the start", async () => {
   jest.useFakeTimers();
   const screen = await render(createElement(TripHistoryInsights, { trip, items }));

@@ -6,10 +6,6 @@ import { AppDialogProvider } from "@/shared/ui/app-dialog";
 
 const mockGenerate = jest.fn().mockResolvedValue(true);
 let mockLatestRequest: {
-  themes: ["food", "cafes"];
-  companions: string;
-  transportModes: ["public_transit", "walking"];
-  budgetLevel: "premium";
   additionalRequests: string;
 } | null;
 
@@ -33,10 +29,6 @@ describe("AiPlanScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockLatestRequest = {
-      themes: ["food", "cafes"],
-      companions: "친구 2명",
-      transportModes: ["public_transit", "walking"],
-      budgetLevel: "premium",
       additionalRequests: "현지 맛집과 카페를 좋아하고 긴 대기는 피하고 싶어요.",
     };
   });
@@ -47,16 +39,11 @@ describe("AiPlanScreen", () => {
     await fireEvent.press(screen.getByLabelText("최근 요청 불러오기"));
     expect(screen.getByText("최근 설정을 불러올까요?")).toBeOnTheScreen();
     await fireEvent.press(screen.getByText("불러오기"));
-    expect(screen.getByLabelText("동행자").props.value).toBe("친구 2명");
     expect(screen.getByLabelText("추가 요청사항").props.value).toBe("현지 맛집과 카페를 좋아하고 긴 대기는 피하고 싶어요.");
 
     await fireEvent.press(screen.getByTestId("ai-plan-generate"));
 
     await waitFor(() => expect(mockGenerate).toHaveBeenCalledWith({
-      themes: ["food", "cafes"],
-      companions: "친구 2명",
-      transportModes: ["public_transit", "walking"],
-      budgetLevel: "premium",
       additionalRequests: "현지 맛집과 카페를 좋아하고 긴 대기는 피하고 싶어요.",
     }));
     expect(router.replace).toHaveBeenCalledWith("/trips/trip-1/itinerary");
@@ -71,17 +58,31 @@ describe("AiPlanScreen", () => {
     expect(screen.getByText("불러올 최근 요청이 없어요")).toBeOnTheScreen();
   });
 
-  it("explains travel themes and budget without offering density choices", async () => {
+  it("only offers additional requests as an AI planning input", async () => {
     const screen = await render(<AppDialogProvider><AiPlanScreen /></AppDialogProvider>);
 
+    expect(screen.getByText("원하시는 여행을 저에게 알려주세요")).toBeOnTheScreen();
+    expect(screen.queryByText("TripUS")).not.toBeOnTheScreen();
     expect(screen.queryByText("여행의 밀도")).not.toBeOnTheScreen();
-    expect(screen.queryByLabelText("여행의 밀도 선택지 설명")).not.toBeOnTheScreen();
-    expect(screen.queryByText("균형 있게")).not.toBeOnTheScreen();
-    expect(screen.queryByText("알차게")).not.toBeOnTheScreen();
-    await fireEvent.press(screen.getByLabelText("여행의 방식 선택지 설명"));
-    expect(screen.getByText(/자연·휴식: 공원과 자연/)).toBeOnTheScreen();
-    await fireEvent.press(screen.getByText("확인"));
-    await fireEvent.press(screen.getByLabelText("예산 선택지 설명"));
-    expect(screen.getByText(/가성비: 비용 부담이 적은/)).toBeOnTheScreen();
+    expect(screen.queryByText("여행의 방식")).not.toBeOnTheScreen();
+    expect(screen.queryByText("동행자")).not.toBeOnTheScreen();
+    expect(screen.queryByText("이동 수단")).not.toBeOnTheScreen();
+    expect(screen.queryByText("예산")).not.toBeOnTheScreen();
+    expect(screen.getByText("추가 요청사항 (선택)")).toBeOnTheScreen();
+    expect(screen.getByLabelText("추가 요청사항")).toBeOnTheScreen();
+  });
+
+  it("fills the request input without generating when an example is selected", async () => {
+    const screen = await render(<AppDialogProvider><AiPlanScreen /></AppDialogProvider>);
+    const label = "현지인처럼 여행하고 싶어요";
+    const request = "유명 관광지는 최소화하고 현지인이 일상적으로 찾는 동네, 식당, 상점과 문화 공간을 중심으로 구성해 주세요.";
+
+    expect(screen.getByText("쇼핑을 많이 하고 싶어요")).toBeOnTheScreen();
+    expect(screen.getByText(label)).toBeOnTheScreen();
+    expect(screen.getByText("도시보다 자연이 더 좋아요")).toBeOnTheScreen();
+    await fireEvent.press(screen.getByLabelText(`예시 요청: ${label}`));
+
+    expect(screen.getByLabelText("추가 요청사항").props.value).toBe(request);
+    expect(mockGenerate).not.toHaveBeenCalled();
   });
 });

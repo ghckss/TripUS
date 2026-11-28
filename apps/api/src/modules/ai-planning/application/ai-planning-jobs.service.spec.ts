@@ -1,14 +1,12 @@
 import { ConflictException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
-import { TravelTheme } from '../domain/ai-planner.port';
 import { AiPlanGenerationJobStatus, type AiPlanGenerationEntity } from '../domain/entities/ai-plan-generation.entity';
 import { AiPlanningJobsService } from './ai-planning-jobs.service';
-import { AiPlanGenerationStatus, AiTransportMode } from './dto/generate-ai-plan.dto';
+import { AiPlanGenerationStatus } from './dto/generate-ai-plan.dto';
 
 const request = {
-  themes: [TravelTheme.Highlights],
-  transportModes: [AiTransportMode.PublicTransit],
+  additionalRequests: '야경 포함',
 };
 
 describe('AiPlanningJobsService', () => {

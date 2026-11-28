@@ -23,10 +23,10 @@ export function tripCoverVariant(id: string) {
   return variants[hash % variants.length];
 }
 
-export function TripCover({ trip }: { trip: Trip }) {
+export function TripCover({ trip, compact = false }: { trip: Trip; compact?: boolean }) {
   const city = trip.regions?.[0];
   const identity = `${trip.id}:${city?.googlePlaceId ?? ""}:${city?.name ?? ""}`;
-  const { data: photo } = useApiQuery(`trips:${trip.id}:cover`, getTripCover, trip.id);
+  const { data: photo, loading } = useApiQuery(`trips:${trip.id}:cover`, getTripCover, trip.id);
   const [loadedUrl, setLoadedUrl] = useState<string>();
   const [failedUrl, setFailedUrl] = useState<string>();
   const imageUrl = photo?.googleMapsUri && photo.imageUrl !== failedUrl ? photo.imageUrl : undefined;
@@ -34,17 +34,17 @@ export function TripCover({ trip }: { trip: Trip }) {
   const variant = tripCoverVariant(trip.id);
 
   return <View>
-    <View style={[styles.frame, { backgroundColor: variant.background }]} testID={`trip-cover-${trip.id}`}>
-      <FieldIllustration kind={variant.kind} style={styles.art} />
+    <View style={[styles.frame, compact && styles.compactFrame, { backgroundColor: variant.background }]} testID={`trip-cover-${trip.id}`}>
+      {!loading && !imageUrl && <FieldIllustration kind={variant.kind} style={styles.art} />}
       {imageUrl && <Image testID={`trip-cover-photo-${trip.id}`} source={{ uri: imageUrl }}
         accessibilityLabel={`${city?.name ?? trip.destination} 여행 표지 사진`}
         contentFit="cover" cachePolicy="memory" recyclingKey={identity}
         style={[StyleSheet.absoluteFill, { opacity: loaded ? 1 : 0 }]}
         onLoad={() => setLoadedUrl(imageUrl)} onError={() => setFailedUrl(imageUrl)} />}
-      <View style={styles.label}>
+      {!compact && <View style={styles.label}>
         <AppText variant="label" color={colors.white} numberOfLines={1}>{city?.name ?? trip.destination}</AppText>
         <AppText variant="micro" color={`${colors.white}E6`}>{trip.startDate} — {trip.endDate}</AppText>
-      </View>
+      </View>}
     </View>
 
   </View>;
@@ -52,6 +52,7 @@ export function TripCover({ trip }: { trip: Trip }) {
 
 const styles = StyleSheet.create({
   frame: { width: "100%", aspectRatio: 16 / 9, overflow: "hidden", borderRadius: radius.sm },
+  compactFrame: { width: 76, height: 64, aspectRatio: undefined, flexShrink: 0 },
   art: { width: "100%", height: "100%", aspectRatio: undefined },
   label: {
     position: "absolute", bottom: 0, left: 0, right: 0,

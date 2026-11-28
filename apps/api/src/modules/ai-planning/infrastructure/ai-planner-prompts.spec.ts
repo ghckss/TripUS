@@ -1,15 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { TravelTheme, type AiPlannerInput } from '../domain/ai-planner.port';
+import type { AiPlannerInput } from '../domain/ai-planner.port';
 import { AI_PLANNER_REVIEW_SYSTEM_PROMPT, buildPlannerSystemPrompt, buildPlannerUserInput, requestedDailyTimeWindow } from './ai-planner-prompts';
 
 const input: AiPlannerInput = {
-  preferences: {
-    themes: [TravelTheme.Food, TravelTheme.Cafes],
-    companions: '부모님과 3명',
-    transportModes: ['public_transit', 'walking'],
-    budgetLevel: 'premium',
-    additionalRequests: '몽생미셸 투어를 포함하고 루브르는 오전에 방문',
-  },
+  additionalRequests: '몽생미셸 투어를 포함하고 루브르는 오전에 방문',
   trip: {
     title: '유럽 여행', destination: '프랑스', regions: [{ name: '파리', address: null, latitude: 48.85, longitude: 2.35 }],
     timezone: 'Europe/Paris', startDate: '2026-12-01', endDate: '2026-12-07',
@@ -25,7 +19,7 @@ describe('travel brief and selected preferences', () => {
   it('sends duration, destination, lodging, boundaries and complete saved-place details', () => {
     expect(buildPlannerUserInput(input)).toEqual({
       trip: { ...input.trip, startPoint: undefined, endPoint: undefined, lodgings: undefined, nights: 6, days: 7, startTimeMeaning: 'ready_to_travel', endTimeMeaning: 'arrival_at_end_point' },
-      preferences: input.preferences,
+      additionalRequests: input.additionalRequests,
       lodgings: input.trip.lodgings, startPoint: input.trip.startPoint, endPoint: input.trip.endPoint,
       places: input.places, itineraryDates: ['2026-12-03'], dayLodgings: input.days,
     });
@@ -35,19 +29,16 @@ describe('travel brief and selected preferences', () => {
     expect(buildPlannerUserInput({ ...input, trip: { ...input.trip, startDate, endDate } }).trip).toMatchObject({ nights, days });
   });
 
-  it('passes all current preferences without a density or sightseeing count target', () => {
-    const themes = Object.values(TravelTheme);
-    expect(buildPlannerUserInput({ ...input, preferences: { ...input.preferences, themes } }).preferences).toEqual({ ...input.preferences, themes });
+  it('passes only additional requests as user personalization', () => {
+    expect(buildPlannerUserInput(input).additionalRequests).toBe(input.additionalRequests);
     const prompt = buildPlannerSystemPrompt();
-    expect(prompt).toContain('preferences.companions');
-    expect(prompt).toContain('preferences.transportModes');
-    expect(prompt).toContain('preferences.budgetLevel');
-    expect(prompt).toContain('preferences.additionalRequests');
+    expect(prompt).not.toMatch(/preferences|themes|companions|transportModes|budgetLevel/);
+    expect(prompt).toContain('additionalRequests');
     expect(prompt).toContain('투어 약칭이나 여러 장소를 뜻하는 표현은 웹 검색');
     expect(prompt).toContain('공휴일 대체 휴관');
     expect(AI_PLANNER_REVIEW_SYSTEM_PROMPT).toContain('해당 여행 연도·월의 공식 달력');
     expect(AI_PLANNER_REVIEW_SYSTEM_PROMPT).toContain('최대 도보 시간');
-    expect(AI_PLANNER_REVIEW_SYSTEM_PROMPT).toContain('preferences.budgetLevel');
+    expect(AI_PLANNER_REVIEW_SYSTEM_PROMPT).not.toMatch(/preferences|themes|companions|transportModes|budgetLevel/);
   });
 
   it.each([
@@ -56,7 +47,7 @@ describe('travel brief and selected preferences', () => {
     ['10:30시~16:45시 일정', { startTime: '10:30', endTime: '16:45' }],
   ])('structures an explicit user time range: %s', (additionalRequests, expected) => {
     expect(requestedDailyTimeWindow(additionalRequests)).toEqual(expected);
-    expect(buildPlannerUserInput({ ...input, preferences: { ...input.preferences, additionalRequests } }).preferences)
+    expect(buildPlannerUserInput({ ...input, additionalRequests }))
       .toMatchObject({ additionalRequests, dailyTimeWindow: expected });
   });
 
@@ -72,7 +63,7 @@ describe('travel brief and selected preferences', () => {
     expect(prompt).not.toContain('arrival(입국 심사 및 수하물 수령) →');
     expect(prompt).toContain('장소의 특징·볼거리·매력');
     expect(prompt).toContain('편의점 도시락 픽업');
-    expect(prompt).toContain('preferences.dailyTimeWindow');
+    expect(prompt).toContain('dailyTimeWindow');
     expect(AI_PLANNER_REVIEW_SYSTEM_PROMPT).toContain('모든 visit의 시작과 종료가 범위 안인지');
     expect(AI_PLANNER_REVIEW_SYSTEM_PROMPT).toContain('실제 업장·시설 고유명칭');
   });
@@ -106,10 +97,9 @@ describe('travel brief and selected preferences', () => {
   });
 
   it('handles missing places and boundaries without adding legacy rules or context', () => {
-    const payload = buildPlannerUserInput({ ...input, trip: { ...input.trip, lodgings: [], startPoint: null, endPoint: null }, places: [], density: 'busy', preferences: { ...input.preferences, density: 'busy', dailySightseeingTarget: { min: 5, max: 7 } }, travelerContext: { additionalRequests: 'legacy' } } as AiPlannerInput);
+    const payload = buildPlannerUserInput({ ...input, trip: { ...input.trip, lodgings: [], startPoint: null, endPoint: null }, places: [], density: 'busy', travelerContext: { additionalRequests: 'legacy' } } as AiPlannerInput);
     expect(payload).toMatchObject({ lodgings: [], places: [], startPoint: null, endPoint: null });
-    expect(Object.keys(payload)).toEqual(['trip', 'preferences', 'lodgings', 'startPoint', 'endPoint', 'places', 'itineraryDates', 'dayLodgings']);
-    expect(payload.preferences).toMatchObject(input.preferences);
+    expect(Object.keys(payload)).toEqual(['trip', 'additionalRequests', 'lodgings', 'startPoint', 'endPoint', 'places', 'itineraryDates', 'dayLodgings']);
     expect(JSON.stringify(payload)).not.toMatch(/legacy|travelerContext|review|density|dailySightseeingTarget/);
     expect(buildPlannerSystemPrompt()).toContain('웹 검색은');
     expect(buildPlannerSystemPrompt()).toContain('확인 가능한 대안으로 바꾸어 시간표를 이어서 완성');

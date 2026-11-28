@@ -1,14 +1,5 @@
 export const AI_PLANNER_PORT = Symbol('AI_PLANNER_PORT');
 
-export enum TravelTheme {
-  Cafes = 'cafes',
-  Culture = 'culture',
-  Food = 'food',
-  Highlights = 'highlights',
-  Nature = 'nature',
-  Shopping = 'shopping',
-}
-
 export interface AiPlannerPlace {
   id: string;
   name: string;
@@ -40,13 +31,7 @@ export interface AiPlannerDay {
 }
 
 export interface AiPlannerInput {
-  preferences: {
-    themes: TravelTheme[];
-    companions: string | null;
-    transportModes: Array<'public_transit' | 'walking' | 'car'>;
-    budgetLevel: 'budget' | 'standard' | 'premium';
-    additionalRequests: string | null;
-  };
+  additionalRequests: string | null;
   trip: {
     title: string;
     destination: string;

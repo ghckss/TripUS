@@ -30,7 +30,7 @@ export default function TripsScreen() {
       </Card>
     </Pressable>)}
     <View style={styles.historyHeading}><AppText variant="label">다녀온 여행</AppText><Pressable accessibilityRole="button" accessibilityLabel="지난 여행 모두 보기" onPress={() => router.push("/(tabs)/completed")} style={styles.profile}><AppText variant="caption" color={colors.primary}>모두 보기 ›</AppText></Pressable></View>
-    {completed.slice(0, 3).map((trip) => <Pressable key={trip.id} accessibilityRole="button" accessibilityLabel={`${trip.title} 여행 기록 열기`} onPress={() => router.push(`/trips/${trip.id}/summary`)} style={styles.historyRow}><FieldIllustration kind="park" /><View style={styles.historyText}><AppText variant="label">{trip.title}</AppText><AppText variant="micro" color={colors.muted}>{trip.startDate} — {trip.endDate}</AppText></View><AppText color={colors.muted}>›</AppText></Pressable>)}
+    {completed.slice(0, 3).map((trip) => <Pressable key={trip.id} accessibilityRole="button" accessibilityLabel={`${trip.title} 여행 기록 열기`} onPress={() => router.push(`/trips/${trip.id}/summary`)} style={styles.historyRow}><TripCover trip={trip} compact /><View style={styles.historyText}><AppText variant="label">{trip.title}</AppText><AppText variant="micro" color={colors.muted}>{trip.startDate} — {trip.endDate}</AppText></View><AppText color={colors.muted}>›</AppText></Pressable>)}
     {historyError && <Button label="지난 여행 다시 불러오기" variant="ghost" onPress={() => void reloadHistory()} />}
     {historyLoading && <AppText variant="caption" color={colors.muted}>지난 여행을 불러오는 중이에요…</AppText>}
     {!historyLoading && !historyError && completed.length === 0 && <AppText variant="caption" color={colors.muted}>다녀온 여행의 기억은 여기에 차곡차곡 쌓여요.</AppText>}

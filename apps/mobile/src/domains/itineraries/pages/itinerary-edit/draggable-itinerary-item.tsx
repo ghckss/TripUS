@@ -37,6 +37,8 @@ export function DraggableItineraryItem({
   scheduledTime,
   timePrefix = "도착",
 }: Props) {
+  const movableCount = Math.max(1, maxIndex - minIndex + 1);
+  const movablePosition = Math.min(movableCount, Math.max(1, index - minIndex + 1));
   const accessibilityActions = [
     ...(index > minIndex ? [{ name: "decrement" as const, label: "앞 순서로 이동" }] : []),
     ...(index < maxIndex ? [{ name: "increment" as const, label: "뒤 순서로 이동" }] : []),
@@ -51,7 +53,7 @@ export function DraggableItineraryItem({
             accessibilityHint="누른 채 위아래로 끌어 순서를 변경합니다"
             accessibilityLabel={`${placeName} 순서 이동`}
             accessibilityRole="adjustable"
-            accessibilityValue={{ min: minIndex + 1, max: maxIndex + 1, now: index + 1 }}
+            accessibilityValue={{ text: `${movablePosition}번째, 총 ${movableCount}곳` }}
             onAccessibilityAction={(event) => {
               if (event.nativeEvent.actionName === "decrement") onReorder(index - 1);
               if (event.nativeEvent.actionName === "increment") onReorder(index + 1);

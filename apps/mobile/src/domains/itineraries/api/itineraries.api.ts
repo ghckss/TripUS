@@ -8,10 +8,7 @@ import { trackEvent } from "@/shared/telemetry/telemetry";
 export type Itinerary = components["schemas"]["ItineraryResponseDto"];
 export type ItineraryActivity = components["schemas"]["ItineraryActivityDto"];
 export type ItineraryItem = components["schemas"]["ItineraryItemResponseDto"];
-export type TravelTheme = components["schemas"]["TravelTheme"];
 export type AiPlanRequest = components["schemas"]["GenerateAiPlanDto"];
-export type AiTransportMode = components["schemas"]["AiTransportMode"];
-export type AiBudgetLevel = components["schemas"]["AiBudgetLevel"];
 export type ReplaceItineraryItem = components["schemas"]["ReplaceItineraryItemDto"];
 type AiPlanExecutionStatus = components["schemas"]["AiPlanExecutionStatusResponseDto"];
 
@@ -111,7 +108,7 @@ export async function generateAiPlan(tripId: string, request: AiPlanRequest): Pr
   });
   if (error) throw new Error(apiErrorMessage(error));
   if (account !== getAccountScope()) throw new Error("Session changed during request");
-  setResource(`trips:${tripId}:ai-request`, request);
+  setResource(cacheKeys.aiRequest(tripId), request);
   trackEvent("ai_plan.accepted", { tripId, generationId: data.generationId });
   return waitForGeneration(tripId, data.generationId, previous);
 }
@@ -129,13 +126,15 @@ export async function generateAiPlanDay(tripId: string, date: string): Promise<I
 }
 
 export const getLatestAiPlanRequest = defineQuery((tripId: string) => ({
-  key: `trips:${tripId}:ai-request`, staleTime: 300000,
+  key: cacheKeys.aiRequest(tripId), staleTime: 300000,
   request: async (): Promise<AiPlanRequest | null> => {
-    const { data, error } = await tripUsApi.GET("/v1/trips/{tripId}/ai-plans/latest-request", {
-      params: { path: { tripId } },
+    return cachedRequest(cacheKeys.aiRequest(tripId), async () => {
+      const { data, error } = await tripUsApi.GET("/v1/trips/{tripId}/ai-plans/latest-request", {
+        params: { path: { tripId } },
+      });
+      if (error) throw new Error(apiErrorMessage(error));
+      return data.request ?? null;
     });
-    if (error) throw new Error(apiErrorMessage(error));
-    return data.request ?? null;
   },
 }));
 

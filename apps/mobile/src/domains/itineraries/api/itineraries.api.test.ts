@@ -12,6 +12,7 @@ jest.mock("@/shared/offline/cache", () => ({
     itinerary: (tripId: string) => `itinerary:${tripId}`,
     places: (tripId: string) => `places:${tripId}`,
     aiUndo: (tripId: string) => `undo:${tripId}`,
+    aiRequest: (tripId: string) => `request:${tripId}`,
   },
   cachedRequest: (_key: string, request: () => Promise<unknown>) => request(),
   deleteCache: jest.fn(),
@@ -32,7 +33,7 @@ describe("generateAiPlan", () => {
       ? { generationId: "limit-job", status: "unavailable", failureReason: "output_limit" }
       : { items: [], unplaced: [] } }));
     mockPost.mockResolvedValue({ data: { generationId: "limit-job", status: "running" } });
-    await expect(generateAiPlan("trip-1", { themes: ["highlights"] } as AiPlanRequest))
+    await expect(generateAiPlan("trip-1", {} as AiPlanRequest))
       .rejects.toThrow("AI 응답 분량 제한으로 생성이 중단됐어요");
     expect(mockWriteCache).not.toHaveBeenCalled();
   });
@@ -42,7 +43,7 @@ describe("generateAiPlan", () => {
       ? { generationId: "timeout-job", status: "unavailable", failureReason: "timeout" }
       : { items: [], unplaced: [] } }));
     mockPost.mockResolvedValue({ data: { generationId: "timeout-job", status: "running" } });
-    await expect(generateAiPlan("trip-1", { themes: ["highlights"] } as AiPlanRequest))
+    await expect(generateAiPlan("trip-1", {} as AiPlanRequest))
       .rejects.toThrow("AI 응답 대기 시간을 초과했어요");
     expect(mockWriteCache).not.toHaveBeenCalled();
   });
@@ -52,7 +53,7 @@ describe("generateAiPlan", () => {
       ? { generationId: "plan-limit-job", status: "unavailable", failureReason: "AI_GENERATION_LIMIT_REACHED" }
       : { items: [], unplaced: [] } }));
     mockPost.mockResolvedValue({ data: { generationId: "plan-limit-job", status: "running" } });
-    await expect(generateAiPlan("trip-1", { themes: ["highlights"] } as AiPlanRequest))
+    await expect(generateAiPlan("trip-1", {} as AiPlanRequest))
       .rejects.toThrow("무료 AI 일정 생성 횟수를 모두 사용했어요");
     expect(mockWriteCache).not.toHaveBeenCalled();
   });
@@ -87,10 +88,7 @@ describe("generateAiPlan", () => {
     });
     mockPost.mockResolvedValue({ data: { generationId: "new-generation", status: "running" } });
 
-    const result = await generateAiPlan("trip-1", {
-      themes: ["highlights"],
-      transportModes: ["public_transit"],
-    } as AiPlanRequest);
+    const result = await generateAiPlan("trip-1", {} as AiPlanRequest);
 
     expect(result).toEqual(generated);
     expect(mockWriteCache).toHaveBeenCalledWith("itinerary:trip-1", generated);

@@ -20,7 +20,7 @@
       "package": "com.tripus.app",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#F7F4ED",
+        "backgroundColor": "#CB6745",
         "foregroundImage": "./assets/images/android-icon-transparent.png",
         "backgroundImage": "./assets/branding/tripus-app-icon-t-filled-1024.png"
       },

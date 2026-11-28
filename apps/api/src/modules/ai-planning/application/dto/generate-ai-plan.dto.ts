@@ -1,47 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMinSize, ArrayUnique, IsArray, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { ItineraryResponseDto } from '../../../itineraries/application/dto/itinerary.dto';
-import { TravelTheme } from '../../domain/ai-planner.port';
-
-export enum AiTransportMode {
-  PublicTransit = 'public_transit',
-  Walking = 'walking',
-  Car = 'car',
-}
-
-export enum AiBudgetLevel {
-  Budget = 'budget',
-  Standard = 'standard',
-  Premium = 'premium',
-}
 
 export class GenerateAiPlanDto {
-  @ApiProperty({ enum: TravelTheme, enumName: 'TravelTheme', isArray: true })
-  @IsArray()
-  @ArrayMinSize(1)
-  @ArrayUnique()
-  @IsEnum(TravelTheme, { each: true })
-  themes!: TravelTheme[];
-
-  @ApiPropertyOptional({ type: String, maxLength: 120, example: '친구 2명' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  companions?: string;
-
-  @ApiProperty({ enum: AiTransportMode, enumName: 'AiTransportMode', isArray: true })
-  @IsArray()
-  @ArrayMinSize(1)
-  @ArrayUnique()
-  @IsEnum(AiTransportMode, { each: true })
-  transportModes!: AiTransportMode[];
-
-  @ApiPropertyOptional({ enum: AiBudgetLevel, enumName: 'AiBudgetLevel' })
-  @IsOptional()
-  @IsEnum(AiBudgetLevel)
-  budgetLevel?: AiBudgetLevel;
-
   @ApiPropertyOptional({ type: String, maxLength: 1000, example: '현지 맛집을 좋아하고 긴 대기와 이른 아침 일정은 피하고 싶어요.' })
   @IsOptional()
   @IsString()
@@ -58,9 +20,6 @@ export enum AiPlanGenerationStatus {
 export class GenerateAiPlanResponseDto {
   @ApiProperty({ enum: AiPlanGenerationStatus, enumName: 'AiPlanGenerationStatus' })
   status!: AiPlanGenerationStatus;
-
-  @ApiProperty({ enum: TravelTheme, enumName: 'TravelTheme', isArray: true })
-  themes!: TravelTheme[];
 
   @ApiProperty({ type: String, isArray: true })
   conflicts!: string[];

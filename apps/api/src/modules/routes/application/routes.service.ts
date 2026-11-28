@@ -48,11 +48,8 @@ export class RoutesService {
     }
 
     try {
-      const configuredModes = trip.latestAiPlanRequest?.transportModes ?? [];
-      const fallbackTravelModes = preferredFallbackModes(configuredModes);
-      const maxFallbackWalkingMinutes = fallbackTravelModes.includes('walking')
-        ? requestedWalkingLimitMinutes(trip.latestAiPlanRequest?.additionalRequests)
-        : undefined;
+      const fallbackTravelModes: Array<Exclude<RouteTravelMode, 'public_transit'>> = [];
+      const maxFallbackWalkingMinutes = undefined;
       const estimate = await this.routes.transit({
         originGooglePlaceId,
         destinationGooglePlaceId,
@@ -89,14 +86,6 @@ export class RoutesService {
       reason, travelMode: null, isFallback: false,
     };
   }
-}
-
-function preferredFallbackModes(configuredModes: string[]): Array<Exclude<RouteTravelMode, 'public_transit'>> {
-  const selected = new Set(configuredModes);
-  const result: Array<'walking' | 'car'> = [];
-  if (selected.has('walking')) result.push('walking');
-  if (selected.has('car')) result.push('car');
-  return result;
 }
 
 export function requestedWalkingLimitMinutes(additionalRequests?: string): number | undefined {

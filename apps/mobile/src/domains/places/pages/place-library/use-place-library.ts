@@ -16,6 +16,7 @@ export function allPlaceIds(places: Pick<SavedPlace, "id">[]): Set<string> {
 }
 
 export type PlaceTag = SavedPlace["tag"];
+type Feedback = { message: string; tone: "success" | "danger" };
 
 export async function updatePlaceTags(tripId: string, placeIds: string[], tag: PlaceTag): Promise<void> {
   // Each update writes the complete list snapshot to the offline cache. Keep those
@@ -28,7 +29,7 @@ export function usePlaceLibrary(tripId: string) {
   const places = useMemo(() => filterTravelPlaces(query.data ?? []), [query.data]);
   const loading = query.loading;
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string>();
+  const [feedback, setFeedback] = useState<Feedback>();
   const [selection, setSelectedIds] = useState<Set<string>>(() => new Set());
 
   const reload = query.refetch;
@@ -46,15 +47,15 @@ export function usePlaceLibrary(tripId: string) {
 
   const removePlaces = useCallback(async (placeIds: string[]) => {
     if (placeIds.length === 0) return false;
-    setSaving(true); setMessage(undefined);
+    setSaving(true); setFeedback(undefined);
     try {
       await deletePlaces(tripId, placeIds);
 
       setSelectedIds(new Set());
-      setMessage(`${placeIds.length}개의 장소를 삭제했어요.`);
+      setFeedback({ message: `${placeIds.length}개의 장소를 삭제했어요.`, tone: "success" });
       return true;
     } catch (caught) {
-      setMessage(safeErrorMessage(caught, "장소를 삭제하지 못했어요."));
+      setFeedback({ message: safeErrorMessage(caught, "장소를 삭제하지 못했어요."), tone: "danger" });
       return false;
     } finally {
       setSaving(false);
@@ -63,14 +64,14 @@ export function usePlaceLibrary(tripId: string) {
 
   const updatePlacesTag = useCallback(async (placeIds: string[], tag: PlaceTag) => {
     if (placeIds.length === 0) return false;
-    setSaving(true); setMessage(undefined);
+    setSaving(true); setFeedback(undefined);
     try {
       await updatePlaceTags(tripId, placeIds, tag);
       setSelectedIds(new Set());
-      setMessage(`${placeIds.length}개 장소의 태그를 변경했어요.`);
+      setFeedback({ message: `${placeIds.length}개 장소의 태그를 변경했어요.`, tone: "success" });
       return true;
     } catch (caught) {
-      setMessage(safeErrorMessage(caught, "장소 태그를 변경하지 못했어요."));
+      setFeedback({ message: safeErrorMessage(caught, "장소 태그를 변경하지 못했어요."), tone: "danger" });
       return false;
     } finally {
       setSaving(false);
@@ -81,7 +82,8 @@ export function usePlaceLibrary(tripId: string) {
     clearSelection,
     places,
     loading,
-    message: message ?? (query.error ? safeErrorMessage(query.error, "장소를 불러오지 못했어요.") : undefined),
+    message: feedback?.message ?? (query.error ? safeErrorMessage(query.error, "장소를 불러오지 못했어요.") : undefined),
+    messageTone: feedback?.tone ?? (query.error ? "danger" : undefined),
     reload,
     removePlaces,
     saving,

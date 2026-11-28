@@ -563,18 +563,7 @@ export interface components {
             optimizedUrl?: string | null;
             thumbnailUrl?: string | null;
         };
-        /** @enum {string} */
-        TravelTheme: "cafes" | "culture" | "food" | "highlights" | "nature" | "shopping";
-        /** @enum {string} */
-        AiTransportMode: "public_transit" | "walking" | "car";
-        /** @enum {string} */
-        AiBudgetLevel: "budget" | "standard" | "premium";
         GenerateAiPlanDto: {
-            themes: components["schemas"]["TravelTheme"][];
-            /** @example 친구 2명 */
-            companions?: string;
-            transportModes: components["schemas"]["AiTransportMode"][];
-            budgetLevel?: components["schemas"]["AiBudgetLevel"];
             /** @example 현지 맛집을 좋아하고 긴 대기와 이른 아침 일정은 피하고 싶어요. */
             additionalRequests?: string;
         };

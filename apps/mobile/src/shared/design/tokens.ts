@@ -3,7 +3,11 @@ export const colors = {
   canvas: "#F7F4ED", surface: "#FFFCF6", ink: "#282C29", muted: "#6B706A",
   line: "#DCDDD2", primary: "#AD412D", primaryPressed: "#913624",
   primarySoft: "#EEDDD2", secondary: "#4B6556", secondarySoft: "#E5E9DF",
-  success: "#4B6556", warning: "#98621E", danger: "#AD412D", white: "#FFFFFF",
+  success: "#3F6B50", successSoft: "#DEE9E1",
+  warning: "#98621E", warningSoft: "#F7E9D2",
+  danger: "#B33F32", dangerSoft: "#F4DEDA",
+  disabledSurface: "#E7E4DC", disabledText: "#96978F", disabledBorder: "#D2D0C8",
+  white: "#FFFFFF",
 } as const;
 export const spacing = { xs: 4, sm: 8, compact: 12, md: 16, lg: 24, xl: 32, xxl: 48 } as const;
 export const radius = { sm: 10, md: 14, lg: 14, pill: 999 } as const;

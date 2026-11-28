@@ -14,6 +14,8 @@ describe("TripCover", () => {
     mockCover.mockResolvedValue({ imageUrl: "https://example.com/paris.jpg", googleMapsUri: "https://maps.google.com/paris", authorNames: ["Photographer"] });
     const screen = await render(<TripCover trip={trip} />);
     const photo = await screen.findByTestId("trip-cover-photo-a");
+    expect(photo).toHaveProp("cachePolicy", "memory");
+    expect(photo).toHaveProp("source", [{ uri: "https://example.com/paris.jpg" }]);
     await fireEvent(photo, "load", { nativeEvent: {} });
     expect(screen.queryByText("Google Maps · Photographer ↗")).toBeNull();
     expect(screen.getByText("파리")).toBeOnTheScreen();
@@ -35,5 +37,12 @@ describe("TripCover", () => {
   it("assigns stable illustration and color combinations by trip identity", () => {
     expect(tripCoverVariant("a")).toEqual(tripCoverVariant("a"));
     expect(tripCoverVariant("a")).not.toEqual(tripCoverVariant("b"));
+  });
+
+  it("uses a compact image-only cover in completed trip rows", async () => {
+    mockCover.mockResolvedValue({ imageUrl: null, googleMapsUri: null, authorNames: [] });
+    const screen = await render(<TripCover trip={trip} compact />);
+    expect(screen.getByTestId("trip-cover-a")).toBeOnTheScreen();
+    expect(screen.queryByText("파리")).toBeNull();
   });
 });

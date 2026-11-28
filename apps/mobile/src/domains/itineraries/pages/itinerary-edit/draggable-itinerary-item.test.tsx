@@ -99,6 +99,25 @@ describe("DraggableItineraryItem", () => {
     expect(screen.getByTestId("itinerary-drag-area-감천문화마을")).toBeOnTheScreen();
   });
 
+  it("announces its ordinal position instead of a percentage", async () => {
+    const screen = await render(
+      <DraggableItineraryItem
+        index={2}
+        itemCount={5}
+        minIndex={1}
+        maxIndex={3}
+        onPress={jest.fn()}
+        onRemove={jest.fn()}
+        onReorder={jest.fn()}
+        placeName="감천문화마을"
+      />,
+    );
+
+    expect(screen.getByLabelText("감천문화마을 순서 이동").props.accessibilityValue).toEqual({
+      text: "2번째, 총 3곳",
+    });
+  });
+
   it("limits a long place name to two lines", async () => {
     const longName = "아주 길어서 여러 줄이 될 수 있는 여행 장소 이름";
     const screen = await render(

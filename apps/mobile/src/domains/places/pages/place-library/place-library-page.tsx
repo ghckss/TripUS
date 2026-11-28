@@ -19,7 +19,7 @@ import { useAppDialog } from "@/shared/ui/app-dialog";
 export default function PlacesScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const {
-    clearSelection, places, loading, saving, message, reload,
+    clearSelection, places, loading, saving, message, messageTone, reload,
     removePlaces, selectPlaces, selectedIds, toggleSelection, updatePlacesTag,
   } = usePlaceLibrary(tripId);
   const { showDialog } = useAppDialog();
@@ -79,7 +79,7 @@ export default function PlacesScreen() {
           </View>
           <Button label="전체 제거" variant="ghost" disabled={saving} onPress={confirmAllRemoval} />
         </Card>}
-        {message && <AppText color={colors.secondary}>{message}</AppText>}
+        {message && <AppText color={messageTone === "danger" ? colors.danger : colors.success}>{message}</AppText>}
         {loading && <Card><AppText color={colors.muted}>장소를 불러오는 중이에요…</AppText></Card>}
         {!loading && places.length === 0 && <Card><AppText variant="heading">아직 저장한 장소가 없어요</AppText><AppText color={colors.muted}>가고 싶은 장소를 먼저 저장해 보세요.</AppText></Card>}
         {filteredPlaces.map((place) => {
@@ -105,7 +105,7 @@ export default function PlacesScreen() {
             </Card>
           </Pressable>;
         })}
-        {message && <Button label="다시 불러오기" variant="ghost" onPress={() => void reload()} />}
+        {message && messageTone === "danger" && <Button label="다시 불러오기" variant="ghost" onPress={() => void reload()} />}
         {!loading && places.length > 0 && filteredPlaces.length === 0 && <AppText color={colors.muted}>검색 조건에 맞는 장소가 없어요.</AppText>}
         <AppText variant="micro" color={colors.muted}>장소를 선택해 관리하거나, 모아둔 곳으로 하루를 구성해 보세요.</AppText>
         <PlaceTagPicker

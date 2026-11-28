@@ -6,7 +6,7 @@ import { useMemo, useRef, useState } from "react";
 import { Platform, ScrollView, StyleSheet, View, useWindowDimensions, type ImageStyle, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp } from "react-native";
 import ViewShot, { type ViewShotRef } from "react-native-view-shot";
 
-import { safeErrorMessage, tripUsApiBaseUrl } from "@/shared/api/trip-us-api";
+import { safeErrorMessage } from "@/shared/api/trip-us-api";
 import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
@@ -15,17 +15,16 @@ import { Screen } from "@/shared/ui/screen";
 import { useAppDialog } from "@/shared/ui/app-dialog";
 import { buildRecapSlides, type RecapPhoto, type RecapSlide } from "./recap-model";
 import { useTripRecap } from "./use-trip-recap";
+import { tripPhotoImageSource } from "../../api/photos.api";
 
 const accents = [colors.primary, colors.secondary, colors.warning, colors.muted];
 
 function photoSource(photo: RecapPhoto, accessToken?: string) {
-  return photo.uri.startsWith(tripUsApiBaseUrl) && accessToken
-    ? { uri: photo.uri, headers: { Authorization: `Bearer ${accessToken}` } }
-    : { uri: photo.uri };
+  return tripPhotoImageSource(photo, photo.uri, accessToken);
 }
 
 function Photo({ photo, accessToken, style }: { photo: RecapPhoto; accessToken?: string; style: StyleProp<ImageStyle> }) {
-  return <Image source={photoSource(photo, accessToken)} style={style} contentFit="cover" transition={150} />;
+  return <Image source={photoSource(photo, accessToken)} cachePolicy="memory-disk" style={style} contentFit="cover" transition={150} />;
 }
 
 function CoverSlide({ slide, accessToken }: { slide: Extract<RecapSlide, { kind: "cover" }>; accessToken?: string }) {

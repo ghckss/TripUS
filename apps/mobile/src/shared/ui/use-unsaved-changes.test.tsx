@@ -16,6 +16,9 @@ it("keeps dirty changes until the user explicitly confirms leaving", async () =>
   expect(mockProtected).toBe(true); expect(repeat).not.toHaveBeenCalled();
   const actions = mockDialog.mock.calls[0][0].actions;
   expect(actions[0].label).toBe("계속 작성");
+  expect(actions[0].variant).toBe("success");
+  expect(actions[1].label).toBe("나가기");
+  expect(actions[1].variant).toBe("danger");
   await act(() => actions[1].onPress());
   expect(repeat).toHaveBeenCalledTimes(1); expect(mockProtected).toBe(false);
 });

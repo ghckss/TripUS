@@ -145,7 +145,7 @@ AI 일정 시작 화면은 여행 스타일 선택이다. 장소 보관함은 �
 - 서버 상태: TanStack Query v5의 계정별 공유 QueryClient와 도메인 API의 defineQuery/options 사용
 - 복잡한 일정 편집 초안이 여러 화면으로 확장될 때만 Zustand 도입
 - 인증 토큰: OS 보안 저장소 사용, 일반 AsyncStorage에 저장하지 않음
-- 오프라인: 계정별 SQLite 읽기 캐시를 Query 초기화 시 원래 updated_at으로 복원. AI 되돌리기 스냅샷은 별도로 유지
+- 오프라인: 계정별 SQLite 읽기 캐시를 Query 초기화 시 원래 updated_at으로 복원. 여행·일정·장소·최근 AI 요청과 사용자 사진 메타데이터를 보관하고, 사용자 사진 픽셀은 안정적인 사진 키를 사용하는 Expo Image 디스크 캐시로 복원. Google Places 대표 사진은 영속화하지 않고 메모리 캐시만 사용. AI 되돌리기 스냅샷은 별도로 유지
 
 캐시 정책과 조회·변경별 연결은 [모바일 공유 캐시](./mobile-query-cache.md)에 정리한다. 기본 staleTime은 1분, gcTime은 30분이며 자동 재시도는 끈다. 읽기 API는 같은 query options를 훅과 명령형 조회가 공유해 중복 요청을 합친다. AppState와 NetInfo를 focusManager·onlineManager에 연결한다. 편집 초안·토큰·업로드 바이트·텔레메트리는 Query에 넣지 않는다.
 

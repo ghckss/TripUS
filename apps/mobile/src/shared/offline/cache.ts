@@ -89,6 +89,8 @@ export const cacheKeys = {
   places: (tripId: string) => `trips:${tripId}:places`,
   itinerary: (tripId: string) => `trips:${tripId}:itinerary`,
   aiUndo: (tripId: string) => `trips:${tripId}:ai-undo`,
+  aiRequest: (tripId: string) => `trips:${tripId}:ai-request`,
+  photos: (tripId: string) => `trips:${tripId}:photos`,
 } as const;
 
 /** Restore only this account's durable resources, retaining their original freshness. */

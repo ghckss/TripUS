@@ -71,6 +71,31 @@ describe("ItineraryScreen day editing", () => {
     expect(mockSetPlacesForDate).toHaveBeenCalledWith("2026-11-08", ["place-1"], expect.any(Array));
   });
 
+  it("does not count lodging or fixed boundaries as selected travel places", async () => {
+    mockDates = ["2026-11-08", "2026-11-09"];
+    mockPlaces = [
+      { id: "lodging-1", name: "부산 호텔", address: "부산 해운대구", tag: "lodging", isPrimaryLodging: true },
+      { id: "place-1", name: "감천문화마을", address: "부산 사하구", tag: "attraction", isPrimaryLodging: false },
+    ];
+    mockItinerary = {
+      items: [
+        { id: "boundary-start", savedPlaceId: "trip-1", placeName: "부산역", date: "2026-11-08", position: 0, boundaryType: "start_point" },
+        { id: "place-item", savedPlaceId: "place-1", placeName: "감천문화마을", date: "2026-11-08", position: 1 },
+        { id: "lodging-item", savedPlaceId: "lodging-1", placeName: "부산 호텔", date: "2026-11-08", position: 2 },
+      ],
+      unplaced: [],
+    };
+    const screen = await renderItineraryScreen();
+
+    await fireEvent.press(screen.getByTestId("itinerary-add-places-2026-11-08"));
+
+    expect(screen.getByTestId("itinerary-place-picker-apply")).toHaveTextContent("1곳 선택 적용");
+    expect(screen.queryByTestId("itinerary-place-option-lodging-1")).not.toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByTestId("itinerary-place-picker-apply"));
+    expect(mockSetPlacesForDate).toHaveBeenCalledWith("2026-11-08", ["place-1"], expect.any(Array));
+  });
+
   it("hides the unplaced summary and still allows selecting an unplaced place", async () => {
     mockItinerary = {
       items: [{ id: "item-1", savedPlaceId: "place-1", placeName: "감천문화마을", date: "2026-11-09", position: 0 }],

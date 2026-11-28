@@ -9,7 +9,7 @@ import { colors, radius, spacing, fonts } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 import { KeyboardAvoidingContainer } from "@/shared/ui/keyboard-avoiding-container";
-import type { ItineraryItem } from "../../api/itineraries.api";
+import { isItineraryBoundary, type ItineraryItem } from "../../api/itineraries.api";
 import { isLodgingPlace } from "./itinerary-lodging-endpoints";
 
 type DayPlacePickerProps = {
@@ -25,7 +25,9 @@ type DayPlacePickerProps = {
 export function DayPlacePicker({ tripId, date, dayIndex, items, places, onApply, onClose }: DayPlacePickerProps) {
   const [selected, setSelected] = useState<Set<string>>(() => {
     const lodgingIds = new Set(places.filter(isLodgingPlace).map((place) => place.id));
-    return new Set(items.filter((item) => item.date === date && !lodgingIds.has(item.savedPlaceId)).map((item) => item.savedPlaceId));
+    return new Set(items
+      .filter((item) => item.date === date && !isItineraryBoundary(item) && !lodgingIds.has(item.savedPlaceId))
+      .map((item) => item.savedPlaceId));
   });
   const [tab, setTab] = useState<"unplaced" | "all">("unplaced");
   const [availablePlaces, setAvailablePlaces] = useState(places);
@@ -38,6 +40,8 @@ export function DayPlacePicker({ tripId, date, dayIndex, items, places, onApply,
 
   const placedIds = new Set(items.map((item) => item.savedPlaceId));
   const selectablePlaces = availablePlaces.filter((place) => !isLodgingPlace(place));
+  const selectablePlaceIds = new Set(selectablePlaces.map((place) => place.id));
+  const selectedPlaceIds = [...selected].filter((placeId) => selectablePlaceIds.has(placeId));
   const unplacedPlaces = selectablePlaces.filter((place) => !placedIds.has(place.id));
   const displayedPlaces = tab === "unplaced" ? unplacedPlaces : selectablePlaces;
   const toggle = (placeId: string) => {
@@ -140,7 +144,7 @@ export function DayPlacePicker({ tripId, date, dayIndex, items, places, onApply,
         })}
       </ScrollView>
       <View style={styles.footer}>
-        <Button label={`${selected.size}곳 선택 적용`} testID="itinerary-place-picker-apply" onPress={() => { onApply(date, [...selected], availablePlaces); onClose(); }} />
+        <Button label={`${selectedPlaceIds.length}곳 선택 적용`} testID="itinerary-place-picker-apply" onPress={() => { onApply(date, selectedPlaceIds, availablePlaces); onClose(); }} />
       </View>
     </SafeAreaView></KeyboardAvoidingContainer>
   </Modal>;

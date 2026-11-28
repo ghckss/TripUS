@@ -1,15 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { TravelTheme } from '../domain/ai-planner.port';
 import { MockAiPlannerAdapter } from './mock-ai-planner.adapter';
-
-const preferences = {
-  themes: [TravelTheme.Highlights],
-  companions: null,
-  transportModes: ['public_transit'] as const,
-  budgetLevel: 'standard' as const,
-  additionalRequests: null,
-};
 
 describe('MockAiPlannerAdapter', () => {
   it('creates a deterministic plan that distributes all saved places across the trip', async () => {
@@ -28,7 +19,7 @@ describe('MockAiPlannerAdapter', () => {
     }));
 
     const result = await planner.generate({
-      preferences: { ...preferences, transportModes: [...preferences.transportModes] },
+      additionalRequests: null,
       trip: {
         title: 'Seoul trip',
         destination: 'Seoul',
@@ -51,7 +42,7 @@ describe('MockAiPlannerAdapter', () => {
 
   it('only returns the requested day even when the trip spans multiple days', async () => {
     const input = {
-      preferences: { ...preferences, transportModes: [...preferences.transportModes] },
+      additionalRequests: null,
       trip: { title: 'Paris', destination: 'France', regions: [], timezone: 'Europe/Paris', startDate: '2026-12-01', endDate: '2026-12-07', lodgings: [], startPoint: null, endPoint: null },
       places: [], days: [{ date: '2026-12-03', startLodging: null, endLodging: null }],
     };
@@ -59,7 +50,7 @@ describe('MockAiPlannerAdapter', () => {
   });
   it('uses the requested day scope rather than expanding back to the full trip', async () => {
     const output = await new MockAiPlannerAdapter().generate({
-      preferences: { ...preferences, transportModes: [...preferences.transportModes] },
+      additionalRequests: null,
       trip: { title: 'Paris', destination: 'France', regions: [], timezone: 'Europe/Paris', startDate: '2026-12-01', endDate: '2026-12-07', lodgings: [], startPoint: null, endPoint: null },
       places: [{ id: 'place', name: 'Museum', address: null, latitude: null, longitude: null, tag: 'attraction', preference: 'must_visit', note: null }],
       days: [{ date: '2026-12-03', startLodging: null, endLodging: null }],

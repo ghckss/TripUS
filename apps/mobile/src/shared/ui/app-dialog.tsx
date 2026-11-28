@@ -5,7 +5,7 @@ import { colors, radius, spacing } from "@/shared/design/tokens";
 import { AppText } from "@/shared/ui/app-text";
 import { Button } from "@/shared/ui/button";
 
-type DialogButtonVariant = "primary" | "ghost" | "danger";
+type DialogButtonVariant = "primary" | "ghost" | "success" | "danger";
 
 export type AppDialogAction = {
   label: string;

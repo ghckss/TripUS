@@ -2,9 +2,17 @@ import { defineQuery, getAccountScope, setResource } from "@/shared/query/query-
 import type { components } from "@tripus/api-client";
 
 import { apiErrorMessage, authenticatedFetch, tripUsApi, tripUsApiBaseUrl } from "@/shared/api/trip-us-api";
+import { cachedRequest, cacheKeys, writeCache } from "@/shared/offline/cache";
 
 export type TripPhoto = components["schemas"]["PhotoResponseDto"];
 type UploadTarget = components["schemas"]["PhotoUploadTargetDto"];
+
+export function tripPhotoImageSource(photo: TripPhoto, uri: string, accessToken?: string) {
+  const variant = uri === photo.thumbnailUrl ? "thumbnail" : uri === photo.optimizedUrl ? "optimized" : "original";
+  return uri.startsWith(tripUsApiBaseUrl) && accessToken
+    ? { uri, headers: { Authorization: `Bearer ${accessToken}` }, cacheKey: `trip-photo:${photo.id}:${variant}` }
+    : { uri, cacheKey: `trip-photo:${photo.id}:${variant}` };
+}
 
 export async function createPhotoUpload(
   tripId: string,
@@ -29,9 +37,10 @@ export async function confirmPhoto(tripId: string, photoId: string, replacesPhot
   });
   if (error) throw new Error(apiErrorMessage(error));
   if (account !== getAccountScope()) throw new Error("Session changed during request");
-  setResource<TripPhoto[]>(`trips:${tripId}:photos`, (current) => current
+  const photos = setResource<TripPhoto[]>(cacheKeys.photos(tripId), (current) => current
     ? [...current.filter((photo) => photo.id !== data.id && photo.id !== replacesPhotoId), data]
     : undefined);
+  if (photos) await writeCache(cacheKeys.photos(tripId), photos);
   return data;
 }
 
@@ -40,14 +49,17 @@ export async function deletePhoto(tripId: string, photoId: string): Promise<void
     params: { path: { tripId, photoId } },
   });
   if (error) throw new Error(apiErrorMessage(error));
-  setResource<TripPhoto[]>(`trips:${tripId}:photos`, (current) => current?.filter((photo) => photo.id !== photoId));
+  const photos = setResource<TripPhoto[]>(cacheKeys.photos(tripId), (current) => current?.filter((photo) => photo.id !== photoId));
+  if (photos) await writeCache(cacheKeys.photos(tripId), photos);
 }
 
 export const listPhotos = defineQuery((tripId: string) => ({
-  key: `trips:${tripId}:photos`, staleTime: 60000,
+  key: cacheKeys.photos(tripId), staleTime: 60000,
   request: async (): Promise<TripPhoto[]> => {
-    const { data, error } = await tripUsApi.GET("/v1/trips/{tripId}/photos", { params: { path: { tripId } } });
-    if (error) throw new Error(apiErrorMessage(error));
-    return data.filter((photo) => photo.status === "ready");
+    return cachedRequest(cacheKeys.photos(tripId), async () => {
+      const { data, error } = await tripUsApi.GET("/v1/trips/{tripId}/photos", { params: { path: { tripId } } });
+      if (error) throw new Error(apiErrorMessage(error));
+      return data.filter((photo) => photo.status === "ready");
+    });
   },
 }));

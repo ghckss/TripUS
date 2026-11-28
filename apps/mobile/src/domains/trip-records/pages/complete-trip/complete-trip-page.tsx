@@ -13,7 +13,7 @@ import { TripNavigation } from "@/shared/ui/trip-navigation";
 import { Screen } from "@/shared/ui/screen";
 import { colors, radius, spacing, fonts } from "@/shared/design/tokens";
 import { isItineraryBoundary, type ItineraryItem } from "@/domains/itineraries";
-import { tripUsApiBaseUrl } from "@/shared/api/trip-us-api";
+import { tripPhotoImageSource } from "../../api/photos.api";
 import { useCompleteTrip } from "./use-complete-trip";
 
 type Review = { rating?: number; unvisited?: boolean; review?: string };
@@ -69,13 +69,13 @@ export default function CompleteTripScreen() {
     <Screen bottomSlot={<TripNavigation tripId={tripId} active="record" onNavigate={(navigate) => {
       if (Object.keys(reviews).length === 0) { navigate(); return; }
       showDialog({ title: "작성 중인 기록이 있어요", message: "이동하면 아직 저장하지 않은 별점과 메모가 사라져요.", actions: [
-        { label: "계속 작성", variant: "ghost" },
-        { label: "저장하지 않고 이동", variant: "ghost", onPress: () => { allowNavigation(); navigate(); } },
+        { label: "계속 작성", variant: "success" },
+        { label: "나가기", variant: "danger", onPress: () => { allowNavigation(); navigate(); } },
       ] });
     }} />}>
       <EditorialHeading eyebrow="KEEP A MOMENT" title={completed ? "여행의 기억을 다듬어요." : "어떤 순간이\n가장 오래 남았나요?"} /><AppText color={colors.muted}>{completed ? "완료한 여행도 사진, 별점과 후기를 언제든 다시 추가하거나 수정할 수 있어요." : "탭을 고르지 않아도 돼요. 방문 장소는 별점을 주고, 가지 못한 곳만 미방문으로 표시하세요."}</AppText>
       {error && <Card><AppText color={colors.danger}>{error}</AppText><Button label="다시 시도" variant="ghost" onPress={() => void retry()} /></Card>}
-      {message && <AppText color={colors.primary}>{message}</AppText>}
+      {message && <AppText color={colors.success}>{message}</AppText>}
       {!itinerary && !error && <Card><AppText color={colors.muted}>방문 장소를 불러오는 중이에요…</AppText></Card>}
       {placeGroups.map((group) => {
         const place = group[0];
@@ -83,16 +83,12 @@ export default function CompleteTripScreen() {
         const itemIds = new Set(group.map(({ id }) => id));
         const photo = photos.find((candidate) => candidate.itineraryItemId && itemIds.has(candidate.itineraryItemId));
         const photoUri = photo?.thumbnailUrl ?? photo?.optimizedUrl ?? photo?.originalUrl;
-        const photoSource = photoUri
-          ? photoUri.startsWith(tripUsApiBaseUrl) && accessToken
-            ? { uri: photoUri, headers: { Authorization: `Bearer ${accessToken}` } }
-            : { uri: photoUri }
-          : undefined;
+        const photoSource = photo && photoUri ? tripPhotoImageSource(photo, photoUri, accessToken) : undefined;
         const uploading = uploadingItemId ? itemIds.has(uploadingItemId) : false;
         return <Card key={place.savedPlaceId}>
           <View style={styles.row}><AppText variant="heading" style={styles.placeName}>{place.placeName}</AppText>{review?.unvisited && <View style={styles.unvisitedChip}><Pill label="미방문" selected /></View>}</View>
           {!review?.unvisited && <>
-            {photoSource && <Image source={photoSource} style={styles.placePhoto} contentFit="cover" accessibilityLabel={`${place.placeName} 대표 사진`} />}
+            {photoSource && <Image source={photoSource} cachePolicy="memory-disk" style={styles.placePhoto} contentFit="cover" accessibilityLabel={`${place.placeName} 대표 사진`} />}
             <View accessibilityRole="radiogroup" accessibilityLabel={`${place.placeName} 나의 별점`} style={styles.stars}>{[1, 2, 3, 4, 5].map((rating) => <Pressable key={rating} accessibilityRole="radio" accessibilityState={{ checked: review?.rating === rating }} style={styles.starTouch} accessibilityLabel={`${rating}점`} testID={`complete-rating-${place.id}-${rating}`} onPress={() => setRating(place.savedPlaceId, rating)}><AppText style={styles.starGlyph} color={(review?.rating ?? 0) >= rating ? colors.primary : colors.muted}>{(review?.rating ?? 0) >= rating ? "★" : "☆"}</AppText></Pressable>)}</View>
             <TextInput value={review?.review ?? ""} onChangeText={(value) => setReview(place.savedPlaceId, value)} multiline placeholder="이 장소의 기억을 남겨 보세요" placeholderTextColor={colors.muted} style={styles.input} />
             {photo ? <View style={styles.photoActions}>

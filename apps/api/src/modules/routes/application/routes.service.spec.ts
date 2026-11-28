@@ -7,7 +7,7 @@ vi.mock('../../../common/http/json-logger', () => ({ writeStructuredLog: vi.fn()
 function setup() {
   const trips = { findOneBy: vi.fn().mockResolvedValue({
     startPoint: { googlePlaceId: 'airport' }, endPoint: { googlePlaceId: 'end-airport' },
-    latestAiPlanRequest: { transportModes: ['public_transit', 'walking'] },
+    latestAiPlanRequest: { additionalRequests: '야경 포함' },
   }) };
   const places = { findBy: vi.fn().mockResolvedValue([{ id: 'hotel', googlePlaceId: 'google-hotel' }, { id: 'visit', googlePlaceId: 'google-visit' }]) };
   const transit = vi.fn().mockResolvedValue({
@@ -24,15 +24,15 @@ describe('route legs after itinerary edits', () => {
     expect(trips.findOneBy).toHaveBeenCalledWith({ id: 'trip', ownerId: 'user', active: true });
     expect(transit).toHaveBeenCalledWith({
       originGooglePlaceId: 'airport', destinationGooglePlaceId: 'google-hotel',
-      departureTime: '2026-12-01T11:00:00Z', fallbackTravelModes: ['walking'],
+      departureTime: '2026-12-01T11:00:00Z', fallbackTravelModes: [],
     });
   });
   it('supports final visit to end boundary and directional saved-place queries', async () => {
     const { service, transit } = setup();
     await service.transit('trip', { originSavedPlaceId: 'visit', destinationBoundaryType: ItineraryBoundaryType.EndPoint });
-    expect(transit).toHaveBeenLastCalledWith({ originGooglePlaceId: 'google-visit', destinationGooglePlaceId: 'end-airport', departureTime: undefined, fallbackTravelModes: ['walking'] });
+    expect(transit).toHaveBeenLastCalledWith({ originGooglePlaceId: 'google-visit', destinationGooglePlaceId: 'end-airport', departureTime: undefined, fallbackTravelModes: [] });
     await service.transit('trip', { originSavedPlaceId: 'hotel', destinationSavedPlaceId: 'visit' });
-    expect(transit).toHaveBeenLastCalledWith({ originGooglePlaceId: 'google-hotel', destinationGooglePlaceId: 'google-visit', departureTime: undefined, fallbackTravelModes: ['walking'] });
+    expect(transit).toHaveBeenLastCalledWith({ originGooglePlaceId: 'google-hotel', destinationGooglePlaceId: 'google-visit', departureTime: undefined, fallbackTravelModes: [] });
   });
   it('rejects missing/ambiguous endpoints and places outside the trip', async () => {
     const { service } = setup();
@@ -45,37 +45,12 @@ describe('route legs after itinerary edits', () => {
     transit.mockRejectedValue(new Error('network failed'));
     expect(await service.transit('trip', { originSavedPlaceId: 'hotel', destinationSavedPlaceId: 'visit' })).toMatchObject({ status: 'unavailable', durationMinutes: null });
   });
-  it('uses the trip transport preferences for truthful route fallbacks', async () => {
-    const { service, transit, trips } = setup();
-    trips.findOneBy.mockResolvedValue({
-      startPoint: { googlePlaceId: 'airport' }, endPoint: { googlePlaceId: 'end-airport' },
-      latestAiPlanRequest: { transportModes: ['public_transit', 'car'] },
-    });
-    transit.mockResolvedValue({ durationMinutes: 22, distanceMeters: 7100, travelMode: 'car', isFallback: true });
-    expect(await service.transit('trip', { originSavedPlaceId: 'hotel', destinationSavedPlaceId: 'visit' }))
-      .toMatchObject({ status: 'available', durationMinutes: 22, travelMode: 'car', isFallback: true });
-    expect(transit).toHaveBeenCalledWith(expect.objectContaining({ fallbackTravelModes: ['car'] }));
-  });
-  it('passes an explicit walking limit to the provider and never enables an unselected fallback', async () => {
-    const { service, transit, trips } = setup();
-    trips.findOneBy.mockResolvedValue({
-      startPoint: { googlePlaceId: 'airport' }, endPoint: { googlePlaceId: 'end-airport' },
-      latestAiPlanRequest: {
-        transportModes: ['public_transit', 'walking'],
-        additionalRequests: '75세 부모님과 함께라 도보는 10분 이내로 제한해 주세요.',
-      },
-    });
+  it('does not derive route fallback modes from a removed AI setting', async () => {
+    const { service, transit } = setup();
     await service.transit('trip', { originSavedPlaceId: 'hotel', destinationSavedPlaceId: 'visit' });
     expect(transit).toHaveBeenCalledWith(expect.objectContaining({
-      fallbackTravelModes: ['walking'], maxFallbackWalkingMinutes: 10,
+      fallbackTravelModes: [],
     }));
-
-    trips.findOneBy.mockResolvedValue({
-      startPoint: { googlePlaceId: 'airport' }, endPoint: { googlePlaceId: 'end-airport' },
-      latestAiPlanRequest: { transportModes: ['public_transit'] },
-    });
-    await service.transit('trip', { originSavedPlaceId: 'hotel', destinationSavedPlaceId: 'visit' });
-    expect(transit).toHaveBeenLastCalledWith(expect.objectContaining({ fallbackTravelModes: [] }));
   });
   it('returns zero only when both endpoints resolve to the same real place', async () => {
     const { service, transit } = setup();

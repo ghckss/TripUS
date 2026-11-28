@@ -97,7 +97,7 @@ export class OpenAiPlannerAdapter implements AiPlannerPort {
     let lastProgressLogAt = 0;
     let completedSearches = 0;
     try {
-      const timeWindow = requestedDailyTimeWindow(input.preferences.additionalRequests);
+      const timeWindow = requestedDailyTimeWindow(input.additionalRequests);
       const schema = createAiPlanSchema(
         input.places.map((place) => place.id),
         input.days.map((day) => day.date),

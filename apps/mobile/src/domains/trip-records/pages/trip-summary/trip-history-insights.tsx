@@ -139,11 +139,11 @@ export function TripHistoryInsights({ trip, items }: { trip: Trip; items: Itiner
         initialRegion={{ latitude: initial.latitude, longitude: initial.longitude, latitudeDelta: 0.12, longitudeDelta: 0.12 }}
         pitchEnabled={false}
         rotateEnabled={false}
-        scrollEnabled={false}
+        scrollEnabled
         style={styles.map}
         testID="trip-history-map"
         toolbarEnabled={false}
-        zoomEnabled={false}
+        zoomEnabled
       >
         {coordinates.map((item, index) => <Marker key={item.id} coordinate={item} title={`${index + 1}. ${item.placeName}`} />)}
         {routeDays.map((day) => day.length > 1 && <Polyline key={day.map((item) => item.id).join("-")} coordinates={day} strokeColor={colors.primary} strokeWidth={3} />)}

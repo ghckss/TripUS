@@ -6,5 +6,4 @@ export {
   replaceItinerary,
   type Itinerary,
   type ItineraryItem,
-  type TravelTheme,
 } from "./api/itineraries.api";

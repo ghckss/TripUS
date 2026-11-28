@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AiPlanningService, addLodgingEndpoints, isGenericActivityName, isInvalidAiPlaceholderPlace } from './ai-planning.service';
-import { AiPlannerError, TravelTheme, type AiPlannerInput, type AiPlannerOutput, type AiPlannerVisit } from '../domain/ai-planner.port';
-import { AiBudgetLevel, AiTransportMode } from './dto/generate-ai-plan.dto';
+import { AiPlannerError, type AiPlannerInput, type AiPlannerOutput, type AiPlannerVisit } from '../domain/ai-planner.port';
 import * as logs from '../../../common/http/json-logger';
 
 type StoredPlacement = { savedPlaceId: string; date: string; position: number; locked?: boolean; scheduledTime?: string; durationMinutes?: number };
@@ -12,9 +11,7 @@ const visit: AiPlannerVisit = {
 };
 const draft: AiPlannerOutput = { days: [{ date, visits: [visit] }] };
 const request = {
-  themes: [TravelTheme.Highlights], companions: '친구 2명',
-  transportModes: [AiTransportMode.PublicTransit, AiTransportMode.Walking],
-  budgetLevel: AiBudgetLevel.Premium, additionalRequests: '와인과 치즈, 노르망디 투어',
+  additionalRequests: '와인과 치즈, 노르망디 투어',
 };
 function place(id: string, note: string | null = null, lodging = false) {
   return { id, name: id, tripId: 'trip', tag: lodging ? 'lodging' : 'attraction', isPrimaryLodging: lodging, note, googlePlaceId: id, address: 'Paris', latitude: 48.85, longitude: 2.35 };
@@ -314,31 +311,23 @@ describe('AI-owned itinerary quality and diagnostics', () => {
   });
 });
 
-describe('travel preferences compatibility', () => {
-  it('ignores stored legacy density when restoring settings or updating a day', async () => {
-    const { service, generate } = setup({ ...request, density: 'busy' });
-    expect((await service.getLatestRequest('trip')).request).not.toHaveProperty('density');
+describe('additional request compatibility', () => {
+  it('restores only the saved additional request when updating a day', async () => {
+    const { service, generate } = setup({ ...request, density: 'busy', themes: ['food'] });
+    expect((await service.getLatestRequest('trip')).request).toEqual(request);
     await service.generateDay('trip', date);
-    expect(generate.mock.calls[0]?.[0].preferences).toEqual({
-      themes: request.themes, companions: request.companions, transportModes: request.transportModes,
-      budgetLevel: request.budgetLevel, additionalRequests: request.additionalRequests,
-    });
+    expect(generate.mock.calls[0]?.[0].additionalRequests).toBe(request.additionalRequests);
   });
-  it('does not retain a legacy density when a queued request is saved again', async () => {
+  it('does not retain retired fields when a request is saved again', async () => {
     const { service, saveTrip } = setup();
-    const legacyRequest = { ...request, density: 'relaxed' };
-    expect(await service.generate('trip', legacyRequest)).not.toHaveProperty('density');
+    const legacyRequest = { ...request, density: 'relaxed', companions: '친구 2명' };
+    await service.generate('trip', legacyRequest);
     expect(saveTrip.mock.calls[0]?.[0]).toMatchObject({ latestAiPlanRequest: request });
-    expect(saveTrip.mock.calls[0]?.[0]).not.toHaveProperty('latestAiPlanRequest.density');
   });
-  it.each([undefined, date])('passes every current preference to the model for scope %s', async (targetDate) => {
+  it.each([undefined, date])('passes the additional request to the model for scope %s', async (targetDate) => {
     const { service, generate } = setup();
-    const requested = { ...request, themes: [TravelTheme.Food, TravelTheme.Cafes, TravelTheme.Nature] };
-    await service.generate('trip', requested, targetDate);
-    expect(generate.mock.calls[0]?.[0].preferences).toEqual({
-      themes: requested.themes, companions: requested.companions, transportModes: requested.transportModes,
-      budgetLevel: requested.budgetLevel, additionalRequests: requested.additionalRequests,
-    });
+    await service.generate('trip', request, targetDate);
+    expect(generate.mock.calls[0]?.[0].additionalRequests).toBe(request.additionalRequests);
     expect(generate.mock.calls[0]?.[0].days.map((day) => day.date)).toEqual([date]);
   });
 });

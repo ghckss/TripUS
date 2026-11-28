@@ -124,8 +124,8 @@ export default function ItineraryScreen() {
       if (!hasChanges) { navigate(); return; }
       showDialog({ title: "저장하지 않은 일정이 있어요", message: "변경한 일정을 저장한 뒤 이동할 수 있어요.", actions: [
         { label: "계속 편집", variant: "ghost" },
-        { label: "저장하지 않고 이동", variant: "ghost", onPress: () => { allowNavigation(); navigate(); } },
-        { label: "저장하고 이동", onPress: () => void save().then((saved) => { if (saved) navigate(); }) },
+        { label: "나가기", variant: "danger", onPress: () => { allowNavigation(); navigate(); } },
+        { label: "저장 후 이동", variant: "success", onPress: () => void save().then((saved) => { if (saved) navigate(); }) },
       ] });
     }} />}
     ref={screenRef}

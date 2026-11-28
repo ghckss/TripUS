@@ -1594,70 +1594,15 @@
           "status"
         ]
       },
-      "TravelTheme": {
-        "type": "string",
-        "enum": [
-          "cafes",
-          "culture",
-          "food",
-          "highlights",
-          "nature",
-          "shopping"
-        ]
-      },
-      "AiTransportMode": {
-        "type": "string",
-        "enum": [
-          "public_transit",
-          "walking",
-          "car"
-        ]
-      },
-      "AiBudgetLevel": {
-        "type": "string",
-        "enum": [
-          "budget",
-          "standard",
-          "premium"
-        ]
-      },
       "GenerateAiPlanDto": {
         "type": "object",
         "properties": {
-          "themes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TravelTheme"
-            }
-          },
-          "companions": {
-            "type": "string",
-            "maxLength": 120,
-            "example": "친구 2명"
-          },
-          "transportModes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AiTransportMode"
-            }
-          },
-          "budgetLevel": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/AiBudgetLevel"
-              }
-            ]
-          },
           "additionalRequests": {
             "type": "string",
             "maxLength": 1000,
             "example": "현지 맛집을 좋아하고 긴 대기와 이른 아침 일정은 피하고 싶어요."
           }
-        },
-        "required": [
-          "themes",
-          "transportModes"
-        ]
+        }
       },
       "LatestAiPlanRequestResponseDto": {
         "type": "object",

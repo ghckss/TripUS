@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { TravelTheme, type AiPlannerInput } from '../domain/ai-planner.port';
+import type { AiPlannerInput } from '../domain/ai-planner.port';
 import { ConfigService } from '@nestjs/config';
 import { constrainAiPlanToTimeWindow, createAiPlanSchema, OpenAiPlannerAdapter } from './openai-ai-planner.adapter';
 
@@ -53,11 +53,7 @@ describe('day visit response schema', () => {
 });
 
 const plannerInput: AiPlannerInput = {
-  preferences: {
-    themes: [TravelTheme.Food, TravelTheme.Cafes], companions: '친구 2명',
-    transportModes: ['public_transit', 'walking'], budgetLevel: 'standard',
-    additionalRequests: '야경은 저녁에 보고 싶어요.',
-  },
+  additionalRequests: '야경은 저녁에 보고 싶어요.',
   trip: { title: 'Paris', destination: '프랑스', regions: [], timezone: 'Europe/Paris', startDate: '2026-12-01', endDate: '2026-12-07', startPoint: null, endPoint: null, lodgings: [] },
   places: [], days: [],
 };
@@ -88,10 +84,10 @@ describe('web-backed streaming generation', () => {
     });
     const { input: messages } = stream.mock.calls[0]?.[0] as { input: Array<{ role: string; content: string }> };
     const payload: unknown = JSON.parse(messages.find((message) => message.role === 'user')!.content);
-    expect(payload).toMatchObject({ preferences: plannerInput.preferences });
+    expect(payload).toMatchObject({ additionalRequests: plannerInput.additionalRequests });
     const { input: reviewMessages } = stream.mock.calls[1]?.[0] as { input: Array<{ role: string; content: string }> };
     const reviewPayload: unknown = JSON.parse(reviewMessages.find((message) => message.role === 'user')!.content);
-    expect(reviewPayload).toMatchObject({ request: { preferences: plannerInput.preferences }, draft: { days: [] } });
+    expect(reviewPayload).toMatchObject({ request: { additionalRequests: plannerInput.additionalRequests }, draft: { days: [] } });
     expect(reviewMessages.find((message) => message.role === 'system')?.content).toContain('여행 일정의 최종 검토자');
     expect(reviewMessages.find((message) => message.role === 'system')?.content).toContain('해당 여행 연도·월의 공식 달력');
     const { text } = stream.mock.calls[0]?.[0] as { text: { format: { schema: unknown } } };
